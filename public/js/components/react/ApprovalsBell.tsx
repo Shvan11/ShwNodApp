@@ -1,110 +1,47 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { httpErrorMessage } from '@/core/http';
-import { approvalsPendingQuery } from '@/query/queries';
-import { qk } from '@/query/keys';
+import { approvalsPendingQuery, HEADER_BELL_POLL } from '@/query/queries';
 import {
     approveRequest,
     rejectRequest,
     acknowledgeRequest,
     approveAllRequests,
     acknowledgeAllNotices,
-    notifyApprovalsChanged,
-    APPROVALS_CHANGED_EVENT,
-    REFRESH_MS,
+    invalidateApprovals,
+    invalidateApprovalTarget,
+    ACTION_LABEL_KEY,
     type ApprovalRow,
 } from '@/services/approvals';
+import HeaderPopover, { RelativeAge } from './HeaderPopover';
 import styles from './ApprovalsBell.module.css';
-
-const POPOVER_WIDTH = 390;
-
-const ACTION_LABELS: Record<string, string> = {
-    'work.update': 'Edit Treatment',
-    'work.discount': 'Discount',
-    'work.delete': 'Delete Treatment',
-    'invoice.delete': 'Delete Invoice',
-    'expense.update': 'Edit Expense',
-    'expense.delete': 'Delete Expense',
-    'patient.delete': 'Delete Patient',
-};
-
-function relAge(iso: string | null): string {
-    if (!iso) return '';
-    const diff = Date.now() - new Date(iso).getTime();
-    if (Number.isNaN(diff)) return '';
-    const day = 86_400_000;
-    if (diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))}m`;
-    if (diff < day) return `${Math.floor(diff / 3_600_000)}h`;
-    return `${Math.floor(diff / day)}d`;
-}
 
 /**
  * ApprovalsBell — admin-only header bell for the maker-checker queue. Shows
  * pending holds (need approve/reject) and pending notices (FYI, need acknowledge).
- * Freshness: mount + 5-min poll + visibilitychange + `approvals:changed` event.
+ * Freshness: `HEADER_BELL_POLL` + `invalidateApprovals()` from every write that
+ * creates or resolves a request.
  */
 const ApprovalsBell = () => {
+    const { t } = useTranslation('approvals');
     const navigate = useNavigate();
     const toast = useToast();
     const confirm = useConfirm();
-    const queryClient = useQueryClient();
 
     const [open, setOpen] = useState(false);
     const [rejectingId, setRejectingId] = useState<number | null>(null);
     const [rejectNote, setRejectNote] = useState('');
-    const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
 
-    const wrapRef = useRef<HTMLDivElement | null>(null);
-    const bellRef = useRef<HTMLButtonElement | null>(null);
-    const popRef = useRef<HTMLDivElement | null>(null);
+    const { data: items = [] } = useQuery({ ...approvalsPendingQuery(), ...HEADER_BELL_POLL });
 
-    const placePopover = useCallback(() => {
-        const r = bellRef.current?.getBoundingClientRect();
-        if (!r) return;
-        const left = Math.min(
-            Math.max(8, r.right - POPOVER_WIDTH),
-            window.innerWidth - POPOVER_WIDTH - 8,
-        );
-        setCoords({ top: r.bottom + 8, left: Math.max(8, left) });
-    }, []);
-
-    const { data, refetch } = useQuery({ ...approvalsPendingQuery(), refetchInterval: REFRESH_MS });
-    const items = (data ?? []) as ApprovalRow[];
-
-    useEffect(() => {
-        const onVisible = () => { if (document.visibilityState === 'visible') void refetch(); };
-        const onChanged = () => void refetch();
-        document.addEventListener('visibilitychange', onVisible);
-        window.addEventListener(APPROVALS_CHANGED_EVENT, onChanged);
-        return () => {
-            document.removeEventListener('visibilitychange', onVisible);
-            window.removeEventListener(APPROVALS_CHANGED_EVENT, onChanged);
-        };
-    }, [refetch]);
-
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e: MouseEvent) => {
-            const t = e.target as Node;
-            if (wrapRef.current?.contains(t) || popRef.current?.contains(t)) return;
-            setOpen(false); setRejectingId(null); setRejectNote('');
-        };
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') { setOpen(false); setRejectingId(null); setRejectNote(''); }
-        };
-        document.addEventListener('mousedown', onDown);
-        document.addEventListener('keydown', onKey);
-        window.addEventListener('resize', placePopover);
-        return () => {
-            document.removeEventListener('mousedown', onDown);
-            document.removeEventListener('keydown', onKey);
-            window.removeEventListener('resize', placePopover);
-        };
-    }, [open, placePopover]);
+    const setOpenAndReset = (next: boolean) => {
+        setOpen(next);
+        if (!next) { setRejectingId(null); setRejectNote(''); }
+    };
 
     const holds = items.filter((r) => r.kind === 'approval');
     const notices = items.filter((r) => r.kind === 'notice');
@@ -114,250 +51,263 @@ const ApprovalsBell = () => {
     const runAction = async (fn: () => Promise<unknown>, failMsg: string) => {
         try {
             await fn();
-            notifyApprovalsChanged();
-            await queryClient.invalidateQueries({ queryKey: qk.approvals.mine() });
         } catch (err) {
             toast.error(httpErrorMessage(err, failMsg));
+        } finally {
+            // Even a failed call may have resolved the row (a 409 "already
+            // processed"), so the list refreshes either way.
+            void invalidateApprovals();
         }
     };
 
+    // The server answers 200 for a hold it could NOT apply too — `stale` (the
+    // record changed after the request) or `failed` (it is gone, or replaying
+    // threw) — so the outcome is read off the row, not the status code (FE-F5-3).
     const handleApprove = (row: ApprovalRow) =>
-        runAction(() => approveRequest(row.request_id), 'Failed to approve');
+        runAction(async () => {
+            const result = await approveRequest(row.request_id);
+            if (result.status === 'approved') {
+                await invalidateApprovalTarget(row);
+                toast.success(t('bell.approved'));
+            } else if (result.status === 'stale') {
+                toast.warning(t('bell.stale'));
+            } else {
+                toast.error(result.review_note ? t('bell.failed', { reason: result.review_note }) : t('bell.failedUnknown'));
+            }
+        }, t('bell.approveFailed'));
 
     const handleReject = (row: ApprovalRow) => {
         const note = rejectNote;
         setRejectingId(null); setRejectNote('');
-        return runAction(() => rejectRequest(row.request_id, note || undefined), 'Failed to reject');
+        return runAction(() => rejectRequest(row.request_id, note || undefined), t('bell.rejectFailed'));
     };
 
     const handleAcknowledge = (row: ApprovalRow) =>
-        runAction(() => acknowledgeRequest(row.request_id), 'Failed to acknowledge');
+        runAction(() => acknowledgeRequest(row.request_id), t('bell.acknowledgeFailed'));
 
     const handleApproveAll = async () => {
-        const n = holds.length;
+        const pending = holds;
         const ok = await confirm(
-            `Approve all ${n} pending request${n === 1 ? '' : 's'}? Each change is applied immediately and cannot be undone.`,
-            { title: 'Approve all', confirmText: 'Approve all', danger: true },
+            t('bell.approveAllConfirm', { n: pending.length }),
+            { title: t('bell.approveAll'), confirmText: t('bell.approveAll'), danger: true },
         );
         if (!ok) return;
         await runAction(async () => {
             const r = await approveAllRequests();
+            // The response does not say which rows applied; refreshing the targets
+            // of the skipped ones as well costs a refetch, never a stale screen.
+            if (r.approved > 0) await Promise.all(pending.map((row) => invalidateApprovalTarget(row)));
             if (r.skipped > 0) {
-                toast.warning(`Approved ${r.approved}; ${r.skipped} skipped (changed or removed since the request).`);
+                toast.warning(t('bell.approvedSome', { approved: r.approved, skipped: r.skipped }));
             } else {
-                toast.success(`Approved ${r.approved} request${r.approved === 1 ? '' : 's'}.`);
+                toast.success(t('bell.approvedAll', { n: r.approved }));
             }
-        }, 'Failed to approve all');
+        }, t('bell.approveAllFailed'));
     };
 
     const handleClearAllNotices = () =>
         runAction(async () => {
             const r = await acknowledgeAllNotices();
-            toast.success(`Cleared ${r.cleared} notice${r.cleared === 1 ? '' : 's'}.`);
-        }, 'Failed to clear notices');
+            toast.success(t('bell.cleared', { n: r.cleared }));
+        }, t('bell.clearFailed'));
 
     const openPatient = (personId: number) => {
-        setOpen(false);
+        setOpenAndReset(false);
         navigate(`/patient/${personId}/works`);
     };
 
-    const toggleOpen = () => {
-        if (!open) placePopover();
-        setOpen((o) => !o);
+    const openHistory = () => {
+        setOpenAndReset(false);
+        navigate('/approvals/history');
     };
 
-    return (
-        <div className={styles.wrap} ref={wrapRef}>
+    const patientChip = (row: ApprovalRow) => {
+        if (row.person_id == null) return null;
+        const personId = row.person_id;
+        const name = row.patient_name ?? t('patientFallback', { id: personId });
+        return (
             <button
                 type="button"
-                ref={bellRef}
-                className={styles.bellBtn}
-                onClick={toggleOpen}
-                aria-label={`Approvals${count ? ` (${count})` : ''}`}
-                aria-expanded={open}
-                title="Approvals"
+                className={styles.patientChip}
+                onClick={() => openPatient(personId)}
+                title={t('openPatient', { name })}
             >
-                <i className="fas fa-gavel" aria-hidden="true" />
-                {count > 0 && (
-                    <span className={`${styles.badge} ${hasHolds ? styles.badgeHold : styles.badgeNotice}`}>
-                        {count}
-                    </span>
-                )}
+                <i className="fas fa-user" aria-hidden="true" /> {name}
             </button>
+        );
+    };
 
-            {open && coords && createPortal(
-                <div
-                    className={styles.popover}
-                    role="dialog"
-                    aria-label="Approvals"
-                    ref={popRef}
-                    style={{ position: 'fixed', top: coords.top, left: coords.left }}
-                >
-                    <div className={styles.popHeader}>
-                        <span>Approvals {count > 0 && <span className={styles.popCount}>{count}</span>}</span>
-                    </div>
-
-                    <div className={styles.list}>
-                        {items.length === 0 ? (
-                            <div className={styles.empty}>
-                                <i className="fas fa-check-circle" />
-                                <span>Nothing pending</span>
-                            </div>
-                        ) : (
-                            <>
-                                {holds.length > 0 && (
-                                    <div className={styles.section}>
-                                        <div className={styles.sectionLabel}>
-                                            <i className="fas fa-pause-circle" aria-hidden="true" /> Holds
-                                            <button
-                                                type="button"
-                                                className={styles.bulkBtn}
-                                                onClick={() => void handleApproveAll()}
-                                                title="Approve all pending requests"
-                                            >
-                                                <i className="fas fa-check-double" aria-hidden="true" /> Approve all
-                                            </button>
-                                        </div>
-                                        {holds.map((row) => (
-                                            <div key={row.request_id} className={styles.item}>
-                                                <span className={`${styles.kindBar} ${styles.kindHold}`} />
-                                                <div className={styles.itemBody}>
-                                                    <div className={styles.itemText}>{row.summary}</div>
-                                                    <div className={styles.itemMeta}>
-                                                        {row.person_id != null && (
-                                                            <button
-                                                                type="button"
-                                                                className={styles.patientChip}
-                                                                onClick={() => { if (row.person_id != null) openPatient(row.person_id); }}
-                                                                title={`Open ${row.patient_name ?? `patient #${row.person_id}`} → Works`}
-                                                            >
-                                                                <i className="fas fa-user" aria-hidden="true" /> {row.patient_name ?? `Patient #${row.person_id}`}
-                                                            </button>
-                                                        )}
-                                                        <span className={styles.typeTag}>
-                                                            {ACTION_LABELS[row.action_type] ?? row.action_type}
-                                                        </span>
-                                                        <span className={styles.byTag}>{row.requested_by}</span>
-                                                        <span className={styles.age}>{relAge(row.requested_at)}</span>
-                                                    </div>
-
-                                                    {rejectingId === row.request_id && (
-                                                        <div className={styles.rejectRow}>
-                                                            <input
-                                                                type="text"
-                                                                className={styles.rejectInput}
-                                                                placeholder="Reason (optional)"
-                                                                value={rejectNote}
-                                                                // eslint-disable-next-line jsx-a11y/no-autofocus
-                                                                autoFocus
-                                                                onChange={(e) => setRejectNote(e.target.value)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') void handleReject(row);
-                                                                    if (e.key === 'Escape') { setRejectingId(null); setRejectNote(''); }
-                                                                }}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                className={styles.confirmRejectBtn}
-                                                                onClick={() => void handleReject(row)}
-                                                            >
-                                                                Confirm
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className={styles.cancelBtn}
-                                                                onClick={() => { setRejectingId(null); setRejectNote(''); }}
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className={styles.actions}>
-                                                    <button
-                                                        type="button"
-                                                        className={styles.approveBtn}
-                                                        title="Approve"
-                                                        onClick={() => void handleApprove(row)}
-                                                    >
-                                                        <i className="fas fa-check" aria-hidden="true" />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={styles.rejectBtn}
-                                                        title="Reject"
-                                                        onClick={() => {
-                                                            setRejectNote('');
-                                                            setRejectingId((id) => (id === row.request_id ? null : row.request_id));
-                                                        }}
-                                                    >
-                                                        <i className="fas fa-times" aria-hidden="true" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {notices.length > 0 && (
-                                    <div className={styles.section}>
-                                        <div className={styles.sectionLabel}>
-                                            <i className="fas fa-info-circle" aria-hidden="true" /> Notices
-                                            <button
-                                                type="button"
-                                                className={styles.bulkBtn}
-                                                onClick={() => void handleClearAllNotices()}
-                                                title="Clear all notices"
-                                            >
-                                                <i className="fas fa-check-double" aria-hidden="true" /> Clear all
-                                            </button>
-                                        </div>
-                                        {notices.map((row) => (
-                                            <div key={row.request_id} className={styles.item}>
-                                                <span className={`${styles.kindBar} ${styles.kindNotice}`} />
-                                                <div className={styles.itemBody}>
-                                                    <div className={styles.itemText}>{row.summary}</div>
-                                                    <div className={styles.itemMeta}>
-                                                        {row.person_id != null && (
-                                                            <button
-                                                                type="button"
-                                                                className={styles.patientChip}
-                                                                onClick={() => { if (row.person_id != null) openPatient(row.person_id); }}
-                                                                title={`Open ${row.patient_name ?? `patient #${row.person_id}`} → Works`}
-                                                            >
-                                                                <i className="fas fa-user" aria-hidden="true" /> {row.patient_name ?? `Patient #${row.person_id}`}
-                                                            </button>
-                                                        )}
-                                                        <span className={styles.typeTag}>
-                                                            {ACTION_LABELS[row.action_type] ?? row.action_type}
-                                                        </span>
-                                                        <span className={styles.byTag}>{row.requested_by}</span>
-                                                        <span className={styles.age}>{relAge(row.requested_at)}</span>
-                                                    </div>
-                                                </div>
-
-                                                <div className={styles.actions}>
-                                                    <button
-                                                        type="button"
-                                                        className={styles.ackBtn}
-                                                        title="Acknowledge"
-                                                        onClick={() => void handleAcknowledge(row)}
-                                                    >
-                                                        <i className="fas fa-eye-slash" aria-hidden="true" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </div>,
-                document.body,
-            )}
+    const meta = (row: ApprovalRow) => (
+        <div className={styles.itemMeta}>
+            {patientChip(row)}
+            <span className={styles.typeTag}>{t(`action.${ACTION_LABEL_KEY[row.action_type]}`)}</span>
+            <span className={styles.byTag}>{row.requested_by}</span>
+            <RelativeAge iso={row.requested_at} className={styles.age} />
         </div>
+    );
+
+    return (
+        <HeaderPopover
+            open={open}
+            onOpenChange={setOpenAndReset}
+            bellLabel={count ? t('bell.titleCount', { n: count }) : t('bell.title')}
+            title={t('bell.title')}
+            icon="fa-gavel"
+            width={390}
+            badge={count > 0 && (
+                <span className={`${styles.badge} ${hasHolds ? styles.badgeHold : styles.badgeNotice}`}>
+                    {count}
+                </span>
+            )}
+        >
+            <div className={styles.popHeader}>
+                <span>{t('bell.title')} {count > 0 && <span className={styles.popCount}>{count}</span>}</span>
+                <button
+                    type="button"
+                    className={styles.headerIconBtn}
+                    onClick={openHistory}
+                    title={t('bell.history')}
+                    aria-label={t('bell.history')}
+                >
+                    <i className="fas fa-clock-rotate-left" aria-hidden="true" />
+                </button>
+            </div>
+
+            <div className={styles.list}>
+                {items.length === 0 ? (
+                    <div className={styles.empty}>
+                        <i className="fas fa-check-circle" aria-hidden="true" />
+                        <span>{t('bell.empty')}</span>
+                    </div>
+                ) : (
+                    <>
+                        {holds.length > 0 && (
+                            <div className={styles.section}>
+                                <div className={styles.sectionLabel}>
+                                    <i className="fas fa-pause-circle" aria-hidden="true" /> {t('bell.holds')}
+                                    <button
+                                        type="button"
+                                        className={styles.bulkBtn}
+                                        onClick={() => void handleApproveAll()}
+                                        title={t('bell.approveAllTitle')}
+                                    >
+                                        <i className="fas fa-check-double" aria-hidden="true" /> {t('bell.approveAll')}
+                                    </button>
+                                </div>
+                                {holds.map((row) => (
+                                    <div key={row.request_id} className={styles.item}>
+                                        <span className={`${styles.kindBar} ${styles.kindHold}`} />
+                                        <div className={styles.itemBody}>
+                                            <div className={styles.itemText}>{row.summary}</div>
+                                            {meta(row)}
+
+                                            {rejectingId === row.request_id && (
+                                                <div className={styles.rejectRow}>
+                                                    <input
+                                                        type="text"
+                                                        className={styles.rejectInput}
+                                                        placeholder={t('bell.reason')}
+                                                        aria-label={t('bell.reason')}
+                                                        value={rejectNote}
+                                                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                                                        autoFocus
+                                                        onChange={(e) => setRejectNote(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') void handleReject(row);
+                                                            if (e.key === 'Escape') {
+                                                                // Close the reason row only, not the popover.
+                                                                e.stopPropagation();
+                                                                setRejectingId(null); setRejectNote('');
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className={styles.confirmRejectBtn}
+                                                        onClick={() => void handleReject(row)}
+                                                    >
+                                                        {t('bell.confirm')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.cancelBtn}
+                                                        onClick={() => { setRejectingId(null); setRejectNote(''); }}
+                                                    >
+                                                        {t('bell.cancel')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className={styles.actions}>
+                                            <button
+                                                type="button"
+                                                className={styles.approveBtn}
+                                                title={t('bell.approve')}
+                                                aria-label={t('bell.approve')}
+                                                onClick={() => void handleApprove(row)}
+                                            >
+                                                <i className="fas fa-check" aria-hidden="true" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.rejectBtn}
+                                                title={t('bell.reject')}
+                                                aria-label={t('bell.reject')}
+                                                aria-expanded={rejectingId === row.request_id}
+                                                onClick={() => {
+                                                    setRejectNote('');
+                                                    setRejectingId((id) => (id === row.request_id ? null : row.request_id));
+                                                }}
+                                            >
+                                                <i className="fas fa-times" aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {notices.length > 0 && (
+                            <div className={styles.section}>
+                                <div className={styles.sectionLabel}>
+                                    <i className="fas fa-info-circle" aria-hidden="true" /> {t('bell.notices')}
+                                    <button
+                                        type="button"
+                                        className={styles.bulkBtn}
+                                        onClick={() => void handleClearAllNotices()}
+                                        title={t('bell.clearAllTitle')}
+                                    >
+                                        <i className="fas fa-check-double" aria-hidden="true" /> {t('bell.clearAll')}
+                                    </button>
+                                </div>
+                                {notices.map((row) => (
+                                    <div key={row.request_id} className={styles.item}>
+                                        <span className={`${styles.kindBar} ${styles.kindNotice}`} />
+                                        <div className={styles.itemBody}>
+                                            <div className={styles.itemText}>{row.summary}</div>
+                                            {meta(row)}
+                                        </div>
+
+                                        <div className={styles.actions}>
+                                            <button
+                                                type="button"
+                                                className={styles.ackBtn}
+                                                title={t('bell.acknowledge')}
+                                                aria-label={t('bell.acknowledge')}
+                                                onClick={() => void handleAcknowledge(row)}
+                                            >
+                                                <i className="fas fa-eye-slash" aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </HeaderPopover>
     );
 };
 

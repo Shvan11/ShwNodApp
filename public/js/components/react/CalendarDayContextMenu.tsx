@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 import { useFloatingMenu, type MenuAnchor } from '../../hooks/useFloatingMenu';
-import { parseLocalDate } from '../../utils/calendarDate';
+import { formatLocaleDate } from '../../utils/formatters';
 import type { CalendarDay } from './calendar.types';
 
 interface CalendarDayContextMenuProps {
@@ -45,12 +45,8 @@ const CalendarDayContextMenu = ({
     const { position, onKeyDown } = useFloatingMenu(menuRef, anchor, onClose);
     const isHoliday = !!day.isHoliday;
 
-    // Local midnight — `new Date('YYYY-MM-DD')` is UTC, a day early west of UTC (FE-F10-16).
-    const dateLabel = parseLocalDate(day.date).toLocaleDateString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric'
-    });
+    // A LOCAL day — `new Date('YYYY-MM-DD')` is UTC, a day early west of UTC (FE-F10-16).
+    const dateLabel = formatLocaleDate(day.date, { weekday: 'short', month: 'short', day: 'numeric' });
 
     const run = (action: (d: CalendarDay) => void) => () => {
         onClose();

@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
+import { formatDate } from '@/core/utils';
 import { alignerAllSetsQuery } from '@/query/queries';
 import { isClosedWorkStatus } from '@shared/contracts/aligner.contract';
 import type * as alignerContract from '@shared/contracts/aligner.contract';
@@ -37,17 +38,6 @@ const getNextBatchState = (set: AlignerSetView): NextBatchState => {
     if (set.NextBatchPresent) return 'ready';
     if (set.LabStatus === 'needs_mfg') return 'pending';
     return 'not_created';
-};
-
-const formatDate = (dateString: string): string => {
-    // Date-only strings must not round-trip through Date: new Date('YYYY-MM-DD')
-    // parses as UTC midnight, so local getters render a day early west of UTC.
-    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
-    if (dateOnly) return `${dateOnly[3]}-${dateOnly[2]}-${dateOnly[1]}`;
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    return `${day}-${month}-${date.getFullYear()}`;
 };
 
 const AllSetsList: React.FC = () => {

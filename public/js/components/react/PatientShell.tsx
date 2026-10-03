@@ -14,9 +14,20 @@ import { patientInfoQuery, workDetailsQuery } from '../../query/queries';
  * silently swallowed — chair-display is non-critical and must never disrupt
  * the main app.
  */
+/**
+ * Ordering tag for the beacons. Leaving patient A for B sends CLEAR(A) then
+ * LOAD(B) as two independent beacons, and sendBeacon does not keep their order:
+ * a CLEAR that landed second blanked the chair kiosk with B open (audit
+ * FE-F4-10). The server drops a beacon older than one it already took from this
+ * tab — `src` names the tab, `seq` only ever grows within it.
+ */
+const BEACON_SRC = Math.random().toString(36).slice(2, 12);
+let beaconSeq = 0;
+
 const notifyChairDisplay = (path: '/api/chair-display/patient-loaded' | '/api/chair-display/patient-cleared', payload: object): void => {
     try {
-        const body = JSON.stringify(payload);
+        beaconSeq += 1;
+        const body = JSON.stringify({ ...payload, src: BEACON_SRC, seq: beaconSeq });
         if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
             const blob = new Blob([body], { type: 'application/json' });
             navigator.sendBeacon(path, blob);
@@ -41,19 +52,7 @@ import styles from './PatientShell.module.css';
 
 // Patient portal CSS (loaded when any patient route is visited)
 import '../../../css/layout/sidebar-navigation.css';
-// patient-info.css -> ViewPatientInfo.module.css
-// add-patient.css -> AddPatientForm.module.css
-// edit-patient.css -> EditPatientComponent.module.css
-// grid.css -> GridComponent.module.css
-// work-management.css -> WorkComponent.module.css
-// work-payments.css -> merged into WorkComponent.module.css
-// xrays.css -> XraysComponent.module.css
-// canvas.css -> CanvasControlButtons.module.css
-// visits-summary.css and visits-spacing.css deleted - were dead code
 import '../../../css/components/work-card.css';
-// new-work-component.css -> NewWorkComponent.module.css
-// invoice-form.css -> PaymentModal.module.css
-// CSS Modules: visits-component.css, new-visit-component.css, patient-appointments.css migrated
 
 /** What ContentRenderer actually reads. This used to declare `view`, `filter`,
  *  `workId` and `phone` as well — four fields PatientShell computed on every

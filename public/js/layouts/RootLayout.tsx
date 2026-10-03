@@ -25,18 +25,6 @@ import PrintQueueIndicator from '../components/react/PrintQueueIndicator';
 import LabelPreviewModal from '../components/react/LabelPreviewModal';
 import NavigationProgress from '../components/react/NavigationProgress';
 
-interface QueuedItem {
-  id: string;
-  batchNumber: number;
-  personId: number;
-  patientName: string;
-  doctorName?: string;
-  doctorLogoPath?: string;
-  includeLogo?: boolean;
-  labels: string[];
-  originalLabels?: string[];
-}
-
 function LoadingFallback() {
   return (
     <div className="loading-fallback">
@@ -54,7 +42,7 @@ function LoadingFallback() {
  */
 function RootLayoutInner() {
   const [showQueueModal, setShowQueueModal] = useState(false);
-  const { queue, clearQueue } = usePrintQueue() as { queue: QueuedItem[]; clearQueue: () => void };
+  const { queue, clearQueue } = usePrintQueue();
   const location = useLocation();
   const { language } = useLanguage();
 

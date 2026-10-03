@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'r
 import { useToast } from '../../contexts/ToastContext';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import { parseLocalDate } from '../../utils/calendarDate';
+import { formatLocaleDate } from '../../utils/formatters';
 import type { ExistingHoliday, AppointmentWarning, SaveHolidayData } from './calendar.types';
 
 interface HolidayQuickModalProps {
@@ -73,16 +73,10 @@ const HolidayQuickModal = ({
 
     if (!date) return null;
 
-    // Local midnight: `new Date('YYYY-MM-DD')` is UTC, so west of UTC the modal
-    // named the previous weekday (FE-F10-16).
-    const formatDate = (dateStr: string): string => {
-        return parseLocalDate(dateStr).toLocaleDateString(undefined, {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    };
+    // formatLocaleDate reads 'YYYY-MM-DD' as a LOCAL day: `new Date('YYYY-MM-DD')`
+    // is UTC, so west of UTC the modal named the previous weekday (FE-F10-16).
+    const formatDate = (dateStr: string): string =>
+        formatLocaleDate(dateStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();

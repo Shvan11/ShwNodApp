@@ -12,7 +12,9 @@
     "notSet": "غير محدد"
   },
   "patientCard": {
-    "smileAlt": "{{name}} - ابتسامة"
+    "smileAlt": "{{name}} - ابتسامة",
+    "alerts": "تنبيهات: {{n}}",
+    "alertsTitle": "فتح تنبيهات المريض"
   },
   "summary": {
     "total": "الإجمالي",
@@ -64,7 +66,8 @@
     "deleted": "تم حذف العمل بنجاح!",
     "failDelete": "فشل حذف العمل",
     "transferred": "تم نقل العمل بنجاح إلى مريض آخر",
-    "paymentAdded": "تمت إضافة الدفعة بنجاح!"
+    "paymentAdded": "تمت إضافة الدفعة بنجاح!",
+    "submittedForApproval": "أُرسل الطلب لموافقة المدير"
   },
   "deleteDeps": {
     "header": "⚠️ لا يمكن حذف العمل - توجد سجلات مرتبطة ⚠️",
@@ -108,6 +111,7 @@
     "title": "سجل الدفعات - {{name}}",
     "workFallback": "عمل رقم {{id}}",
     "totalRequired": "المبلغ الإجمالي المطلوب:",
+    "discount": "الخصم:",
     "totalPaid": "إجمالي المدفوع:",
     "balanceRemaining": "الرصيد المتبقي:",
     "loading": "جاري تحميل سجل الدفعات...",
@@ -117,8 +121,6 @@
       "change": "الباقي",
       "actions": "إجراءات"
     },
-    "editTitle": "تعديل الدفعة",
-    "editComingSoon": "ميزة تعديل الدفعة قادمة قريباً!\n\nرقم الدفعة: {{id}}\nالمبلغ: {{amount}}",
     "deleteTitle": "حذف الدفعة",
     "deleteConfirm": "هل أنت متأكد من حذف هذه الدفعة؟\n\nالمبلغ: {{amount}}\nالتاريخ: {{date}}\n\nلا يمكن التراجع عن هذا الإجراء.",
     "deleteConfirmButton": "حذف",
@@ -170,6 +172,42 @@
     "printReceipt": "طباعة الإيصال",
     "printReceiptTitle": "طباعة إيصال اليوم",
     "addAlignerSet": "إضافة مجموعة تقويم",
-    "addAlignerSetTitle": "إضافة أو إدارة مجموعات التقويم الشفاف"
+    "addAlignerSetTitle": "إضافة أو إدارة مجموعات التقويم الشفاف",
+    "clinicDoctor": "العيادة"
+  },
+  "transfer": {
+    "title": "نقل العمل",
+    "status": "الحالة",
+    "searchLabel": "ابحث عن المريض الذي سيُنقل إليه العمل",
+    "byName": "الاسم",
+    "byPhoneId": "الهاتف أو الرقم",
+    "namePlaceholder": "اكتب اسمًا…",
+    "phoneIdPlaceholder": "الهاتف أو الرقم…",
+    "pickHint": "اختر مريضًا من القائمة",
+    "groupId": "الرقم",
+    "groupPhone": "الهاتف",
+    "loadingPreview": "جاري تحميل المعاينة...",
+    "previewFailed": "فشل تحميل معاينة النقل",
+    "summary": "ملخص النقل",
+    "from": "من",
+    "to": "إلى",
+    "related": "السجلات المرتبطة ({{n}} إجمالًا)",
+    "records": {
+      "visits": "زيارات: {{n}}",
+      "payments": "مدفوعات: {{n}}",
+      "diagnoses": "تشخيصات: {{n}}",
+      "workItems": "بنود علاج: {{n}}",
+      "alignerSets": "مجموعات تقويم شفاف: {{n}}",
+      "alignerBatches": "شحنات تقويم شفاف: {{n}}",
+      "implants": "زرعات: {{n}}",
+      "screws": "براغي: {{n}}"
+    },
+    "warning": "لا يمكن التراجع عن هذا الإجراء. سيفقد المريض الحالي هذا العمل وكل سجلاته المرتبطة.",
+    "back": "رجوع",
+    "confirm": "تأكيد النقل",
+    "transferring": "جاري النقل...",
+    "conflict": "لدى المريض المستهدف عمل نشط بالفعل",
+    "notFound": "لم يُعثر على العمل أو المريض",
+    "failed": "فشل النقل"
   }
 }

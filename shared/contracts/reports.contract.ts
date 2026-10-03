@@ -112,8 +112,16 @@ const enrichedInvoiceRow = z.object({
 export type EnrichedInvoiceRow = z.infer<typeof enrichedInvoiceRow>;
 
 // GET /api/statistics → { month, year, exchangeRate, dailyData, summary }.
+// `exchangeRate` is the month's reference rate (days with their own rate use that);
+// null = no rate has ever been recorded, so nothing converts. The page's money notice
+// branches on it, so it is modeled: a renamed or dropped field must fail the guard,
+// not silently switch the page to "no exchange rate" (audit FE-F5-10).
 export const statistics = {
-  response: z.looseObject({ dailyData: z.array(dailyDataRow), summary: monthlyStatisticsSummary }),
+  response: z.looseObject({
+    exchangeRate: z.number().nullable(),
+    dailyData: z.array(dailyDataRow),
+    summary: monthlyStatisticsSummary,
+  }),
 } as const;
 
 // GET /api/statistics/yearly → { startMonth, startYear, …, monthlyData, summary }.

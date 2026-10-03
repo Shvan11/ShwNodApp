@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
 import { alertTypesQuery, employeesQuery } from '@/query/queries';
-import { createTask, notifyTasksChanged, type StaffOption, type TaskRow } from '@/services/tasks';
+import { createTask, invalidateTasks, type StaffOption, type TaskRow } from '@/services/tasks';
 import * as patientContract from '@shared/contracts/patient.contract';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
@@ -23,17 +24,15 @@ interface PatientPick {
 interface TaskFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    /** Called after a successful save (the bell refetches). */
-    onSaved: () => void;
     /** When set, the modal edits this task instead of creating a new one. */
     editTask?: TaskRow | null;
 }
 
-const SEVERITIES: Array<{ value: string; label: string; cls: string }> = [
-    { value: '1', label: 'Mild', cls: styles.sev1 },
-    { value: '2', label: 'Moderate', cls: styles.sev2 },
-    { value: '3', label: 'Severe', cls: styles.sev3 },
-];
+const SEVERITIES = [
+    { value: '1', label: 'mild', cls: styles.sev1 },
+    { value: '2', label: 'moderate', cls: styles.sev2 },
+    { value: '3', label: 'severe', cls: styles.sev3 },
+] as const;
 
 /**
  * TaskFormModal — create or edit a header task (the push surface of `alerts`).
@@ -41,7 +40,8 @@ const SEVERITIES: Array<{ value: string; label: string; cls: string }> = [
  * (create only) is a small typeahead: a numeric query resolves a single patient by
  * id, text queries search by name.
  */
-const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProps) => {
+const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
+    const { t } = useTranslation('tasks');
     const toast = useToast();
     const isEdit = !!editTask;
 
@@ -59,6 +59,13 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
     const alertTypes: AlertType[] = alertTypesData ?? [];
     const { data: employeesData } = useQuery({ ...employeesQuery(), enabled: isOpen });
     const staff: StaffOption[] = employeesData?.employees ?? [];
+    // The picker lists active staff only; a task still assigned to someone who has
+    // since left keeps them (the server allows keeping an existing assignment), so
+    // show them by name rather than as "Anyone" over a value no option has (FE-F5-5).
+    const formerAssignee =
+        editTask?.assigned_to != null && !staff.some((s) => s.id === editTask.assigned_to)
+            ? { id: editTask.assigned_to, name: editTask.assignee_name ?? `#${editTask.assigned_to}` }
+            : null;
 
     // Patient typeahead state (create mode only)
     const [pickerQuery, setPickerQuery] = useState('');
@@ -142,14 +149,15 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
 
     const handleSave = async () => {
         if (!details.trim()) {
-            toast.error('Please enter the task details');
+            toast.error(t('form.detailsRequired'));
             return;
         }
         setLoading(true);
         try {
             if (isEdit && editTask) {
                 await putJSON(`/api/alerts/${editTask.alert_id}`, {
-                    alertTypeId: alertTypeId ? parseInt(alertTypeId, 10) : undefined,
+                    // null clears the category; omitting it would keep the old one (FE-F5-5).
+                    alertTypeId: alertTypeId ? parseInt(alertTypeId, 10) : null,
                     alertSeverity: parseInt(severity, 10),
                     alertDetails: details.trim(),
                     surfaceMode: editTask.surface_mode,
@@ -168,12 +176,11 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                     assignedTo: assignedTo ? parseInt(assignedTo, 10) : undefined,
                 });
             }
-            toast.success(`Task ${isEdit ? 'updated' : 'created'}`);
-            notifyTasksChanged();
-            onSaved();
+            toast.success(isEdit ? t('form.updated') : t('form.created'));
+            void invalidateTasks(isEdit ? editTask?.person_id : patient?.person_id);
             onClose();
         } catch (error) {
-            toast.error(httpErrorMessage(error, `Failed to ${isEdit ? 'update' : 'create'} task`));
+            toast.error(httpErrorMessage(error, isEdit ? t('form.updateFailed') : t('form.createFailed')));
         } finally {
             setLoading(false);
         }
@@ -193,26 +200,26 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
             <ModalHeader
                 titleId="task-modal-title"
                 icon={<i className="fas fa-bell" />}
-                title={isEdit ? 'Edit Task' : 'New Task'}
+                title={isEdit ? t('form.editTitle') : t('form.newTitle')}
                 onClose={dismiss}
             />
 
             <div className={`modal-body ${styles.body}`}>
                 <div className="form-group">
-                    <label htmlFor="task-details">Details <span className="required">*</span></label>
+                    <label htmlFor="task-details">{t('form.details')} <span className="required">*</span></label>
                     <textarea
                         id="task-details"
                         className="form-control"
                         value={details}
                         onChange={handleDetails}
                         rows={3}
-                        placeholder="e.g. Call patient to come pick up his appliance"
+                        placeholder={t('form.detailsPlaceholder')}
                         disabled={loading}
                     />
                 </div>
 
                 <div className="form-group">
-                    <span>Severity</span>
+                    <span>{t('form.severity')}</span>
                     <div className={styles.severityRow}>
                         {SEVERITIES.map((s) => (
                             <label key={s.value} className={styles.severityOption}>
@@ -225,7 +232,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                                     disabled={loading}
                                 />
                                 <span className={`${styles.severityBadge} ${s.cls} ${severity === s.value ? styles.severityActive : ''}`}>
-                                    {s.label}
+                                    {t(`severity.${s.label}`)}
                                 </span>
                             </label>
                         ))}
@@ -235,12 +242,12 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                 {/* Patient link — create only (the edit endpoint can't reassign the patient). */}
                 {!isEdit && (
                     <div className="form-group">
-                        <label htmlFor="task-patient">Link a patient <span className={styles.optional}>(optional)</span></label>
+                        <label htmlFor="task-patient">{t('form.linkPatient')} <span className={styles.optional}>{t('form.optional')}</span></label>
                         {patient ? (
                             <div className={styles.chip}>
                                 <i className="fas fa-user" />
                                 <span>{patient.patient_name} <span className={styles.chipId}>#{patient.person_id}</span></span>
-                                <button type="button" className={styles.chipRemove} onClick={() => { setPatient(null); setPickerQuery(''); }} aria-label="Remove patient">
+                                <button type="button" className={styles.chipRemove} onClick={() => { setPatient(null); setPickerQuery(''); }} aria-label={t('form.removePatient')}>
                                     &times;
                                 </button>
                             </div>
@@ -252,7 +259,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                                     className="form-control"
                                     value={pickerQuery}
                                     onChange={(e) => setPickerQuery(e.target.value)}
-                                    placeholder="Search by name or patient id…"
+                                    placeholder={t('form.searchPatient')}
                                     autoComplete="off"
                                     disabled={loading}
                                 />
@@ -281,7 +288,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                 )}
 
                 <div className="form-group">
-                    <label htmlFor="task-type">Category <span className={styles.optional}>(optional)</span></label>
+                    <label htmlFor="task-type">{t('form.category')} <span className={styles.optional}>{t('form.optional')}</span></label>
                     <select
                         id="task-type"
                         className="form-control"
@@ -289,7 +296,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                         onChange={(e) => setAlertTypeId(e.target.value)}
                         disabled={loading}
                     >
-                        <option value="">None</option>
+                        <option value="">{t('form.none')}</option>
                         {alertTypes.map((t) => (
                             <option key={t.alert_type_id} value={t.alert_type_id}>{t.type_name}</option>
                         ))}
@@ -297,7 +304,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="task-assignee">Assign to <span className={styles.optional}>(optional)</span></label>
+                    <label htmlFor="task-assignee">{t('form.assignTo')} <span className={styles.optional}>{t('form.optional')}</span></label>
                     <select
                         id="task-assignee"
                         className="form-control"
@@ -305,7 +312,10 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                         onChange={(e) => setAssignedTo(e.target.value)}
                         disabled={loading}
                     >
-                        <option value="">Anyone (unassigned)</option>
+                        <option value="">{t('form.anyone')}</option>
+                        {formerAssignee && (
+                            <option value={formerAssignee.id}>{t('form.formerStaff', { name: formerAssignee.name })}</option>
+                        )}
                         {staff.map((s) => (
                             <option key={s.id} value={s.id}>{s.employee_name}</option>
                         ))}
@@ -314,7 +324,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
 
                 <div className={styles.dateGrid}>
                     <div className="form-group">
-                        <label htmlFor="task-expires">Expires <span className={styles.optional}>(optional)</span></label>
+                        <label htmlFor="task-expires">{t('form.expires')} <span className={styles.optional}>{t('form.optional')}</span></label>
                         <input
                             id="task-expires"
                             type="date"
@@ -326,7 +336,7 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
                     </div>
                     {!isEdit && (
                         <div className="form-group">
-                            <label htmlFor="task-snooze">Show from <span className={styles.optional}>(optional)</span></label>
+                            <label htmlFor="task-snooze">{t('form.showFrom')} <span className={styles.optional}>{t('form.optional')}</span></label>
                             <input
                                 id="task-snooze"
                                 type="date"
@@ -341,9 +351,11 @@ const TaskFormModal = ({ isOpen, onClose, onSaved, editTask }: TaskFormModalProp
             </div>
 
             <div className={`modal-footer ${styles.footer}`}>
-                <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={loading}>Cancel</button>
+                <button type="button" className="btn btn-secondary" onClick={dismiss} disabled={loading}>{t('form.cancel')}</button>
                 <button type="button" className="btn btn-primary" onClick={handleSave} disabled={loading}>
-                    {loading ? <><i className="fas fa-spinner fa-spin" /> Saving…</> : <><i className="fas fa-save" /> {isEdit ? 'Save' : 'Create Task'}</>}
+                    {loading
+                        ? <><i className="fas fa-spinner fa-spin" aria-hidden="true" /> {t('form.saving')}</>
+                        : <><i className="fas fa-save" aria-hidden="true" /> {isEdit ? t('form.save') : t('form.create')}</>}
                 </button>
             </div>
             </>)}

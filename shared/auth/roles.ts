@@ -49,10 +49,14 @@ export interface RoleCapabilities {
    * The server enforces the same line with `authorize(FINANCE_ROLES)` on
    * `/api/statistics` + `/api/daily-invoices`; this flag only hides the UI.
    *
-   * Narrower still and admin-only (server: `authorize(ADMIN_ROLES)`): the month/year
-   * rollups, per-doctor commissions and the revenue breakdown.
+   * Narrower still and admin-only: `viewReports`.
    */
   viewFinance: boolean;
+  /**
+   * The admin-only reports (server: `authorize(ADMIN_ROLES)`): the month/year rollups,
+   * the month's summary totals, per-doctor commissions and the revenue breakdown.
+   */
+  viewReports: boolean;
   writeFinance: boolean;
   /**
    * May edit a work, complete / discontinue / reactivate / delete it, and edit or delete a
@@ -85,6 +89,7 @@ export function roleCaps(role: UserRole | undefined): RoleCapabilities {
   const isFrontDesk = role === ROLES.FRONT_DESK;
   return {
     viewFinance: isAdmin || isFrontDesk,
+    viewReports: isAdmin,
     writeFinance: isAdmin || isFrontDesk,
     editRecords: isAdmin || isFrontDesk,
     adminWrites: isAdmin,

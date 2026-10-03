@@ -46,6 +46,8 @@
 
 /* Error Display */
 .newWorkError {
+    /* The status-conflict message is several lines (FE-F7-13). */
+    white-space: pre-line;
     background-color: var(--error-50);
     color: var(--error-600);
     padding: var(--spacing-xs) var(--spacing-sm);

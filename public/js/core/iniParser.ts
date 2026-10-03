@@ -1,6 +1,20 @@
 /**
  * INI File Parser Utility
- * Client-side parsing and formatting of INI configuration files
+ * Client-side reading and IN-PLACE editing of INI configuration files
+ * (Settings → Protocol Handlers → C:\ShwanOrtho\ProtocolHandlers.ini).
+ *
+ * Saving EDITS the file rather than regenerating it (audit FE-F1-6, owner's
+ * call 2026-10-03). The old save parsed the file into `{section: {key: value}}`
+ * and wrote that object back out, which deleted every comment, every key above
+ * the first section, every line the parser didn't understand and any edit made
+ * on disk since the page loaded — on a file staff edit by hand during setup.
+ * `applyIniChanges` touches only the lines of the keys that changed.
+ *
+ * Semantics follow the Windows profile API (GetPrivateProfileString), which is
+ * what the protocol handlers read the file with: the FIRST occurrence of a key
+ * in a section wins, `;` starts a comment line, and everything after `=` is the
+ * value (there are no inline comments). `#` lines are treated as comments too —
+ * the old formatter wrote its header with them.
  */
 
 // ============================================================================
@@ -17,26 +31,19 @@ export interface IniConfig {
   [section: string]: IniSection;
 }
 
-/** Parse options */
-export interface ParseOptions {
-  /** Comment characters (default: ['#', ';']) */
-  commentChars?: string[];
-  /** Allow values with = character */
-  allowMultipleEquals?: boolean;
-}
+// ============================================================================
+// LINE GRAMMAR
+// ============================================================================
 
-/** Format options */
-export interface FormatOptions {
-  /** Include header comment */
-  includeHeader?: boolean;
-  /** Include timestamp */
-  includeTimestamp?: boolean;
-  /** Custom header lines */
-  headerLines?: string[];
-  /** Section comments */
-  sectionComments?: Record<string, string>;
-  /** Key comments */
-  keyComments?: Record<string, string>;
+const SECTION_RE = /^\s*\[([^\]]+)\]\s*(?:[;#].*)?$/;
+const COMMENT_RE = /^\s*[;#]/;
+// indent · key · `=` with its surrounding spaces · value (rest of the line)
+const KEY_RE = /^(\s*)([^=\s[][^=]*?)(\s*=\s*)(.*)$/;
+const LAST_UPDATED_RE = /^(\s*[#;]\s*Last updated:\s*).*$/i;
+
+function splitLines(content: string): { lines: string[]; eol: string } {
+  const eol = content.includes('\r\n') ? '\r\n' : '\n';
+  return { lines: content.split(/\r?\n/), eol };
 }
 
 // ============================================================================
@@ -44,40 +51,31 @@ export interface FormatOptions {
 // ============================================================================
 
 /**
- * Parse INI content string into structured object
+ * Parse INI content into `{ section: { key: value } }` for display. Keys above
+ * the first section, comments and unparseable lines are not part of the result
+ * (they are still preserved on save — see `applyIniChanges`). First occurrence
+ * of a key wins, as it does for the Windows reader.
  */
-export function parseIniContent(
-  content: string,
-  options?: ParseOptions
-): IniConfig {
+export function parseIniContent(content: string): IniConfig {
   const config: IniConfig = {};
   let currentSection = '';
-  const lines = content.split('\n');
-  const commentChars = options?.commentChars ?? ['#', ';'];
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  for (const line of splitLines(content).lines) {
+    if (!line.trim() || COMMENT_RE.test(line)) continue;
 
-    // Skip empty lines and comments
-    if (!trimmed || commentChars.some(char => trimmed.startsWith(char))) {
+    const section = SECTION_RE.exec(line);
+    if (section) {
+      currentSection = section[1].trim();
+      config[currentSection] ??= {};
       continue;
     }
 
-    // Section header [SectionName]
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      currentSection = trimmed.slice(1, -1);
-      if (!config[currentSection]) {
-        config[currentSection] = {};
+    const kv = KEY_RE.exec(line);
+    if (kv && currentSection) {
+      const key = kv[2].trim();
+      if (!(key in config[currentSection])) {
+        config[currentSection][key] = kv[4].trim();
       }
-      continue;
-    }
-
-    // Key=Value pair
-    const equalIndex = trimmed.indexOf('=');
-    if (equalIndex > 0 && currentSection) {
-      const key = trimmed.substring(0, equalIndex).trim();
-      const value = trimmed.substring(equalIndex + 1).trim();
-      config[currentSection][key] = value;
     }
   }
 
@@ -85,132 +83,96 @@ export function parseIniContent(
 }
 
 // ============================================================================
-// FORMATTING
+// EDITING
 // ============================================================================
 
 /**
- * Format config object back to INI file content
+ * Apply `changes` to the INI text and return the new text, editing in place:
+ * - a changed key's line keeps its indent, key spelling and `=` spacing — only
+ *   the value is replaced (first occurrence in its section, the one Windows reads);
+ * - a key missing from its section is appended after that section's last
+ *   non-blank line; a missing section is appended at the end of the file;
+ * - every other line — comments, keys above the first section, blank lines,
+ *   unknown lines, other sections — is left byte-for-byte alone, and the file's
+ *   own line ending (CRLF or LF) is kept;
+ * - an existing `# Last updated:` comment gets the save time.
+ *
+ * Values are single-line by construction: CR/LF inside a value is replaced by a
+ * space, so an edit can never inject a line.
  */
-export function formatIniContent(
-  config: IniConfig,
-  options?: FormatOptions
+export function applyIniChanges(
+  content: string,
+  changes: Partial<IniConfig>,
+  now: Date = new Date()
 ): string {
-  const lines: string[] = [];
+  const { lines, eol } = splitLines(content);
+  const clean = (value: string) => value.replace(/[\r\n]+/g, ' ');
 
-  // Add header
-  if (options?.includeHeader !== false) {
-    if (options?.headerLines) {
-      lines.push(...options.headerLines.map(line => `# ${line}`));
-    } else {
-      lines.push('# Protocol Handlers Configuration');
-      lines.push('# Location: C:\\ShwanOrtho\\ProtocolHandlers.ini');
-    }
-
-    if (options?.includeTimestamp !== false) {
-      lines.push(`# Last updated: ${new Date().toISOString()}`);
-    }
-
-    lines.push('');
-  }
-
-  // Add sections
-  for (const [section, values] of Object.entries(config)) {
-    lines.push(`[${section}]`);
-
-    // Add section comment if provided
-    const sectionComment = options?.sectionComments?.[section];
-    if (sectionComment) {
-      lines.push(`# ${sectionComment}`);
-    }
-
-    // Add key-value pairs
-    for (const [key, value] of Object.entries(values)) {
-      // Add key comment if provided
-      const keyComment = options?.keyComments?.[key];
-      if (keyComment) {
-        lines.push(`# ${keyComment}`);
-      }
-      lines.push(`${key}=${value}`);
-    }
-
-    lines.push('');
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Get default Protocol Handler format options
- */
-export function getProtocolHandlerFormatOptions(): FormatOptions {
-  return {
-    includeHeader: true,
-    includeTimestamp: true,
-    headerLines: [
-      'Protocol Handlers Configuration',
-      'Location: C:\\ShwanOrtho\\ProtocolHandlers.ini'
-    ],
-    sectionComments: {
-      Paths: 'Path configuration for protocol handlers'
-    },
-    keyComments: {
-      UseRunAsDate: 'Set to true on PCs requiring RunAsDate workaround for Dolphin',
-      RunAsDatePath: 'Full path to RunAsDate.exe utility'
-    }
-  };
-}
-
-// ============================================================================
-// UTILITIES
-// ============================================================================
-
-/**
- * Merge two INI configs (for pending changes)
- * Returns a new object without mutating inputs
- */
-export function mergeConfigs(
-  base: IniConfig,
-  changes: Partial<IniConfig>
-): IniConfig {
-  const result: IniConfig = {};
-
-  // Copy base config
-  for (const [section, values] of Object.entries(base)) {
-    result[section] = { ...values };
-  }
-
-  // Apply changes
+  // What is still to be written, per section — entries are deleted as applied.
+  const pending = new Map<string, Map<string, string>>();
   for (const [section, values] of Object.entries(changes)) {
-    if (!result[section]) {
-      result[section] = {};
-    }
-    if (values) {
-      Object.assign(result[section], values);
+    if (values && Object.keys(values).length > 0) {
+      pending.set(section, new Map(Object.entries(values)));
     }
   }
 
-  return result;
-}
+  const out: string[] = [];
+  let currentSection: string | null = null;
+  // Index in `out` just past the current section's last non-blank line, where
+  // its missing keys are appended when the section closes.
+  let insertAt = 0;
 
-/**
- * Set a value in config (returns new object)
- */
-export function setValue(
-  config: IniConfig,
-  section: string,
-  key: string,
-  value: string
-): IniConfig {
-  return {
-    ...config,
-    [section]: {
-      ...config[section],
-      [key]: value
+  const closeSection = () => {
+    if (currentSection === null) return;
+    const remaining = pending.get(currentSection);
+    if (remaining && remaining.size > 0) {
+      const added = [...remaining].map(([key, value]) => `${key}=${clean(value)}`);
+      out.splice(insertAt, 0, ...added);
+      remaining.clear();
     }
   };
-}
 
-// No `export default {…}`: its only consumer (ProtocolHandlersSettings) uses named
-// imports, so the object was dead weight that nonetheless made 7 unused exports
-// look used. Those went with it — validateIniConfig, getValue, removeKey,
-// getSectionKeys, getSections, hasKey, countKeys (~110 lines).
+  for (const line of lines) {
+    const section = SECTION_RE.exec(line);
+    if (section) {
+      closeSection();
+      currentSection = section[1].trim();
+      out.push(line);
+      insertAt = out.length;
+      continue;
+    }
+
+    const stamp = LAST_UPDATED_RE.exec(line);
+    if (stamp) {
+      out.push(`${stamp[1]}${now.toISOString()}`);
+      if (currentSection !== null) insertAt = out.length;
+      continue;
+    }
+
+    const kv = currentSection !== null && !COMMENT_RE.test(line) ? KEY_RE.exec(line) : null;
+    const remaining = currentSection !== null ? pending.get(currentSection) : undefined;
+    const key = kv?.[2].trim();
+    if (kv && key !== undefined && remaining?.has(key)) {
+      out.push(`${kv[1]}${kv[2]}${kv[3]}${clean(remaining.get(key)!)}`);
+      remaining.delete(key);
+    } else {
+      out.push(line);
+    }
+    if (currentSection !== null && line.trim()) insertAt = out.length;
+  }
+  closeSection();
+
+  // Sections the file doesn't have at all go at the end, after one blank line.
+  const newSections = [...pending].filter(([, values]) => values.size > 0);
+  if (newSections.length > 0) {
+    while (out.length > 0 && out[out.length - 1].trim() === '') out.pop();
+    for (const [section, values] of newSections) {
+      if (out.length > 0) out.push('');
+      out.push(`[${section}]`);
+      for (const [key, value] of values) out.push(`${key}=${clean(value)}`);
+    }
+    out.push('');
+  }
+
+  return out.join(eol);
+}

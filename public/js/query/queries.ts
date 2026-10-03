@@ -263,17 +263,6 @@ export const tagOptionsQuery = () =>
       }),
   });
 
-/** GET /api/patients/type-options — patient type options. */
-export const typeOptionsQuery = () =>
-  queryOptions({
-    queryKey: qk.lookups.typeOptions(),
-    queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof patientContract.typeOptions.response>>('/api/patients/type-options', {
-        signal,
-        schema: patientContract.typeOptions.response,
-      }),
-  });
-
 // ---------------------------------------------------------------------------
 // Work / visits — patient-scoped lists (the headline dedup + gap-fix targets)
 // ---------------------------------------------------------------------------
@@ -1167,6 +1156,18 @@ export const usersListQuery = () =>
         schema: userManagementContract.usersList.response,
       }),
   });
+
+/**
+ * The header bells' freshness policy, shared by all four: a 5-minute poll, plus a
+ * refetch on return to the tab once the 30 s staleTime has passed (React Query's
+ * focus manager listens to `visibilitychange`). Writes reach them sooner through
+ * invalidation. Each bell used to carry its own interval and an unconditional
+ * visibility refetch — three GETs per alt-tab for an admin (audit FE-F5-13).
+ */
+export const HEADER_BELL_POLL = {
+  refetchInterval: 5 * 60_000,
+  refetchOnWindowFocus: true,
+} as const;
 
 /** GET /api/tasks — open app-wide tasks (header Tasks surface). */
 export const tasksQuery = () =>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation, useNavigation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { patientInfoQuery, brandingQuery } from '@/query/queries';
 import { ROLES } from '@shared/auth/roles';
 import { appointmentsPath } from '../../utils/appointmentsDate';
@@ -62,7 +62,7 @@ const UniversalHeader = () => {
     const pendingPatientCode = pendingPath?.match(/^\/patient\/(\d+)/)?.[1] ?? null;
     // GlobalState already fetches /api/auth/me and exposes the user, so the
     // header reads it from there instead of making its own duplicate request.
-    const { user } = useGlobalState();
+    const user = useAuthUser();
 
     // Clinic branding (logo + display name) — configured in Settings → General,
     // shared by all users. Cached with a long staleTime, so after first paint it

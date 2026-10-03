@@ -314,13 +314,14 @@
     border-color: var(--info-color);
 }
 
-.customizeButtonActive {
+/* Doubled class so the active state outranks `.customizeButton:hover` without !important. */
+.customizeButton.customizeButtonActive {
     background: var(--info-color);
-    color: var(--color-white) !important;
-    border-color: var(--info-color) !important;
+    color: var(--color-white);
+    border-color: var(--info-color);
 }
 
-.customizeButtonActive:hover {
+.customizeButton.customizeButtonActive:hover {
     background: var(--info-600);
 }
 

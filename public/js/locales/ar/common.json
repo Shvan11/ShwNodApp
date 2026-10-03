@@ -51,5 +51,16 @@
     "message": "لديك تغييرات غير محفوظة. هل تريد تجاهلها؟",
     "discard": "تجاهل",
     "keepEditing": "متابعة التعديل"
+  },
+  "age": {
+    "minutes": "{{n}} د",
+    "hours": "{{n}} س",
+    "days": "{{n}} ي"
+  },
+  "lookups": {
+    "editValues": "تعديل القيم",
+    "manage": "إدارة {{name}}",
+    "manageValues": "إدارة القيم",
+    "loading": "جارٍ التحميل…"
   }
 }

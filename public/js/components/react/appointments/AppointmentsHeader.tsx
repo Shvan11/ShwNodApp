@@ -6,7 +6,7 @@ import DoctorFilterSelect from './DoctorFilterSelect';
 import type { LegendDoctor } from '../calendar.types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatWeekdayShort } from '@/utils/formatters';
-import { parseLocalDate } from '@/utils/calendarDate';
+import { parseLocalDate, toLocalDateString } from '@/utils/calendarDate';
 import styles from './AppointmentsHeader.module.css';
 
 // Doctor-filter selection: a specific doctor (employees.id) or every doctor.
@@ -75,12 +75,9 @@ const AppointmentsHeader = ({
 
     // Step the selected day by ±1 (noon avoids TZ date-shift).
     const shiftDay = (delta: number): void => {
-        const base = selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date();
+        const base = selectedDate ? parseLocalDate(selectedDate) : new Date();
         base.setDate(base.getDate() + delta);
-        const year = base.getFullYear();
-        const month = String(base.getMonth() + 1).padStart(2, '0');
-        const day = String(base.getDate()).padStart(2, '0');
-        onDateChange(`${year}-${month}-${day}`);
+        onDateChange(toLocalDateString(base));
     };
 
     const handleSearchInputChange = (e: ChangeEvent<HTMLInputElement>): void => {

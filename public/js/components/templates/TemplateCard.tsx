@@ -2,6 +2,7 @@
  * Template Card Component
  * Displays a single template with actions
  */
+import { formatLocaleDate } from '../../utils/formatters';
 
 interface Template {
     template_id: number;
@@ -29,9 +30,7 @@ interface TemplateCardProps {
 }
 
 function TemplateCard({ template, onEdit, onSetDefault, onDelete, styles }: TemplateCardProps) {
-    const lastUsed = template.last_used_date
-        ? new Date(template.last_used_date).toLocaleDateString()
-        : 'Never';
+    const lastUsed = formatLocaleDate(template.last_used_date) || 'Never';
 
     return (
         <div className={`${styles.templateCard} ${template.is_default ? styles.templateCardDefault : ''}`}>

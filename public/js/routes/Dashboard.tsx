@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { MouseEvent, DragEvent } from 'react';
 import { getItem, setItem } from '../core/storage';
-import { useGlobalState } from '../contexts/GlobalStateContext';
+import { useAuthUser } from '../contexts/GlobalStateContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { LANGUAGES } from '../core/language';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { appointmentsPath } from '../utils/appointmentsDate';
 
@@ -36,9 +38,9 @@ const STORAGE_KEY = 'dashboard_card_order';
 const getInitialCards = (): DashboardCardType[] => {
   const savedOrder = getItem<string[]>(STORAGE_KEY);
   if (savedOrder && Array.isArray(savedOrder)) {
-    const cardMap = new Map(DASHBOARD_CARDS.map((c) => [c.key, c]));
+    const cardMap = new Map<string, DashboardCardType>(DASHBOARD_CARDS.map((c) => [c.key, c]));
     const ordered = savedOrder
-      .map((key) => cardMap.get(key as any))
+      .map((key) => cardMap.get(key))
       .filter((c): c is DashboardCardType => !!c);
 
     // Keep state clean: append any cards defined in code but missing in storage
@@ -53,17 +55,19 @@ const getInitialCards = (): DashboardCardType[] => {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { t } = useTranslation('dashboard');
-  const { user } = useGlobalState();
+  const user = useAuthUser();
+  const { language } = useLanguage();
 
   // Statistics and Stand are admin + front-desk only (server: authorize(FINANCE_ROLES)
   // on /api/statistics and on every /api/stand/* read — the Stand's reads carry cost
   // prices, margins and the sales ledger) — don't offer clinical staff a card that
   // lands on an access-denied page. Filtered at RENDER, not in `cards`, so the saved
-  // drag order survives a role change.
-  const FINANCE_ONLY_CARDS = new Set(['statistics', 'stand']);
+  // drag order survives a role change. Hidden until the role is known: offering them
+  // for a beat on a cold load showed a clinical user two cards they cannot open.
+  const FINANCE_ONLY_CARDS = new Set<string>(['statistics', 'stand']);
   const caps = roleCaps(user?.role as UserRole | undefined);
   const isVisibleCard = (card: DashboardCardType): boolean =>
-    !FINANCE_ONLY_CARDS.has(card.key) || !user?.role || caps.viewFinance;
+    !FINANCE_ONLY_CARDS.has(card.key) || caps.viewFinance;
 
   const [isCustomizeMode, setIsCustomizeMode] = useState(false);
   const [cards, setCards] = useState<DashboardCardType[]>(getInitialCards);
@@ -73,7 +77,11 @@ export default function Dashboard() {
   // What actually gets rendered + reordered. `cards` stays the full saved order.
   const visibleCards = cards.filter(isVisibleCard);
 
-  const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  // From the language, not from <html dir>: RootLayout applies `dir` in an effect
+  // AFTER the render a language flip causes, so reading the attribute here was one
+  // render behind and the first arrow after a flip moved the card the wrong way.
+  // The Dashboard is a translated route, so its direction is the language's.
+  const isRtl = LANGUAGES[language].dir === 'rtl';
 
   const handleCardClick = (e: MouseEvent<HTMLAnchorElement>, link: string) => {
     e.preventDefault();

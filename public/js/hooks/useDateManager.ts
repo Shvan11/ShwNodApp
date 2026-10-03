@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react';
 import { CONFIG } from '../utils/whatsapp-send-constants';
 import { validateDate } from '../utils/whatsapp-validation';
+import { toLocalDateString } from '../utils/calendarDate';
 
 /**
  * Date option for dropdown
@@ -30,18 +31,7 @@ export interface UseDateManagerReturn {
   currentDate: string;
   dateOptions: DateOption[];
   setCurrentDate: (newDate: string) => void;
-  getLocalDateString: (date: Date) => string;
   sendability: DateSendability;
-}
-
-/**
- * Get local date string in YYYY-MM-DD format without timezone issues
- */
-export function getLocalDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -91,7 +81,7 @@ function getDefaultDate(): string {
     defaultDate.setDate(today.getDate() + 1);
   }
 
-  return getLocalDateString(defaultDate);
+  return toLocalDateString(defaultDate);
 }
 
 /**
@@ -100,18 +90,18 @@ function getDefaultDate(): string {
 function formatDateLabel(date: Date): string {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  const dateStr = getLocalDateString(date);
+  const dateStr = toLocalDateString(date);
   const today = new Date();
-  const todayStr = getLocalDateString(today);
+  const todayStr = toLocalDateString(today);
 
   // Calculate yesterday and tomorrow
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  const yesterdayStr = getLocalDateString(yesterday);
+  const yesterdayStr = toLocalDateString(yesterday);
 
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = getLocalDateString(tomorrow);
+  const tomorrowStr = toLocalDateString(tomorrow);
 
   let label = `${dateStr} (${dayNames[date.getDay()]})`;
 
@@ -167,10 +157,10 @@ function generateDateOptions(currentDate: string): DateOption[] {
   }
 
   return dates.map((date) => ({
-    value: getLocalDateString(date),
+    value: toLocalDateString(date),
     label: formatDateLabel(date),
-    isToday: getLocalDateString(date) === getLocalDateString(today),
-    isDefault: getLocalDateString(date) === currentDate,
+    isToday: toLocalDateString(date) === toLocalDateString(today),
+    isDefault: toLocalDateString(date) === currentDate,
   }));
 }
 
@@ -226,7 +216,6 @@ export function useDateManager(): UseDateManagerReturn {
     currentDate,
     dateOptions,
     setCurrentDate: handleDateChange,
-    getLocalDateString,
     sendability,
   };
 }

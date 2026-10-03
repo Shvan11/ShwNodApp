@@ -152,3 +152,59 @@
         height: 50px;
     }
 }
+
+/* ===== Primary (deciduous) teeth — shown by the switch (audit FE-F9-12) ===== */
+
+.primarySwitch {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: var(--spacing-xs);
+}
+
+.primaryArch .archLabel {
+    font-weight: var(--font-weight-medium);
+}
+
+.primaryTooth {
+    width: 34px;
+    height: 34px;
+    margin: 0 2px;
+    border: 1.5px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: var(--background-primary);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    flex-shrink: 0;
+}
+
+.primaryTooth:hover {
+    border-color: var(--info-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.primaryTooth:active {
+    transform: scale(0.95);
+}
+
+/* The gap between RA and LA marks the midline, like the permanent row's red slot. */
+.primaryMidline {
+    margin-inline-start: 14px;
+}
+
+@media (max-width: 640px) {
+    .primaryTooth {
+        width: 24px;
+        height: 28px;
+        margin: 0 1px;
+    }
+}

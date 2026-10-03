@@ -3,16 +3,16 @@
  *
  * Reads are thin wrappers over the React Query `queryOptions` factories in
  * `query/queries.ts` — so the cache is shared/deduped across screens and a write
- * on one screen refreshes every other. Mutations write via `core/http` then
- * invalidate `qk.stand.all()` (the hierarchical parent that covers items, sales,
- * categories, dashboard, movements & reports), replacing the old caller-supplied
- * `onSuccess`→`refetch` wiring.
+ * on one screen refreshes every other. Mutations are `useApiMutation`s that
+ * write via `core/http` then invalidate `qk.stand.all()` (the hierarchical
+ * parent that covers items, sales, categories, dashboard, movements & reports).
  */
 import { useState, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as standContract from '@shared/contracts/stand.contract';
 import { qk } from '@/query/keys';
+import { useApiMutation } from '@/query/useApiMutation';
 import {
   standItemsQuery,
   standCategoriesQuery,
@@ -272,6 +272,17 @@ export function useStockMovements(itemId: number | null): {
 // ITEM MUTATIONS
 // ============================================================================
 
+/**
+ * Each write is its own `useApiMutation`, so: the stand invalidation is AWAITED
+ * before the caller's `await` resolves (a modal closing on that await no longer
+ * shows the stale list for a beat); `loading` ORs the per-operation pending
+ * flags (one shared boolean let the first write to settle clear a spinner the
+ * other still owned); and a 5xx is reported like every other mutation's. A
+ * failure rejects with the funnel's error — callers show it through
+ * `httpErrorMessage(err, …)`. (An `error` field used to sit here unread — FE-F3-12.)
+ */
+const STAND_KEYS = [qk.stand.all()];
+
 export function useStandItemMutations(): {
   createItem: (data: StandItemCreateData) => Promise<{ item_id: number }>;
   updateItem: (id: number, data: Partial<StandItemCreateData>) => Promise<void>;
@@ -279,102 +290,74 @@ export function useStandItemMutations(): {
   restockItem: (id: number, quantity: number, unitCost: number) => Promise<void>;
   adjustStock: (id: number, delta: number, reason: string) => Promise<void>;
   loading: boolean;
-  error: string | null;
 } {
-  const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const createItem = useCallback(async (data: StandItemCreateData): Promise<{ item_id: number }> => {
-    try {
-      setLoading(true); setError(null);
-      const result = await postJSON<{ item_id: number }>('/api/stand/items', data, { schema: standContract.createItem.response });
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-      return result;
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to create item')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const updateItem = useCallback(async (id: number, data: Partial<StandItemCreateData>): Promise<void> => {
-    try {
-      setLoading(true); setError(null);
+  const create = useApiMutation({
+    mutationFn: (data: StandItemCreateData) =>
+      postJSON<{ item_id: number }>('/api/stand/items', data, { schema: standContract.createItem.response }),
+    invalidate: STAND_KEYS,
+  });
+  const update = useApiMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<StandItemCreateData> }) => {
       await putJSON(`/api/stand/items/${id}`, data);
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to update item')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const deleteItem = useCallback(async (id: number): Promise<void> => {
-    try {
-      setLoading(true); setError(null);
+    },
+    invalidate: STAND_KEYS,
+  });
+  const remove = useApiMutation({
+    mutationFn: async (id: number) => {
       await deleteJSON(`/api/stand/items/${id}`);
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to delete item')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const restockItem = useCallback(async (id: number, quantity: number, unitCost: number): Promise<void> => {
-    try {
-      setLoading(true); setError(null);
+    },
+    invalidate: STAND_KEYS,
+  });
+  const restock = useApiMutation({
+    mutationFn: async ({ id, quantity, unitCost }: { id: number; quantity: number; unitCost: number }) => {
       await postJSON(`/api/stand/items/${id}/restock`, { quantity, unitCost });
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to restock')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const adjustStock = useCallback(async (id: number, delta: number, reason: string): Promise<void> => {
-    try {
-      setLoading(true); setError(null);
+    },
+    invalidate: STAND_KEYS,
+  });
+  const adjust = useApiMutation({
+    mutationFn: async ({ id, delta, reason }: { id: number; delta: number; reason: string }) => {
       await postJSON(`/api/stand/items/${id}/adjust`, { delta, reason });
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to adjust stock')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
+    },
+    invalidate: STAND_KEYS,
+  });
 
-  return { createItem, updateItem, deleteItem, restockItem, adjustStock, loading, error };
+  return {
+    createItem: create.mutateAsync,
+    updateItem: (id, data) => update.mutateAsync({ id, data }),
+    deleteItem: remove.mutateAsync,
+    restockItem: (id, quantity, unitCost) => restock.mutateAsync({ id, quantity, unitCost }),
+    adjustStock: (id, delta, reason) => adjust.mutateAsync({ id, delta, reason }),
+    loading: create.isPending || update.isPending || remove.isPending || restock.isPending || adjust.isPending,
+  };
 }
 
 // ============================================================================
 // SALE MUTATIONS
 // ============================================================================
 
+/** See `useStandItemMutations` for why each write is its own `useApiMutation`. */
 export function useStandSaleMutations(): {
   createSale: (data: SaleCreateData) => Promise<StandSaleResult>;
   voidSale: (id: number, reason: string) => Promise<void>;
   loading: boolean;
-  error: string | null;
 } {
-  const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const createSale = useCallback(async (data: SaleCreateData) => {
-    try {
-      setLoading(true); setError(null);
-      const result = await postJSON<StandSaleResult>('/api/stand/sales', data, { schema: standContract.createSale.response });
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-      return result;
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to create sale')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const voidSale = useCallback(async (id: number, reason: string): Promise<void> => {
-    try {
-      setLoading(true); setError(null);
+  const create = useApiMutation({
+    mutationFn: (data: SaleCreateData) =>
+      postJSON<StandSaleResult>('/api/stand/sales', data, { schema: standContract.createSale.response }),
+    invalidate: STAND_KEYS,
+  });
+  const voidOne = useApiMutation({
+    mutationFn: async ({ id, reason }: { id: number; reason: string }) => {
       await postJSON(`/api/stand/sales/${id}/void`, { reason });
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } catch (err) {
-      setError(httpErrorMessage(err, 'Failed to void sale')); throw err;
-    } finally { setLoading(false); }
-  }, [queryClient]);
+    },
+    invalidate: STAND_KEYS,
+  });
 
-  return { createSale, voidSale, loading, error };
+  return {
+    createSale: create.mutateAsync,
+    voidSale: (id, reason) => voidOne.mutateAsync({ id, reason }),
+    loading: create.isPending || voidOne.isPending,
+  };
 }
 
 // ============================================================================
@@ -411,38 +394,39 @@ export function useTopSellingItems(startDate: string | null, endDate: string | n
 // CATEGORY MUTATIONS
 // ============================================================================
 
+/**
+ * See `useStandItemMutations`. This one used to be `try/finally` with no error
+ * surface at all; it now rejects exactly like its siblings (FE-F3-12).
+ */
 export function useStandCategoryMutations(): {
   createCategory: (name: string) => Promise<void>;
   updateCategory: (id: number, data: { categoryName?: string }) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
   loading: boolean;
 } {
-  const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(false);
-
-  const createCategory = useCallback(async (name: string) => {
-    try {
-      setLoading(true);
+  const create = useApiMutation({
+    mutationFn: async (name: string) => {
       await postJSON('/api/stand/categories', { name });
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const updateCategory = useCallback(async (id: number, data: { categoryName?: string }) => {
-    try {
-      setLoading(true);
+    },
+    invalidate: STAND_KEYS,
+  });
+  const update = useApiMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { categoryName?: string } }) => {
       await putJSON(`/api/stand/categories/${id}`, data);
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } finally { setLoading(false); }
-  }, [queryClient]);
-
-  const deleteCategory = useCallback(async (id: number) => {
-    try {
-      setLoading(true);
+    },
+    invalidate: STAND_KEYS,
+  });
+  const remove = useApiMutation({
+    mutationFn: async (id: number) => {
       await deleteJSON(`/api/stand/categories/${id}`);
-      void queryClient.invalidateQueries({ queryKey: qk.stand.all() });
-    } finally { setLoading(false); }
-  }, [queryClient]);
+    },
+    invalidate: STAND_KEYS,
+  });
 
-  return { createCategory, updateCategory, deleteCategory, loading };
+  return {
+    createCategory: create.mutateAsync,
+    updateCategory: (id, data) => update.mutateAsync({ id, data }),
+    deleteCategory: remove.mutateAsync,
+    loading: create.isPending || update.isPending || remove.isPending,
+  };
 }

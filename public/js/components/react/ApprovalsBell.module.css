@@ -1,31 +1,6 @@
-/* ApprovalsBell — admin header bell for the maker-checker approval queue.
-   Bell matches the header (white icon on coloured background). Popover mirrors
-   TasksBell layout; holds get an orange bar, notices get a blue bar. */
-
-.wrap {
-    position: relative;
-    display: inline-flex;
-}
-
-.bellBtn {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 42px;
-    height: 42px;
-    border: none;
-    border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-white);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.bellBtn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
+/* ApprovalsBell — admin bell for the maker-checker queue: the badge and the
+   popover content (the shell is HeaderPopover's). Holds get an orange bar,
+   notices a blue one. */
 
 .badge {
     position: absolute;
@@ -57,18 +32,6 @@
     50% { box-shadow: 0 0 0 5px rgba(220, 53, 69, 0); }
 }
 
-/* Popover — portaled to <body>; position:fixed, top/left set inline from bell rect */
-.popover {
-    width: 390px;
-    max-width: calc(100vw - 24px);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    z-index: var(--z-index-popover);
-    overflow: hidden;
-}
-
 .popHeader {
     display: flex;
     align-items: center;
@@ -77,6 +40,25 @@
     border-bottom: 1px solid var(--border-light);
     font-weight: var(--font-weight-semibold);
     color: var(--text-heading);
+}
+
+.headerIconBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+}
+
+.headerIconBtn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
 }
 
 .popCount {

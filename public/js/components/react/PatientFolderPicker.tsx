@@ -27,11 +27,8 @@ const PatientFolderPicker = ({ personId, selectedRelPath, onSelect }: Props) => 
     const [currentPath, setCurrentPath] = useState('');
     const [thumbErrors, setThumbErrors] = useState<Set<string>>(new Set());
 
-    const { data, isLoading: loading, error: queryError, refetch } = useQuery({
-        ...patientFilesQuery(personId, currentPath),
-        enabled: personId != null,
-    });
-    const listing = (data ?? null) as fileExplorer.FileListing | null;
+    const { data, isLoading: loading, error: queryError, refetch } = useQuery(patientFilesQuery(personId, currentPath));
+    const listing: fileExplorer.FileListing | null = data ?? null;
     const error = queryError ? httpErrorMessage(queryError, 'Failed to load folder') : null;
 
     const markThumbError = (relPath: string) =>

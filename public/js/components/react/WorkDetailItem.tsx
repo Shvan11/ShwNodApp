@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import cn from 'classnames';
 import TeethSelector, { type ToothOption } from './TeethSelector';
@@ -10,35 +10,24 @@ import {
     FILLING_DEPTH_OPTIONS,
     isProstheticWork,
 } from '../../config/workTypeConfig';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, formatLocaleDate } from '../../utils/formatters';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { useLookupManager } from '../../hooks/useLookupManager';
 import LabCaseModal from './lab-tracking/LabCaseModal';
 import { labelForStage } from '../../config/labStages';
-import type { LabStage } from '@shared/contracts/lab-case.contract';
+import type { ImplantManufacturersResponse, LabsResponse, ShadesResponse } from '@shared/contracts/lookup.contract';
 import styles from './WorkDetailItem.module.css';
 
-export interface ImplantManufacturer {
-    id: number;
-    name: string;
-}
-
+type ImplantManufacturer = ImplantManufacturersResponse[number];
 /** A lab option for the Bridge/Veneers lab dropdown (a "Lab" expense subcategory). */
-export interface LabOption {
-    id: number;
-    name: string;
-}
-
+type LabOption = LabsResponse[number];
 /** A dental shade system and its values, for the Bridge/Veneers shade dropdowns. */
-export interface ShadeSystemOption {
-    name: string;
-    shades: { id: number; shade: string }[];
-}
+type ShadeSystemOption = ShadesResponse['systems'][number];
 
 /** Editable mirror of a work item — all fields as strings, matching the add/update payload. */
 interface DetailDraft {
@@ -74,6 +63,8 @@ interface WorkDetailItemProps {
     startInEdit?: boolean;
     /** Called when a NEW item's edit finishes (saved or cancelled) so the panel can drop the draft slot. */
     onCloseNew?: () => void;
+    /** The editor gained or lost unsaved input; the card asks before a collapse discards it (FE-F7-14). */
+    onDirtyChange?: (key: string, dirty: boolean) => void;
 }
 
 const noop = () => {};
@@ -98,11 +89,7 @@ const buildDraft = (d: WorkDetail | null, workId: number): DetailDraft => ({
     note: d?.note ?? '',
 });
 
-const fmtDate = (value?: string): string => {
-    if (!value) return '—';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
-};
+const fmtDate = (value: string | null): string => formatLocaleDate(value) || '—';
 
 /** Read-mode value formatting — mirrors the table's former renderCell. */
 const renderFieldValue = (d: WorkDetail, key: string): string => {
@@ -111,8 +98,15 @@ const renderFieldValue = (d: WorkDetail, key: string): string => {
         const v = d[key];
         return v ? `${v} mm` : '—';
     }
-    const v = d[key];
+    // The display config names its fields by string; only a real column is read.
+    const v = key in d ? d[key as keyof WorkDetail] : undefined;
     return v === undefined || v === null || v === '' ? '—' : String(v);
+};
+
+/** The lab-stage badge text of an item with a lab case. */
+const labBadgeText = (d: WorkDetail): string => {
+    if (d.lab_status === 'cancelled') return 'Lab: Cancelled';
+    return d.lab_status ? labelForStage(d.lab_status, d.material) : 'Lab case';
 };
 
 const StatusBadge = ({ detail }: { detail: WorkDetail }) => {
@@ -137,6 +131,7 @@ const WorkDetailItem = ({
     labs,
     startInEdit = false,
     onCloseNew,
+    onDirtyChange,
 }: WorkDetailItemProps) => {
     const queryClient = useQueryClient();
     const toast = useToast();
@@ -144,7 +139,7 @@ const WorkDetailItem = ({
     // Doctors and assistants write treatment items (CLINICAL_ROLES on the server, FE-F7-7) —
     // except the cost, which is money: its input is finance-only, and the server drops
     // `item_cost` from a clinical caller's body anyway.
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     const caps = roleCaps(user?.role as UserRole | undefined);
     const config = getWorkTypeConfig(typeOfWork);
     const isNew = detail === null;
@@ -171,6 +166,17 @@ const WorkDetailItem = ({
         menuLabel: 'Edit labs',
         invalidateKeys: [qk.lookups.labs()],
     });
+
+    // Unsaved input = an open editor whose draft differs from what it opened with. The
+    // card collapses by unmounting this editor, so it asks first while any is dirty
+    // (a typed note used to vanish on collapse: FE-F7-14).
+    const dirty = isEditing && JSON.stringify(draft) !== JSON.stringify(buildDraft(detail, workId));
+    const dirtyKey = `item-${detail?.id ?? 'new'}`;
+    useEffect(() => {
+        if (!onDirtyChange) return;
+        onDirtyChange(dirtyKey, dirty);
+        return () => onDirtyChange(dirtyKey, false);
+    }, [dirty, dirtyKey, onDirtyChange]);
 
     const fid = (name: string) => `wd-${detail?.id ?? 'new'}-${name}`;
     const hasField = (name: string) => config.fields.includes(name);
@@ -209,7 +215,12 @@ const WorkDetailItem = ({
 
     const handleDelete = async () => {
         if (!detail) return;
-        if (!await confirm('Are you sure you want to delete this work detail?', { title: 'Delete Work Detail', danger: true, confirmText: 'Delete' })) return;
+        // The item's lab case goes with it (lab_cases.work_item_id is ON DELETE CASCADE),
+        // which the confirm used to leave unsaid (FE-F7-14).
+        const message = detail.lab_case_id
+            ? `Are you sure you want to delete this work detail?\n\nIts lab case (${labBadgeText(detail)}) and that case's history are deleted with it.`
+            : 'Are you sure you want to delete this work detail?';
+        if (!await confirm(message, { title: 'Delete Work Detail', danger: true, confirmText: 'Delete' })) return;
         try {
             await deleteJSON('/api/deleteworkdetail', { body: JSON.stringify({ detailId: detail.id }) });
             await queryClient.invalidateQueries({ queryKey: qk.work.detailsList(workId) });
@@ -234,7 +245,7 @@ const WorkDetailItem = ({
                                 title="Open lab case tracker"
                             >
                                 <i className="fas fa-flask"></i>{' '}
-                                {detail.lab_status === 'cancelled' ? 'Lab: Cancelled' : labelForStage(detail.lab_status as LabStage, detail.material)}
+                                {labBadgeText(detail)}
                             </button>
                         ) : (
                             <button type="button" className="btn btn-xs btn-secondary" onClick={() => setLabModalOpen(true)} title="Start Lab Flow">
@@ -471,7 +482,9 @@ const WorkDetailItem = ({
                                 const digits = e.target.value.replace(/[^\d]/g, '');
                                 const num = parseInt(digits, 10) || 0;
                                 setDisplayItemCost(num ? num.toLocaleString('en-US') : '');
-                                setDraft({ ...draft, item_cost: String(num) });
+                                // Cleared is '' (no cost), not '0' — '0' re-displayed as `0` on
+                                // blur (FE-F7-14); the server stores either as NULL.
+                                setDraft({ ...draft, item_cost: num ? String(num) : '' });
                             }}
                             onBlur={() => setDisplayItemCost(draft.item_cost ? formatNumber(draft.item_cost) : '')}
                             placeholder="Optional"

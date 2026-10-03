@@ -19,14 +19,13 @@ import {
 } from '../../core/fileSystemAccess';
 import {
     parseIniContent,
-    formatIniContent,
-    mergeConfigs,
-    getProtocolHandlerFormatOptions,
+    applyIniChanges,
     type IniConfig,
     type IniSection
 } from '../../core/iniParser';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { formatLocaleDateTime } from '../../utils/formatters';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -299,19 +298,22 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 return;
             }
 
-            // Merge pending changes with current config
-            const mergedConfig = mergeConfigs(config, pendingChanges);
-
-            // Format and write to file
-            const content = formatIniContent(mergedConfig, getProtocolHandlerFormatOptions());
+            // Edit the file AS IT IS ON DISK NOW, in place: only the changed keys'
+            // lines are rewritten, so comments, unknown lines and edits made on
+            // disk since this page loaded all survive (audit FE-F1-6).
+            const current = await readTextFile(fileHandle);
+            if (!current.success) {
+                throw new Error(current.error || 'Failed to read file');
+            }
+            const content = applyIniChanges(current.data ?? '', pendingChanges);
             const result = await writeTextFile(fileHandle, content);
 
             if (!result.success) {
                 throw new Error(result.error || 'Failed to write file');
             }
 
-            // Update state
-            setConfig(mergedConfig);
+            // Update state from what was written (it may carry outside edits)
+            setConfig(parseIniContent(content));
             setPendingChanges({});
 
             // Refresh file info
@@ -337,10 +339,19 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             return;
         }
 
+        if (!fileHandle) {
+            toast.error('No file selected');
+            return;
+        }
+
         try {
-            // Merge any pending changes for backup
-            const currentConfig = mergeConfigs(config, pendingChanges);
-            const content = formatIniContent(currentConfig, getProtocolHandlerFormatOptions());
+            // The backup is the file exactly as it is on disk (unsaved edits are
+            // not part of it) — comments and all.
+            const current = await readTextFile(fileHandle);
+            if (!current.success) {
+                throw new Error(current.error || 'Failed to read file');
+            }
+            const content = current.data ?? '';
 
             // Use save file picker for backup
             const backupHandle = await window.showSaveFilePicker({
@@ -394,8 +405,9 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 throw new Error(backupContent.error || 'Failed to read backup file');
             }
 
-            // Parse backup
-            const parsed = parseIniContent(backupContent.data || '');
+            // Restored byte-for-byte: the backup is written back unchanged.
+            const content = backupContent.data ?? '';
+            const parsed = parseIniContent(content);
 
             // Ensure we have write permission for target
             const hasPermission = await ensurePermission(fileHandle, 'readwrite');
@@ -405,7 +417,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             }
 
             // Write to target file
-            const content = formatIniContent(parsed, getProtocolHandlerFormatOptions());
             const writeResult = await writeTextFile(fileHandle, content);
 
             if (!writeResult.success) {
@@ -643,7 +654,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 {fileInfo?.lastModified && (
                     <div>
                         <strong>Last modified:</strong>{' '}
-                        {fileInfo.lastModified.toLocaleString()}
+                        {formatLocaleDateTime(fileInfo.lastModified)}
                     </div>
                 )}
                 {fileInfo?.size !== undefined && (

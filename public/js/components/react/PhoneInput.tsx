@@ -12,7 +12,7 @@
  */
 
 import { IMaskInput } from 'react-imask';
-import { PHONE_MASK, PHONE_PLACEHOLDER } from '../../utils/phoneFormatter';
+import { PHONE_MASK, PHONE_PLACEHOLDER, cleanPhone } from '../../utils/phoneFormatter';
 
 interface PhoneInputProps {
   value: string;
@@ -38,7 +38,12 @@ const PhoneInput = ({
       mask={PHONE_MASK}
       value={value}
       unmask={true}
-      onAccept={onChange}
+      // IMask fires `accept` when it first formats the value it was given. That is
+      // not an edit: reporting it rewrote the form's copy of a number the user had
+      // only looked at (audit FE-F6-4), so only a value that differs is passed on.
+      onAccept={(next: string) => {
+        if (next !== cleanPhone(value)) onChange(next);
+      }}
       placeholder={placeholder}
       className={className}
       disabled={disabled}

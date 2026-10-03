@@ -51,5 +51,16 @@
     "message": "You have unsaved changes. Discard them?",
     "discard": "Discard",
     "keepEditing": "Keep editing"
+  },
+  "age": {
+    "minutes": "{{n}}m",
+    "hours": "{{n}}h",
+    "days": "{{n}}d"
+  },
+  "lookups": {
+    "editValues": "Edit values",
+    "manage": "Manage {{name}}",
+    "manageValues": "Manage values",
+    "loading": "Loading…"
   }
 }

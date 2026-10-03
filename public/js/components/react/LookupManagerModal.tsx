@@ -15,6 +15,7 @@
  * `stopImmediatePropagation` plus `closeOnEscape={false}`.)
  */
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import LookupEditor from './LookupEditor';
@@ -53,7 +54,7 @@ interface LookupManagerModalProps {
   onClose: () => void;
   /** Whitelist key of the lookup table (e.g. 'tblLabs'). */
   tableKey: string;
-  /** Modal title override; defaults to `Manage <displayName>`. */
+  /** Modal title override; defaults to `common:lookups.manage` ("Manage <displayName>"). */
   title?: string;
   /** Fired after any successful create/update/delete (refresh consumer feeds). */
   onChanged?: () => void;
@@ -62,6 +63,7 @@ interface LookupManagerModalProps {
 const TITLE_ID = 'lookup-manager-title';
 
 const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: LookupManagerModalProps) => {
+  const { t } = useTranslation('common');
   // The config list is long-lived + shared with Settings; only fetch once open.
   const { data } = useQuery({ ...adminLookupTablesQuery(), enabled: isOpen });
   // `lookupAdmin.tables.response` is `anyArray` on purpose (config rows vary per
@@ -69,7 +71,7 @@ const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: Loo
   const tables = (data ?? []) as TableConfig[];
   const config = tables.find((t) => t.key === tableKey) ?? null;
 
-  const heading = title ?? (config ? `Manage ${config.displayName}` : 'Manage Values');
+  const heading = title ?? (config ? t('lookups.manage', { name: config.displayName }) : t('lookups.manageValues'));
 
   return (
     <Modal
@@ -96,7 +98,7 @@ const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: Loo
         ) : (
           <div className={styles.loading}>
             <i className="fas fa-spinner fa-spin" aria-hidden="true" />
-            <span>Loading…</span>
+            <span>{t('lookups.loading')}</span>
           </div>
         )}
       </div>

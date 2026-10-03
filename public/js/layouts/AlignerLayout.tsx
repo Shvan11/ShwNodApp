@@ -8,9 +8,7 @@ import '../../css/components/aligner-common.css';
 
 // CSS Module for layout-specific styles
 import styles from './AlignerLayout.module.css';
-import AlignerModeToggle from '../components/react/AlignerModeToggle';
-
-type AlignerMode = 'doctors' | 'search' | 'all-sets' | 'archform-match';
+import AlignerModeToggle, { type AlignerMode } from '../components/react/AlignerModeToggle';
 
 /**
  * Layout component for aligner section
@@ -36,14 +34,14 @@ function AlignerLayout() {
 
   // All-sets locks the shell to the viewport so the table's internal scroller
   // is the only vertical scrollbar (page + table both scrolling = double bar).
-  const containerClass =
-    activeMode === 'all-sets'
-      ? `${styles.container} ${styles.containerViewportLocked}`
-      : styles.container;
+  const viewportLocked = activeMode === 'all-sets';
+  const containerClass = viewportLocked
+    ? `${styles.container} ${styles.containerViewportLocked}`
+    : styles.container;
 
   return (
     <div className={containerClass}>
-      <AlignerModeToggle activeMode={activeMode} styles={styles} />
+      <AlignerModeToggle activeMode={activeMode} sticky={!viewportLocked} />
       <Outlet />
     </div>
   );

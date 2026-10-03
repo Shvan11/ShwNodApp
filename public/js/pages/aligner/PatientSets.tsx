@@ -13,6 +13,7 @@ import BatchFormDrawer from '../../components/react/BatchFormDrawer';
 import PaymentFormDrawer from '../../components/react/PaymentFormDrawer';
 import LabelPreviewModal from '../../components/react/LabelPreviewModal';
 import { copyToClipboard } from '../../core/utils';
+import { formatLocaleDate, formatLocaleDateTime } from '../../utils/formatters';
 import {
     isFileSystemAccessSupported,
     getDirectoryHandle,
@@ -23,7 +24,7 @@ import {
     isAbortError
 } from '../../core/fileSystemAccess';
 import { useToast } from '../../contexts/ToastContext';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { usePrintQueue } from '../../contexts/PrintQueueContext';
 import { useSetDrawer } from '../../hooks/useSetDrawer';
@@ -40,20 +41,11 @@ import type { PaymentSaveData } from '@/types/api.types';
 import { fetchJSON, postJSON, putJSON, patchJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import * as alignerContract from '@shared/contracts/aligner.contract';
+import AlignerPhotoViewer from './AlignerPhotoViewer';
 import styles from './PatientSets.module.css';
 
 /** Fullscreen photo viewer: the photo list it was opened from + the current position. */
 type PhotoViewerState = { photos: AlignerPhoto[]; index: number };
-
-/**
- * Clamped prev/next stepper for the photo viewer. Module-scoped so it's referentially
- * stable in the keydown effect's deps without manual memoization.
- */
-const stepViewer = (delta: number) => (v: PhotoViewerState | null): PhotoViewerState | null => {
-    if (!v) return v;
-    const next = v.index + delta;
-    return next >= 0 && next < v.photos.length ? { ...v, index: next } : v;
-};
 
 const getFileIconClass = (photo: AlignerPhoto): string => {
     const ext = photo.file_name.split('.').pop()?.toLowerCase();
@@ -130,7 +122,7 @@ const PatientSets: React.FC = () => {
     const toast = useToast();
     const queryClient = useQueryClient();
     const { addToQueue, isInQueue, removeByBatchId } = usePrintQueue();
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     const caps = roleCaps(user?.role as UserRole | undefined);
 
     // Determine if we came from doctor browse or direct search
@@ -164,26 +156,6 @@ const PatientSets: React.FC = () => {
     const [viewer, setViewer] = useState<PhotoViewerState | null>(null);
     const [expandedCommunication, setExpandedCommunication] = useState<Record<number, boolean>>({});
     const [loading, setLoading] = useState<boolean>(false);
-
-    const viewerPhoto = viewer ? viewer.photos[viewer.index] ?? null : null;
-
-    // Fullscreen photo viewer keys: Escape closes, arrows step through the set's photos.
-    useEffect(() => {
-        if (!viewer) return;
-        const handleKeyDown = (e: globalThis.KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                setViewer(null);
-            } else if (e.key === 'ArrowLeft') {
-                setViewer(stepViewer(-1));
-            } else if (e.key === 'ArrowRight') {
-                setViewer(stepViewer(1));
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [viewer]);
 
     // Self-managed data loaders. Declared above the drawer hooks + mount effects
     // that reference them so every reference is a backward one (a forward reference
@@ -453,23 +425,17 @@ const PatientSets: React.FC = () => {
     };
 
     // Helper functions
-    const formatDate = (dateString: string | null | undefined): string => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-    };
+    const formatDate = (dateString: string | null | undefined): string =>
+        formatLocaleDate(dateString, { year: 'numeric', month: 'short', day: 'numeric' }) || 'N/A';
 
-    const formatDateTime = (dateString: string | null | undefined): string => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleString(undefined, {
+    const formatDateTime = (dateString: string | null | undefined): string =>
+        formatLocaleDateTime(dateString, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-        });
-    };
+        }) || 'N/A';
 
     // Delivered = server-computed sum over batches with a delivery date (net of
     // templates, matching the set totals). total-minus-remaining is wrong here:
@@ -2281,66 +2247,14 @@ const PatientSets: React.FC = () => {
                 doctorName={labelModalData.set?.AlignerDoctorName ?? undefined}
             />
 
-            {viewer && viewerPhoto && (
-                <div
-                    className="aligner-photo-viewer-overlay"
-                    onClick={() => setViewer(null)}
-                    role="dialog"
-                    aria-modal="true"
-                >
-                    <button
-                        className="aligner-photo-viewer-close"
-                        onClick={() => setViewer(null)}
-                        aria-label="Close viewer"
-                    >
-                        <i className="fas fa-times"></i>
-                    </button>
-                    {viewer.photos.length > 1 && (
-                        <button
-                            className="aligner-photo-viewer-nav aligner-photo-viewer-prev"
-                            onClick={(e) => { e.stopPropagation(); setViewer(stepViewer(-1)); }}
-                            disabled={viewer.index === 0}
-                            title="Previous photo"
-                            aria-label="Previous photo"
-                        >
-                            <i className="fas fa-chevron-left"></i>
-                        </button>
-                    )}
-                    <div
-                        className="aligner-photo-viewer-content"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <img
-                            src={viewerPhoto.view_url}
-                            alt={viewerPhoto.file_name}
-                            className="aligner-photo-viewer-image"
-                        />
-                        <div className="aligner-photo-viewer-details">
-                            <div className="aligner-photo-viewer-filename">{viewerPhoto.file_name}</div>
-                            {viewerPhoto.uploaded_at && (
-                                <div className="aligner-photo-viewer-meta">
-                                    Uploaded: {formatDate(viewerPhoto.uploaded_at)}
-                                </div>
-                            )}
-                            {viewer.photos.length > 1 && (
-                                <div className="aligner-photo-viewer-counter">
-                                    {viewer.index + 1} / {viewer.photos.length}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    {viewer.photos.length > 1 && (
-                        <button
-                            className="aligner-photo-viewer-nav aligner-photo-viewer-next"
-                            onClick={(e) => { e.stopPropagation(); setViewer(stepViewer(1)); }}
-                            disabled={viewer.index === viewer.photos.length - 1}
-                            title="Next photo"
-                            aria-label="Next photo"
-                        >
-                            <i className="fas fa-chevron-right"></i>
-                        </button>
-                    )}
-                </div>
+            {viewer && (
+                <AlignerPhotoViewer
+                    photos={viewer.photos}
+                    index={viewer.index}
+                    onIndexChange={(index) => setViewer({ ...viewer, index })}
+                    onClose={() => setViewer(null)}
+                    formatDate={formatDate}
+                />
             )}
         </div>
     );

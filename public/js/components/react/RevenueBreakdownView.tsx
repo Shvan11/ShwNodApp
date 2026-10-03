@@ -208,7 +208,9 @@ const RevenueBreakdownView = () => {
 
     const { data, isFetching, isError, error } = useQuery({
         ...revenueBreakdownQuery(startDate, endDate),
-        enabled: !invalidRange,
+        // Composed with the factory's own guard, not in place of it: replacing it
+        // let an empty date through to a 400 (audit FE-F5-8).
+        enabled: !invalidRange && !!startDate && !!endDate,
         placeholderData: keepPreviousData,
     });
 

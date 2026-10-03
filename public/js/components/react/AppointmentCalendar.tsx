@@ -8,7 +8,7 @@ import HolidayQuickModal from './HolidayQuickModal';
 import CalendarLegend from './CalendarLegend';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { useAppointmentDoctors } from '../../hooks/useAppointmentDoctors';
 import type { MenuAnchor } from '../../hooks/useFloatingMenu';
@@ -18,6 +18,7 @@ import {
     getWeekStartSaturday,
     addWorkingDays
 } from '../../utils/calendarDate';
+import { formatLocaleDate } from '../../utils/formatters';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
@@ -80,11 +81,7 @@ const readStoredDayCount = (): number => {
 const isMobileWidth = (): boolean => typeof window !== 'undefined' && window.innerWidth <= MOBILE_MAX_WIDTH;
 
 const shortDate = (d: string): string =>
-    parseLocalDate(d).toLocaleDateString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric'
-    });
+    formatLocaleDate(d, { weekday: 'short', month: 'short', day: 'numeric' });
 
 /** First of the month `delta` months from `d`. Always the 1st, so it never overflows. */
 const monthStep = (d: Date, delta: number): Date => new Date(d.getFullYear(), d.getMonth() + delta, 1);
@@ -127,7 +124,7 @@ const AppointmentCalendar = () => {
     const toast = useToast();
     const confirm = useConfirm();
     const queryClient = useQueryClient();
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     // Holiday writes go through `/api/admin/lookups`, which is admin + front desk.
     const canManageHolidays = roleCaps(user?.role as UserRole | undefined).manageLookups;
     const { byId: doctorColors, legend: doctorLegend } = useAppointmentDoctors();
@@ -178,18 +175,15 @@ const AppointmentCalendar = () => {
     );
 
     // Toolbar title — main line (month + year) + sub line (range / single day).
-    const titleMain = (effectiveView === 'month' ? currentDate : parseLocalDate(anchorDate))
-        .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const titleMain = formatLocaleDate(
+        effectiveView === 'month' ? currentDate : anchorDate,
+        { month: 'long', year: 'numeric' }
+    );
 
     let titleSub = '';
     if (effectiveView !== 'month') {
         titleSub = effectiveDayCount === 1
-            ? parseLocalDate(anchorDate).toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric'
-              })
+            ? formatLocaleDate(anchorDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
             : `${shortDate(anchorDate)} – ${shortDate(gridEnd)} · ${effectiveDayCount} days`;
     }
 

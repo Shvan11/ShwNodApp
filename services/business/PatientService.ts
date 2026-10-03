@@ -17,6 +17,7 @@ import { insertIntakeWork } from '../database/queries/work-queries.js';
 import { recomputePatientType } from '../database/queries/patient-type-classifier.js';
 import { getKysely, withPgTransaction } from '../database/kysely.js';
 import { WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
+import { CLINIC_DOCTOR_NAME } from '../../shared/clinic-doctor.js';
 import type { PatientIntake } from '../../shared/contracts/patient.contract.js';
 import { toDateOnly } from '../../utils/date.js';
 import { createAlert } from '../database/queries/alert-queries.js';
@@ -203,7 +204,7 @@ async function resolveClinicDoctorId(): Promise<number> {
   const row = await getKysely()
     .selectFrom('employees')
     .select('id')
-    .where('employee_name', '=', 'Clinic')
+    .where('employee_name', '=', CLINIC_DOCTOR_NAME)
     .where('is_active', '=', true)
     .executeTakeFirst();
   if (!row) {

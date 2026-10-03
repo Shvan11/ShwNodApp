@@ -5,7 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import LookupEditorModal from './LookupEditorModal';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import { parseLocalDate } from '../../utils/calendarDate';
+import { formatLocaleDate, formatLocaleTime } from '../../utils/formatters';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import * as holiday from '@shared/contracts/holiday.contract';
 import { qk } from '@/query/keys';
@@ -329,15 +329,8 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
     });
 
     // Format date for display
-    const formatDate = (dateValue: unknown): string => {
-        if (!dateValue) return '-';
-        const date = parseLocalDate(dateValue as string);
-        return date.toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
+    const formatDate = (dateValue: unknown): string =>
+        formatLocaleDate(dateValue as string, { year: 'numeric', month: 'short', day: 'numeric' }) || '-';
 
     // Get display value for a cell (specialized for holidays)
     const getCellValue = (item: HolidayItem, column: Column): React.ReactNode => {
@@ -508,10 +501,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                                         </span>
                                         <span className="appointment-detail">{apt.app_detail}</span>
                                         <span className="appointment-time">
-                                            {apt.app_date ? new Date(apt.app_date).toLocaleTimeString(undefined, {
-                                                hour: 'numeric',
-                                                minute: '2-digit'
-                                            }) : ''}
+                                            {formatLocaleTime(apt.app_date, { hour: 'numeric', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 ))}

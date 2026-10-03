@@ -4,7 +4,7 @@
  */
 import type { StandItem, StandStockMovement } from '../../hooks/useStand';
 import { useStockMovements } from '../../hooks/useStand';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, formatLocaleDate } from '../../utils/formatters';
 import Modal from '../react/Modal';
 import ModalHeader from '../react/ModalHeader';
 import styles from './StockMovementsModal.module.css';
@@ -16,16 +16,13 @@ interface StockMovementsModalProps {
 }
 
 function formatDate(dateString: string | null): string {
-  if (!dateString) return '-';
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString(undefined, {
+  return formatLocaleDate(dateString, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  }) || '-';
 }
 
 function getTypeBadgeClass(type: string): string {

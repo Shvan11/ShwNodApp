@@ -30,6 +30,7 @@ import {
   type MessageStatusValue,
 } from '../utils/whatsapp-send-constants';
 import { escapeHtml } from '../utils/whatsapp-validation';
+import { formatLocaleDate } from '../utils/formatters';
 
 /**
  * Coalesce the burst of status ticks during a live send (server → device → read
@@ -116,16 +117,11 @@ function fetchMessageStatus(date: string, signal?: AbortSignal): Promise<Message
 }
 
 /**
- * Format display date
+ * Format display date. The selected day is a 'YYYY-MM-DD', read as a LOCAL day
+ * (`new Date('YYYY-MM-DD')` is UTC midnight — the previous weekday west of UTC).
  */
 function formatDisplayDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  return formatLocaleDate(dateString, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 /**

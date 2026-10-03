@@ -1,9 +1,9 @@
 /**
  * Client-side patient jump-list matching.
  *
- * One home for the name rule, because there are two widgets rendering a patient
- * jump list (`PatientSearchCombobox` and the older `PatientQuickSearch`) and
- * they had drifted into two copies of it. Both copies were also wrong in the
+ * One home for the name rule. There used to be two widgets rendering a patient
+ * jump list (`PatientSearchCombobox` and the older `PatientQuickSearch`, retired
+ * by audit FE-F4-13) with a drifted copy each, and both copies were wrong in the
  * same way: a bare `String.startsWith`, which is case-SENSITIVE, over a server
  * whose text columns are `citext` (case-insensitive). Typing `ali` offered
  * nothing while pressing Enter found `Ali`.

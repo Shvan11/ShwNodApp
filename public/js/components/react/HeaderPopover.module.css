@@ -1,0 +1,49 @@
+/* HeaderPopover — the shared shell of the header bells: a white icon button in
+   the coloured header band and a surface card portaled to <body> (position:fixed,
+   top/left/width set inline off the bell rect). Each bell styles its own badge
+   colour and the card's content. Logical props throughout for RTL. */
+
+.wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.bellBtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-white);
+    font-size: var(--font-size-lg);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.bellBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.bellBtn:focus-visible {
+    outline: 2px solid var(--color-white);
+    outline-offset: 2px;
+}
+
+.popover {
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    z-index: var(--z-index-popover);
+    overflow: hidden;
+}
+
+/* The card takes focus on open only as a starting point for Tab. */
+.popover:focus {
+    outline: none;
+}

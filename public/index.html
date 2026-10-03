@@ -37,12 +37,12 @@
         if (lang !== 'en' && lang !== 'ar') lang = 'en';
         document.documentElement.setAttribute('lang', lang);
         var p = location.pathname;
-        // Prefix-match all three static routes, exactly like isRtlRoute's
+        // Prefix-match every static route, exactly like isRtlRoute's
         // `path === route || path.startsWith(route + '/')`. This list used to
         // prefix-match only /expenses/ and exact-match the other two, so the two
         // implementations of the same rule would have diverged the moment
         // /dashboard or /appointments grew a child route.
-        var rtlStatic = ['/dashboard', '/expenses', '/appointments'];
+        var rtlStatic = ['/dashboard', '/expenses', '/appointments', '/approvals'];
         var rtlRoute = (p === '/' || rtlStatic.some(function (r) { return p === r || p.indexOf(r + '/') === 0; }) || /^\/patient\/[^/]+\/works\/?$/.test(p) || /^\/patient\/[^/]+\/appointments\/?$/.test(p) || /^\/patient\/[^/]+\/new-appointment\/?$/.test(p) || /^\/patient\/[^/]+\/edit-appointment(\/.*)?$/.test(p) || /^\/patient\/[^/]+\/patient-info\/?$/.test(p) || /^\/patient\/[^/]+\/edit-patient\/?$/.test(p) || /^\/patient\/[^/]+\/add\/?$/.test(p));
         document.documentElement.setAttribute('dir', (lang === 'ar' && rtlRoute) ? 'rtl' : 'ltr');
 
@@ -200,6 +200,12 @@
             color: #666;
         }
 
+        .error-boundary .error-boundary-detail {
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
         @media screen {
             html[data-theme="dark"] .error-boundary {
                 background-color: #2a1416;
@@ -264,8 +270,6 @@
                         return response;
                     });
             };
-
-            console.log('[Auth] Global fetch interceptor installed');
         })();
     </script>
 
@@ -274,75 +278,32 @@
         import React from 'react';
         import ReactDOM from 'react-dom/client';
 
-        console.log('[App] Initializing unified React application with Data Router');
-
-        // Import main App component (contains RouterProvider with createBrowserRouter).
-        // App itself renders the <StrictMode> wrapper — see App.tsx.
+        // App renders its own <StrictMode> and owns the router (RouterProvider over
+        // createBrowserRouter) — no BrowserRouter wrapper here. Uncaught errors are
+        // reported by core/error-reporter.ts, so this page adds no listeners of its own.
         import App from '/js/App.jsx';
 
-        // Wait for ALL resources (including CSS) to load
-        window.addEventListener('load', async () => {
-            console.log('[App] All resources loaded - mounting application');
+        // Mount now. A module script already runs after the document is parsed AND
+        // after the head's stylesheets have loaded (pending sheets block it), so
+        // there is no unstyled flash to wait out. It used to wait for window
+        // `load` — every image and font as well — before mounting anything
+        // (audit FE-F0-5).
+        const appContainer = document.getElementById('single-spa-application');
+        appContainer.innerHTML = '<div id="app-root"></div>';
 
-            // Clear loading spinner and prepare root element
-            const appContainer = document.getElementById('single-spa-application');
-            appContainer.innerHTML = '<div id="app-root"></div>';
-
-            // Mount the unified React application with Data Router
-            // App.jsx contains RouterProvider with createBrowserRouter
-            // NO BrowserRouter wrapper needed - Data Router handles routing
-            const root = ReactDOM.createRoot(document.getElementById('app-root'));
-
-            try {
-                root.render(React.createElement(App));
-
-                console.log('[App] Application mounted successfully with Data Router');
-            } catch (error) {
-                console.error('[App] Failed to mount application:', error);
-
-                // Show error to user
-                appContainer.innerHTML = `
-                    <div class="error-boundary">
-                        <h2>Application Failed to Start</h2>
-                        <p>Unable to initialize the application. Please refresh the page.</p>
-                        <p style="color: #999; font-size: 12px; margin-top: 10px;">
-                            Error: ${error.message}
-                        </p>
-                    </div>
-                `;
-            }
-        });
-
-        // Global error handler
-        window.addEventListener('error', (event) => {
-            console.error('[App] Global error:', event.error);
-        });
-
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('[App] Unhandled promise rejection:', event.reason);
-        });
-
-        // Performance monitoring
-        window.addEventListener('load', () => {
-            if (window.performance) {
-                const perfData = window.performance.timing;
-                const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
-                console.log(`[App] Page load time: ${pageLoadTime}ms`);
-            }
-        });
-    </script>
-
-    <!-- Service Worker Registration (Future Enhancement) -->
-    <!--
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(reg => console.log('[SW] Service Worker registered'))
-                    .catch(err => console.error('[SW] Service Worker registration failed:', err));
-            });
+        try {
+            ReactDOM.createRoot(document.getElementById('app-root')).render(React.createElement(App));
+        } catch (error) {
+            console.error('[App] Failed to mount application:', error);
+            appContainer.innerHTML = `
+                <div class="error-boundary">
+                    <h2>Application Failed to Start</h2>
+                    <p>Unable to initialize the application. Please refresh the page.</p>
+                    <p class="error-boundary-detail"></p>
+                </div>
+            `;
+            appContainer.querySelector('.error-boundary-detail').textContent = 'Error: ' + (error && error.message);
         }
     </script>
-    -->
 </body>
 </html>

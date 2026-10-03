@@ -5,6 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import type { StandItem } from '../../hooks/useStand';
+import { parseLocalDate } from '../../utils/calendarDate';
 import styles from './ExpiringItemsPanel.module.css';
 
 interface ExpiringItemsPanelProps {
@@ -24,10 +25,12 @@ function daysBetween(from: Date, to: Date): number {
 }
 
 /**
- * Format a date string as DD/MM/YYYY.
+ * Format a date string as DD/MM/YYYY. `expiry_date` is a PG `date` ('YYYY-MM-DD'):
+ * parse it as a LOCAL day — `new Date('YYYY-MM-DD')` is UTC midnight, a day early
+ * in any timezone west of UTC.
  */
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
   const year = d.getFullYear();
@@ -62,7 +65,7 @@ const ExpiringItemsPanel: React.FC<ExpiringItemsPanelProps> = ({ items, loading 
       items
         .filter((item) => item.expiry_date != null)
         .map((item) => {
-          const days = daysBetween(today, new Date(item.expiry_date as string));
+          const days = daysBetween(today, parseLocalDate(item.expiry_date as string));
           return { item, days };
         })
         .sort((a, b) => a.days - b.days),

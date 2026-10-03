@@ -62,6 +62,13 @@
     margin-right: var(--spacing-sm);
 }
 
+/* A collapsed card's chevron points the way its content opens: toward the text,
+   which under RTL is left (audit FE-F7-12; postcss-rtlcss flips layout, not
+   icon glyphs). */
+[dir='rtl'] .chevronCollapsed {
+    transform: scaleX(-1);
+}
+
 .balanceIndicator {
     color: var(--error-500);
     font-weight: var(--font-weight-semibold);

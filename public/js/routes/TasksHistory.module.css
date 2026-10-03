@@ -175,6 +175,7 @@
 .stSnoozed { background: var(--warning-100); color: var(--warning-700); }
 .stDone { background: var(--success-100); color: var(--success-700); }
 .stDismissed { background: var(--surface-muted); color: var(--text-secondary); }
+.stExpired { background: var(--surface-muted); color: var(--text-muted); font-style: italic; }
 
 .actionCell {
     white-space: nowrap;
@@ -233,4 +234,10 @@
 .deleteBtn:disabled {
     opacity: 0.6;
     cursor: default;
+}
+
+.limitNote {
+    margin: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
 }

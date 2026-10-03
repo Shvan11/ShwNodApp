@@ -11,10 +11,10 @@ import { formatISODate } from '../../core/utils';
 import { putJSON, postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
 import { PATIENT_LANGUAGE_OPTIONS } from '@shared/patient-language';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { qk } from '@/query/keys';
-import { notifyApprovalsChanged } from '@/services/approvals';
+import { invalidateApprovals } from '@/services/approvals';
 import {
     patientByIdQuery,
     gendersQuery,
@@ -56,7 +56,6 @@ interface Tag {
 }
 
 interface FormData {
-    person_id: string | number;
     patient_name: string;
     first_name: string;
     last_name: string;
@@ -67,7 +66,6 @@ interface FormData {
     gender: string;
     address_id: string;
     referral_source_id: string;
-    patient_type_id: string;
     notes: string;
     language: string;
     country_code: string;
@@ -79,7 +77,7 @@ interface FormData {
 const EditPatientComponent = ({ personId }: Props) => {
     const { t } = useTranslation('patients');
     // Patient edit + delete are FINANCE_ROLES on the server — see the guard above the render.
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     const caps = roleCaps(user?.role as UserRole | undefined);
     const navigate = useNavigate();
     const location = useLocation();
@@ -91,16 +89,19 @@ const EditPatientComponent = ({ personId }: Props) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
-    // Patient record read — populates the form via the effect below. Each
-    // dropdown read is its own independent query, so one lookup failing can't
-    // blank the others (same tolerance the old per-promise `.catch` gave, free).
+    // Patient record read — seeds the form below. Always refetched on mount and
+    // seeded only once that fetch has settled: Save is a whole-row PUT, so seeding
+    // from a cached copy (up to gcTime old) let a save revert a colleague's newer
+    // change that nothing on screen had shown (audit FE-F6-8). Each dropdown read
+    // is its own query, so one lookup failing can't blank the others.
     const {
         data: patientData,
-        isLoading: patientLoading,
+        isFetching: patientFetching,
         error: patientError,
     } = useQuery({
         ...patientByIdQuery(personId ?? ''),
         enabled: !!personId,
+        refetchOnMount: 'always',
     });
 
     // Dropdown reads — loose contract responses expose the long-tail fields as
@@ -119,12 +120,6 @@ const EditPatientComponent = ({ personId }: Props) => {
     const patientTypes: PatientType[] = patientTypesData ?? [];
     const tags: Tag[] = tagsData ?? [];
 
-    // Loading screen shows only while the patient record is in flight (a missing
-    // personId resolves immediately to "not loading").
-    const loading = !!personId && patientLoading;
-
-    // Use validated PersonID from loader, fallback to patientData.person_id
-    const validPersonId = personId ?? patientData?.person_id ?? null;
 
     // Where Save/Cancel return to. Callers that navigate here pass the page they
     // came from in `location.state.from` (patient-info, patient management, …) so
@@ -135,7 +130,6 @@ const EditPatientComponent = ({ personId }: Props) => {
 
     // Form data
     const [formData, setFormData] = useState<FormData>({
-        person_id: '',
         patient_name: '',
         first_name: '',
         last_name: '',
@@ -146,7 +140,6 @@ const EditPatientComponent = ({ personId }: Props) => {
         gender: '',
         address_id: '',
         referral_source_id: '',
-        patient_type_id: '',
         notes: '',
         language: '0',
         country_code: '',
@@ -155,26 +148,30 @@ const EditPatientComponent = ({ personId }: Props) => {
         tag_id: ''
     });
 
-    // Derived patient-type label for the read-only display (id→name map). Empty when
-    // the type isn't set/loaded yet. Must stay below the `formData` declaration —
-    // `.find()` runs its callback synchronously, so referencing `formData` above it
-    // would hit the temporal dead zone once `patientTypes` is non-empty.
+    // One field at a time, always from the latest state. The handlers used to spread
+    // the render's `formData`, so two writes in one tick (both phone inputs report at
+    // mount) lost the first (audit FE-F6-4).
+    const setField = <K extends keyof FormData>(key: K, value: FormData[K]) =>
+        setFormData(prev => ({ ...prev, [key]: value }));
+    const handlePhoneChange = (value: string) => setField('phone', value);
+    const handlePhone2Change = (value: string) => setField('phone2', value);
+
+    // Derived patient-type label for the read-only display (id→name map); the type is
+    // derived from the works and never posted, so it is read off the record itself.
     const patientTypeLabel =
-        patientTypes.find((pt) => String(pt.id) === String(formData.patient_type_id))?.name ?? '';
+        patientTypes.find((pt) => pt.id === patientData?.patient_type_id)?.name ?? '';
 
     // Populate the form when the patient record arrives (or is refetched after a
     // save). Mirrors the old loadPatientData population exactly — same field
     // coercion (String(...) on FK ids/cost, NULL→'' empty-option, language→'0').
     // Done during render (adjust-state-during-render), keyed on the patient identity,
     // so the React Compiler can optimize and there's no extra post-paint render.
-    const patientKey = patientData ? String(patientData.person_id) : '';
+    const patientKey = patientData && !patientFetching ? String(patientData.person_id) : '';
     const [initializedPatientKey, setInitializedPatientKey] = useState('');
-    if (patientKey !== initializedPatientKey) {
+    if (patientKey && patientKey !== initializedPatientKey) {
         setInitializedPatientKey(patientKey);
-        if (patientData) {
-        const data = patientData;
+        const data = patientData!;
         setFormData({
-            person_id: data.person_id,
             patient_name: data.patient_name || '',
             first_name: data.first_name || '',
             last_name: data.last_name || '',
@@ -188,7 +185,6 @@ const EditPatientComponent = ({ personId }: Props) => {
             gender: data.gender ? String(data.gender) : '',
             address_id: data.address_id ? String(data.address_id) : '',
             referral_source_id: data.referral_source_id ? String(data.referral_source_id) : '',
-            patient_type_id: data.patient_type_id ? String(data.patient_type_id) : '',
             notes: data.notes || '',
             language: (data.language !== null && data.language !== undefined) ? data.language.toString() : '0',
             country_code: data.country_code || '',
@@ -196,8 +192,10 @@ const EditPatientComponent = ({ personId }: Props) => {
             currency: data.currency || 'IQD',
             tag_id: data.tag_id ? String(data.tag_id) : ''
         });
-        }
     }
+
+    // The form shows once it is seeded from the fresh record (or the read failed).
+    const loading = !!personId && !patientError && initializedPatientKey !== String(personId);
 
     // Surface a patient-record load failure in the existing error banner (the
     // old loadPatientData did setError(...) on its catch). Done during render
@@ -219,8 +217,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             return;
         }
 
-        // Use validated PersonID for API call
-        const pid = validPersonId ?? formData.person_id;
+        const pid = personId;
         if (!pid) {
             setError(t('edit.toast.invalidId'));
             toast.error(t('edit.toast.invalidId'));
@@ -233,6 +230,8 @@ const EditPatientComponent = ({ personId }: Props) => {
 
             await putJSON(`/api/patients/${pid}`, formData);
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
+            // The name and phones feed the jump comboboxes and message pickers (FE-F6-9).
+            queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
 
             toast.success(t('edit.toast.success'));
             // Close the form on success — return to the page the user came from
@@ -291,8 +290,8 @@ const EditPatientComponent = ({ personId }: Props) => {
 
     const handleCancel = () => {
         // Back to wherever the user opened the form from (works page by default)
-        if (validPersonId) {
-            navigate(backTo(validPersonId));
+        if (personId) {
+            navigate(backTo(personId));
         } else {
             navigate(returnTo ?? '/patient-management');
         }
@@ -303,7 +302,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     // a same-day-only user's delete is routed to admin approval instead of applied.
     const handleDeleteConfirm = async () => {
         if (deleting) return;
-        const pid = validPersonId ?? formData.person_id;
+        const pid = personId;
         if (!pid) {
             toast.error(t('edit.toast.invalidId'));
             return;
@@ -319,10 +318,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                 toast.success(t('edit.toast.deletePending'));
                 // A request was created but no row changed — tell the approval bells
                 // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
-                notifyApprovalsChanged();
+                void invalidateApprovals();
                 return;
             }
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
+            queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
             if (data.folderRemoved === false) {
                 toast.warning(t('edit.toast.deleteFolderWarning'));
             } else {
@@ -376,12 +376,20 @@ const EditPatientComponent = ({ personId }: Props) => {
             </div>
 
             {error && (
-                <div className={styles.editPatientError}>
+                <div className={styles.editPatientError} role="alert">
                     <div>
-                        <i className="fas fa-exclamation-circle"></i>
+                        <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                         {error}
                     </div>
-                    <button onClick={() => setError(null)} className={styles.editPatientErrorClose}><i className="fas fa-times"></i></button>
+                    <button
+                        type="button"
+                        onClick={() => setError(null)}
+                        className={styles.editPatientErrorClose}
+                        aria-label={t('edit.dismissError')}
+                        title={t('edit.dismissError')}
+                    >
+                        <i className="fas fa-times" aria-hidden="true"></i>
+                    </button>
                 </div>
             )}
 
@@ -429,9 +437,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-patient-name"
                             type="text"
                             value={formData.patient_name}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, patient_name: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setField('patient_name', e.target.value)}
                             required
                             className="form-control"
+                            dir="rtl"
+                            lang="ar"
                         />
                     </div>
                 </div>
@@ -444,7 +454,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                             type="text"
                             className="form-control"
                             value={formData.first_name}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, first_name: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setField('first_name', e.target.value)}
+                            dir="ltr"
                         />
                     </div>
                     <div className={styles.formGroup}>
@@ -454,7 +465,8 @@ const EditPatientComponent = ({ personId }: Props) => {
                             type="text"
                             className="form-control"
                             value={formData.last_name}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, last_name: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setField('last_name', e.target.value)}
+                            dir="ltr"
                         />
                     </div>
                 </div>
@@ -484,8 +496,12 @@ const EditPatientComponent = ({ personId }: Props) => {
                             type="text"
                             className="form-control"
                             value={formData.country_code}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, country_code: e.target.value})}
-                            placeholder="+964"
+                            // Digits only: a typed "+964" reached the SMS builder as "++964…" (FE-F6-7e).
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setField('country_code', e.target.value.replace(/\D/g, ''))}
+                            placeholder={t('fields.countryCodePlaceholder')}
+                            inputMode="numeric"
+                            maxLength={4}
+                            dir="ltr"
                         />
                     </div>
                     <div className={styles.formGroup}>
@@ -493,7 +509,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <PhoneInput
                             id="edit-phone"
                             value={formData.phone}
-                            onChange={(value) => setFormData({...formData, phone: value})}
+                            onChange={handlePhoneChange}
                         />
                     </div>
                 </div>
@@ -504,7 +520,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         <PhoneInput
                             id="edit-phone2"
                             value={formData.phone2}
-                            onChange={(value) => setFormData({...formData, phone2: value})}
+                            onChange={handlePhone2Change}
                         />
                     </div>
                 </div>
@@ -517,7 +533,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             type="email"
                             className="form-control"
                             value={formData.email}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, email: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setField('email', e.target.value)}
                             dir="ltr"
                         />
                     </div>
@@ -528,7 +544,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             type="date"
                             className="form-control"
                             value={formData.date_of_birth}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, date_of_birth: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setField('date_of_birth', e.target.value)}
                         />
                     </div>
                 </div>
@@ -540,7 +556,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-gender"
                             className="form-control"
                             value={formData.gender}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, gender: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('gender', e.target.value)}
                         >
                             <option value="">{t('fields.selectGender')}</option>
                             {genders.map(gender => (
@@ -556,7 +572,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-language"
                             className="form-control"
                             value={formData.language}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, language: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('language', e.target.value)}
                         >
                             {/* Codebook shared with the reminder senders (FE-F6-2). */}
                             {PATIENT_LANGUAGE_OPTIONS.map(o => (
@@ -573,7 +589,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-address-id"
                             className="form-control"
                             value={formData.address_id}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, address_id: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('address_id', e.target.value)}
                         >
                             <option value="">{t('fields.selectAddress')}</option>
                             {addresses.map(address => (
@@ -589,7 +605,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-referral-source-id"
                             className="form-control"
                             value={formData.referral_source_id}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, referral_source_id: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('referral_source_id', e.target.value)}
                         >
                             <option value="">{t('fields.selectReferralSource')}</option>
                             {referralSources.map(source => (
@@ -622,7 +638,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-tag-id"
                             className="form-control"
                             value={formData.tag_id}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, tag_id: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('tag_id', e.target.value)}
                         >
                             <option value="">{t('fields.selectTag')}</option>
                             {tags.map(tag => (
@@ -645,7 +661,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 const rawValue = e.target.value.replace(/,/g, '');
                                 if (rawValue === '' || /^\d+$/.test(rawValue)) {
-                                    setFormData({...formData, estimated_cost: rawValue});
+                                    setField('estimated_cost', rawValue);
                                 }
                             }}
                             placeholder={t('fields.estimatedCostPlaceholder')}
@@ -657,7 +673,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                             id="edit-currency"
                             className="form-control"
                             value={formData.currency}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, currency: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('currency', e.target.value)}
                         >
                             <option value="IQD">{t('currencies.iqd')}</option>
                             <option value="USD">{t('currencies.usd')}</option>
@@ -672,7 +688,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         id="edit-notes"
                         className="form-control"
                         value={formData.notes}
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, notes: e.target.value})}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setField('notes', e.target.value)}
                         rows={3}
                     />
                 </div>

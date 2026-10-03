@@ -1,8 +1,47 @@
+import { useState } from 'react';
+import { toLocalDateString as ymd } from '../../utils/calendarDate';
 import styles from './PeriodNavigator.module.css';
 
-// Local-wall-clock YYYY-MM-DD helpers (single-clinic dates, no UTC shift).
-const pad2 = (n: number): string => String(n).padStart(2, '0');
-const ymd = (d: Date): string => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/**
+ * A complete date the range can use. A date input reports `0002-10-15` after the
+ * first digit of a typed year and '' when cleared; neither is a period anyone
+ * means, and each fired an aggregate query or a 400 (audit FE-F5-8).
+ */
+const isUsableDate = (v: string): boolean => /^(\d{4})-\d{2}-\d{2}$/.test(v) && Number(v.slice(0, 4)) >= 2000;
+
+/**
+ * A date field that hands the range only a usable date and snaps an unusable
+ * draft back to the committed value on blur. (Controlled straight off the prop,
+ * an ignored keystroke would also be reverted, and the year could not be typed.)
+ */
+const DateField = ({ id, value, min, max, onCommit }: {
+    id: string;
+    value: string;
+    min?: string;
+    max?: string;
+    onCommit: (v: string) => void;
+}) => {
+    const [draft, setDraft] = useState(value);
+    const [shown, setShown] = useState(value);
+    if (value !== shown) {
+        setShown(value);
+        setDraft(value);
+    }
+    return (
+        <input
+            id={id}
+            type="date"
+            value={draft}
+            min={min}
+            max={max}
+            onChange={(e) => {
+                setDraft(e.target.value);
+                if (isUsableDate(e.target.value) && e.target.value !== value) onCommit(e.target.value);
+            }}
+            onBlur={() => { if (!isUsableDate(draft)) setDraft(value); }}
+        />
+    );
+};
 
 /** First day of the current calendar month, as YYYY-MM-DD. */
 export const currentMonthStart = (): string => {
@@ -36,7 +75,10 @@ interface PeriodNavigatorProps {
 const PeriodNavigator = ({ startDate, endDate, onChange, isFetching, idPrefix }: PeriodNavigatorProps) => {
     // Jump to the whole calendar month `delta` months from the current start month.
     const stepMonth = (delta: number) => {
-        const [y, m] = startDate.split('-').map(Number);
+        // An unusable start (never committed by DateField, but the prop is the
+        // parent's) steps from this month rather than producing NaN-NaN-NaN.
+        const base = isUsableDate(startDate) ? startDate : currentMonthStart();
+        const [y, m] = base.split('-').map(Number);
         const first = new Date(y, m - 1 + delta, 1);
         const last = new Date(y, m - 1 + delta + 1, 0);
         onChange(ymd(first), ymd(last));
@@ -56,12 +98,11 @@ const PeriodNavigator = ({ startDate, endDate, onChange, isFetching, idPrefix }:
 
             <div className={styles.periodField}>
                 <label htmlFor={`${idPrefix}-start`}>From</label>
-                <input
+                <DateField
                     id={`${idPrefix}-start`}
-                    type="date"
                     value={startDate}
                     max={endDate || undefined}
-                    onChange={(e) => onChange(e.target.value, endDate)}
+                    onCommit={(v) => onChange(v, endDate)}
                 />
             </div>
 
@@ -69,12 +110,11 @@ const PeriodNavigator = ({ startDate, endDate, onChange, isFetching, idPrefix }:
 
             <div className={styles.periodField}>
                 <label htmlFor={`${idPrefix}-end`}>To</label>
-                <input
+                <DateField
                     id={`${idPrefix}-end`}
-                    type="date"
                     value={endDate}
                     min={startDate || undefined}
-                    onChange={(e) => onChange(startDate, e.target.value)}
+                    onCommit={(v) => onChange(startDate, v)}
                 />
             </div>
 

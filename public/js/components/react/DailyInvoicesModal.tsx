@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { httpErrorMessage } from '@/core/http';
 import { dailyInvoicesQuery } from '@/query/queries';
-import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
+import { formatCurrency as formatCurrencyUtil, formatLocaleDate, formatLocaleTime } from '../../utils/formatters';
+import { toLocalDateString } from '../../utils/calendarDate';
 import type { EnrichedInvoiceRow } from '@shared/contracts/reports.contract';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
@@ -12,12 +13,13 @@ import styles from './StatisticsComponent.module.css';
 // numeric string, so it is not narrowed with a cast (FE-F8-11).
 type Invoice = EnrichedInvoiceRow;
 
+/** The statistics row of the day (`reports.statistics` dailyData); null = that currency side had no row. */
 interface SelectedDateData {
     Day?: string;
-    ExpensesIQD?: number;
-    ExpensesUSD?: number;
-    ExpectedCashIQD?: number;
-    ExpectedCashUSD?: number;
+    ExpensesIQD?: number | null;
+    ExpensesUSD?: number | null;
+    ExpectedCashIQD?: number | null;
+    ExpectedCashUSD?: number | null;
 }
 
 interface Totals {
@@ -42,10 +44,7 @@ const toExpenseDate = (value: string): string => {
     if (!value) return '';
     if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
     const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '';
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${d.getFullYear()}-${month}-${day}`;
+    return Number.isNaN(d.getTime()) ? '' : toLocalDateString(d);
 };
 
 const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) => {
@@ -77,23 +76,11 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
         return formatCurrencyUtil(amount, currency);
     };
 
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
+    const formatDate = (dateString: string): string =>
+        formatLocaleDate(dateString, { year: 'numeric', month: 'short', day: 'numeric' });
 
-    const formatTime = (dateString: string | undefined): string => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date.toLocaleTimeString(undefined, {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+    const formatTime = (dateString: string | undefined): string =>
+        formatLocaleTime(dateString, { hour: '2-digit', minute: '2-digit' }) || '-';
 
     // Calculate totals
     const calculateTotals = (): Totals => {

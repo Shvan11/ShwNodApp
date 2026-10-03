@@ -132,9 +132,18 @@
     flex-wrap: wrap;
 }
 
-/* Bottom bar exists only for the mobile accordion (see 768px breakpoint) */
+/* Bottom bar — rendered only with the mobile accordion */
 .bottomActions {
-    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 2px solid var(--gray-100);
+}
+
+.bottomActions > * {
+    width: 100%;
 }
 
 /* Loading spinner animation */
@@ -376,14 +385,6 @@
    ======================================== */
 
 /* Hide desktop tabs on mobile, show accordion */
-.desktopOnly {
-    display: block;
-}
-
-.mobileOnly {
-    display: none;
-}
-
 /* Responsive design */
 @media (max-width: 1200px) {
     .addPatientFormContainer {
@@ -412,14 +413,6 @@
 
 /* Mobile Breakpoint (768px and below) - Switch to Accordion */
 @media (max-width: 768px) {
-    .desktopOnly {
-        display: none;
-    }
-
-    .mobileOnly {
-        display: block;
-    }
-
     .addPatientFormContainer {
         padding: var(--spacing-lg);
         margin: 0;
@@ -433,25 +426,6 @@
 
     .formHeader {
         justify-content: center;
-    }
-
-    /* On mobile the accordion is tall — actions live at the bottom instead */
-    .headerActions {
-        display: none;
-    }
-
-    .bottomActions {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: var(--spacing-sm);
-        margin-top: var(--spacing-lg);
-        padding-top: var(--spacing-lg);
-        border-top: 2px solid var(--gray-100);
-    }
-
-    .bottomActions > * {
-        width: 100%;
     }
 
     .accordionContent .formRow {

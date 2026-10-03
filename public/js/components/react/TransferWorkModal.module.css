@@ -74,6 +74,20 @@
   color: var(--text-secondary);
 }
 
+.searchFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+.searchField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
 /* Confirm section */
 .confirmSection {
   display: flex;
@@ -137,6 +151,14 @@
   background: var(--primary-color);
   color: var(--color-white);
   border-radius: 50%;
+}
+
+/* Under RTL the row mirrors (From on the right), so the arrow must point left,
+   from From to To — it pointed back at From on an irreversible action (audit
+   FE-F7-11; postcss-rtlcss flips layout, not icon glyphs). */
+[dir='rtl'] .arrowIcon i,
+[dir='rtl'] .backIcon {
+  transform: scaleX(-1);
 }
 
 /* Related records */
@@ -288,7 +310,16 @@
     transform: rotate(90deg);
   }
 
+  /* Stacked, the arrow points down in either direction. */
+  [dir='rtl'] .arrowIcon i {
+    transform: none;
+  }
+
   .relatedRecords ul {
+    grid-template-columns: 1fr;
+  }
+
+  .searchFields {
     grid-template-columns: 1fr;
   }
 }

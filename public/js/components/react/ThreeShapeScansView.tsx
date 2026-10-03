@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { httpErrorMessage } from '@/core/http';
 import { formatDate } from '@/core/utils';
 import { threeShapeCasesQuery, threeShapeMediaQuery } from '@/query/queries';
-import { useGlobalState } from '@/contexts/GlobalStateContext';
+import { useAuthUser } from '@/contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { unnToPalmer } from '@/utils/toothNotation';
 import styles from './ThreeShapeScansView.module.css';
@@ -67,7 +67,7 @@ const downloadHref = (mediaId: string, fileId: string | null): string =>
 const ThreeShapeScansView = ({ personId }: Props) => {
   const enabled = !!personId;
   // Settings → Integrations is an admin-only tab; only an admin can act on the link.
-  const { user } = useGlobalState();
+  const user = useAuthUser();
   const canConnect = roleCaps(user?.role as UserRole | undefined).adminWrites;
   const casesQ = useQuery({ ...threeShapeCasesQuery(personId ?? ''), enabled });
   const mediaQ = useQuery({ ...threeShapeMediaQuery(personId ?? ''), enabled });

@@ -14,6 +14,8 @@ export interface ChartThemeColors {
   ticks: string;
   /** Legend label colour (maps to --text-secondary). */
   legend: string;
+  /** Chart title colour (maps to --text-heading); Chart.js's default #666 is unreadable on a dark card. */
+  title: string;
 }
 
 export function getChartThemeColors(): ChartThemeColors {
@@ -24,5 +26,5 @@ export function getChartThemeColors(): ChartThemeColors {
   const grid = read('--border', '#dee2e6');
   const text = read('--text-secondary', '#6c757d');
 
-  return { grid, ticks: text, legend: text };
+  return { grid, ticks: text, legend: text, title: read('--text-heading', '#212529') };
 }

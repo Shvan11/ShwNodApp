@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { PortalPaymentRow } from '../portal.schemas';
 import { portalPaymentsResponseSchema } from '../portal.schemas';
+import { formatLocaleDate } from '../../utils/formatters';
 import styles from '../portal.module.css';
 
+// English, like the rest of the portal's text — never the phone's own locale,
+// which on an Arabic phone renders Arabic-Indic digits (audit FE-F3-3).
 function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatLocaleDate(iso, { year: 'numeric', month: 'short', day: 'numeric' }) || iso;
 }
 
 function formatAmount(v: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(v);
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(v);
 }
 
 const PaymentsTab = () => {

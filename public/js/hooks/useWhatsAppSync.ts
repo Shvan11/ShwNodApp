@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchJSON } from '@/core/http';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
-import { useGlobalState } from '../contexts/GlobalStateContext';
+import { useWhatsAppStatus } from '../contexts/GlobalStateContext';
 import { UI_STATES, type UIState } from '../utils/whatsapp-send-constants';
 import sseWhatsapp from '../services/sse-whatsapp';
 
@@ -60,11 +60,11 @@ export interface UseWhatsAppSyncReturn {
   sendingProgress: SendingProgress;
   messageStatusUpdate: MessageStatusUpdateData | null;
   unconfirmedSend: UnconfirmedSendData | null;
-  requestInitialState: (dateToRequest?: string) => void;
+  requestInitialState: () => void;
 }
 
-export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
-  const { whatsappClientReady: clientReady } = useGlobalState();
+export function useWhatsAppSync(): UseWhatsAppSyncReturn {
+  const { clientReady } = useWhatsAppStatus();
 
   // Starts CONNECTING: the mount effect always opens the SSE stream immediately,
   // so this is the true first-paint state (and keeps that setState out of the
@@ -82,12 +82,8 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
   );
   const [unconfirmedSend, setUnconfirmedSend] = useState<UnconfirmedSendData | null>(null);
 
-  const currentDateRef = useRef(currentDate);
-  const lastRequestedDateRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    currentDateRef.current = currentDate;
-  }, [currentDate]);
+  // Single-flight guard for the initial-state read (true while one is in flight).
+  const inFlightRef = useRef(false);
 
   const applyInitialState = useCallback((data: InitialStateResponse | null) => {
     if (!data) return;
@@ -104,27 +100,23 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
     }
   }, []);
 
-  // Fetch initial state via REST (replaces the WS RPC). Preserves the
-  // per-date dedupe so a date-change effect doesn't re-fire for the same
-  // date during quick re-renders. The date is an explicit (optional) arg:
-  // synchronous date-driven callers pass the fresh value directly, while
-  // async SSE handlers omit it and fall back to the latest-date ref.
-  const requestInitialState = useCallback((dateToRequest: string = currentDateRef.current) => {
-    if (!dateToRequest) return;
-    if (lastRequestedDateRef.current === dateToRequest) {
-      return;
-    }
-    lastRequestedDateRef.current = dateToRequest;
+  // Fetch initial state via REST (replaces the WS RPC). `/api/wa/initial-state`
+  // takes no date — it reads only the session and the server's message state —
+  // so the only dedupe is single-flight: a call while one is in flight is
+  // dropped (the connect + mount triggers land together), and every later call
+  // refetches. It used to dedupe BY DATE, which made an explicit refresh after a
+  // finished send a permanent no-op until the date changed (audit FE-F3-11).
+  const requestInitialState = useCallback(() => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
 
     fetchJSON<InitialStateResponse>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
       .then(applyInitialState)
       .catch((err) => {
         console.error('[useWhatsAppSync] initial-state fetch failed', err);
-        // Clear the dedupe key so a later trigger can retry this date.
-        // Guarded so we don't clobber a newer in-flight request for another date.
-        if (lastRequestedDateRef.current === dateToRequest) {
-          lastRequestedDateRef.current = null;
-        }
+      })
+      .finally(() => {
+        inFlightRef.current = false;
       });
   }, [applyInitialState]);
 
@@ -137,11 +129,7 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
     };
     const handleDisconnected = () => setConnectionStatus(UI_STATES.DISCONNECTED);
     const handleError = () => setConnectionStatus(UI_STATES.ERROR);
-    const handleReconnected = () => {
-      // Force a refresh on reconnect by clearing the dedupe.
-      lastRequestedDateRef.current = null;
-      requestInitialState();
-    };
+    const handleReconnected = () => requestInitialState();
 
     const handleMessageStatus = (data: unknown) => {
       setMessageStatusUpdate(data as MessageStatusUpdateData);
@@ -213,18 +201,8 @@ export function useWhatsAppSync(currentDate: string): UseWhatsAppSyncReturn {
       sseWhatsapp.off('whatsapp_sending_finished', handleSendingFinished);
       sseWhatsapp.off('whatsapp_send_unconfirmed', handleSendUnconfirmed);
       sseWhatsapp.release();
-      lastRequestedDateRef.current = null;
     };
   }, [requestInitialState]);
-
-  // Request initial state when date changes (transport stays connected).
-  // Pass `currentDate` explicitly so this doesn't depend on the ref-updater
-  // effect having run first — no ordering fragility.
-  useEffect(() => {
-    if (connectionStatus === UI_STATES.CONNECTED && currentDate) {
-      requestInitialState(currentDate);
-    }
-  }, [currentDate, connectionStatus, requestInitialState]);
 
   return {
     connectionStatus,

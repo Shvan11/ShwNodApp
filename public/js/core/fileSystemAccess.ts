@@ -99,14 +99,26 @@ export function isFileSystemAccessSupported(): boolean {
 // ============================================================================
 
 /**
- * Open IndexedDB database for storing file handles
+ * Open IndexedDB database for storing file handles.
+ *
+ * `onblocked` rejects instead of waiting: a `DB_VERSION` bump with another tab
+ * still holding an old connection fires only `blocked`, and with no handler the
+ * promise never settled — "remember this folder" spun with no error (audit
+ * FE-F1-5). Every connection also yields to a later upgrade (`onversionchange`),
+ * though `withStore` below closes each one as soon as its transaction ends.
  */
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onblocked = () =>
+      reject(new Error('The saved-folder store is being upgraded — close the app\'s other tabs and try again.'));
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -118,6 +130,28 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 /**
+ * Run ONE request against the handle store and close the connection when its
+ * transaction ends. Every helper used to open a connection and never close it —
+ * one live `IDBDatabase` per call on a long-lived tab, and each one blocks a
+ * future upgrade. Resolves on the transaction's `complete` (so a write is
+ * committed, not merely queued) with the request's result.
+ */
+async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+  const db = await openDatabase();
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], mode);
+      const request = run(transaction.objectStore(STORE_NAME));
+      transaction.oncomplete = () => resolve(request.result);
+      transaction.onerror = () => reject(transaction.error ?? request.error);
+      transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB transaction aborted'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/**
  * Save a handle to IndexedDB for persistence across sessions
  */
 export async function saveHandle(
@@ -125,40 +159,22 @@ export async function saveHandle(
   handle: FileSystemHandle,
   metadata?: Record<string, unknown>
 ): Promise<void> {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const entry: StoredHandleEntry = {
-      key,
-      handle,
-      type: handle.kind,
-      timestamp: Date.now(),
-      metadata
-    };
-    const request = store.put(entry);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  const entry: StoredHandleEntry = {
+    key,
+    handle,
+    type: handle.kind,
+    timestamp: Date.now(),
+    metadata
+  };
+  await withStore('readwrite', (store) => store.put(entry));
 }
 
 /**
  * Get a saved handle from IndexedDB
  */
 async function getHandle(key: string): Promise<FileSystemHandle | undefined> {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.get(key);
-
-    request.onsuccess = () => {
-      const entry = request.result as StoredHandleEntry | undefined;
-      resolve(entry?.handle);
-    };
-    request.onerror = () => reject(request.error);
-  });
+  const entry = (await withStore('readonly', (store) => store.get(key))) as StoredHandleEntry | undefined;
+  return entry?.handle;
 }
 
 /**
@@ -187,15 +203,7 @@ export async function getDirectoryHandle(key: string): Promise<FileSystemDirecto
  * Remove a saved handle from IndexedDB
  */
 export async function removeHandle(key: string): Promise<void> {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(key);
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  await withStore('readwrite', (store) => store.delete(key));
 }
 
 // ============================================================================

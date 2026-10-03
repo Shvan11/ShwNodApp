@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { httpErrorMessage } from '@/core/http';
+import { formatLocaleDateTime, formatNumber } from '@/utils/formatters';
 import type { SyncClockReport, SyncDriftReport, SyncSinkStatus, SyncSinkStatusResponse } from '@/query/queries';
 import styles from './SyncStatusPanel.module.css';
 
@@ -46,8 +47,7 @@ function sinkHealth(s: SyncSinkStatus): Health {
 
 function formatTime(iso: string | null): string {
     if (!iso) return '—';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+    return formatLocaleDateTime(iso) || iso;
 }
 
 /** Coarse age in the largest unit that still reads naturally — "3 days", not "259,200 s". */
@@ -92,8 +92,8 @@ const DriftBanner = ({ drift }: { drift: SyncDriftReport }) => {
         <div className={styles.errorBanner}>
             <i className="fas fa-exclamation-triangle"></i>
             <span>
-                Mirror diverged — {drift.missing.toLocaleString()} row(s) missing from the mirror
-                {drift.extra > 0 && `, ${drift.extra.toLocaleString()} only on the mirror`}, across{' '}
+                Mirror diverged — {formatNumber(drift.missing)} row(s) missing from the mirror
+                {drift.extra > 0 && `, ${formatNumber(drift.extra)} only on the mirror`}, across{' '}
                 {drift.tables.length} of {drift.tablesChecked} table(s):{' '}
                 {drift.tables
                     .slice(0, 5)
@@ -297,7 +297,7 @@ const SyncStatusPanel = ({
                                     <div className={styles.row}>
                                         <dt>Pending backlog</dt>
                                         <dd className={s.backlog > 0 ? styles.warnText : ''}>
-                                            {s.backlog.toLocaleString()} change(s)
+                                            {formatNumber(s.backlog)} change(s)
                                         </dd>
                                     </div>
                                     <div className={styles.row}>

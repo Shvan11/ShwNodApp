@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import { useLookupManager } from '@/hooks/useLookupManager';
 import { httpErrorMessage } from '@/core/http';
+import { formatLocaleDateTime } from '@/utils/formatters';
 import { qk } from '@/query/keys';
 import { labsQuery } from '@/query/queries';
 import { MATERIAL_OPTIONS } from '@/config/workTypeConfig';
@@ -36,10 +37,7 @@ interface LabCaseModalProps {
 
 type ActionMode = null | 'advance' | 'remake' | 'edit' | 'cancel';
 
-const fmtDateTime = (value: string): string => {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
-};
+const fmtDateTime = (value: string): string => formatLocaleDateTime(value) || value;
 
 const isLabStage = (stage: string): stage is LabStage =>
     LAB_STAGE_META.some((m) => m.key === stage);

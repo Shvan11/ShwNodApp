@@ -74,7 +74,7 @@ export default function WhatsAppSend() {
     messageStatusUpdate,
     unconfirmedSend,
     requestInitialState
-  } = useWhatsAppSync(currentDate);
+  } = useWhatsAppSync();
 
   // Message count
   const {

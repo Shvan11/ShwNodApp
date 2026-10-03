@@ -69,58 +69,6 @@ export type AlignerSetForBatch = Pick<AlignerSet,
     | 'is_active'
 >;
 
-/**
- * Minimal set type for label printing
- * Used in useLabelModal
- */
-export type AlignerSetForLabel = Pick<AlignerSet,
-    | 'aligner_set_id'
-    | 'set_sequence'
-    | 'aligner_dr_id'
-    | 'AlignerDoctorName'
->;
-
-/**
- * Set type for form editing
- * Used in SetFormDrawer - all optional except ID fields
- */
-export interface AlignerSetFormData {
-    aligner_set_id?: number;
-    set_sequence: number;
-    type?: string;
-    upper_aligners_count?: number;
-    lower_aligners_count?: number;
-    days?: number;
-    aligner_dr_id?: number;
-    set_url?: string;
-    set_pdf_url?: string;
-    set_video?: string;
-    set_cost?: number;
-    currency?: string;
-    notes?: string;
-    is_active?: boolean;
-    creation_date?: string;
-    TotalBatches?: number;
-}
-
-// =============================================================================
-// BATCH TYPES
-// =============================================================================
-
-/**
- * Minimal batch type for label printing
- * Used in useLabelModal
- */
-export type AlignerBatchForLabel = Pick<AlignerBatch,
-    | 'aligner_batch_id'
-    | 'aligner_set_id'
-    | 'batch_sequence'
-    | 'upper_aligner_start_sequence'
-    | 'upper_aligner_end_sequence'
-    | 'lower_aligner_start_sequence'
-    | 'lower_aligner_end_sequence'
->;
-
 // =============================================================================
 // NOTE TYPES
 // =============================================================================

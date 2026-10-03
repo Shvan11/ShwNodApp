@@ -1,202 +1,197 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import styles from './TransferWorkModal.module.css';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
+import PatientSearchCombobox from './PatientSearchCombobox';
 import { useToast } from '../../contexts/ToastContext';
-import PatientQuickSearch, { type SelectedPatient } from './PatientQuickSearch';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { transferPreviewQuery } from '@/query/queries';
+import { patientPhonesQuery, transferPreviewQuery } from '@/query/queries';
+import { WORK_STATUS } from '@shared/treatment-taxonomy';
+import * as workContract from '@shared/contracts/work.contract';
+import type { Work } from './WorkCard';
 
-/**
- * Work data for transfer
- */
-interface Work {
-  work_id: number;
+interface SelectedPatient {
   person_id: number;
-  type_name?: string;
-  status_name?: string;
-  doctor_name?: string;
-  total_required?: number;
-  currency?: string;
-  patient_name?: string;
+  patient_name: string;
 }
 
-/**
- * Transfer preview data from API
- */
-interface TransferPreview {
-  work: {
-    workId: number;
-    type: string;
-    status: string;
-    doctor: string;
-    totalRequired: number;
-    currency: string;
-    currentPatient: {
-      personId: number;
-      name: string;
-    };
-  };
-  relatedRecords: {
-    visits: number;
-    invoices: number;
-    diagnoses: number;
-    workItems: number;
-    alignerSets: number;
-    alignerBatches: number;
-    wires: number;
-    implants: number;
-    screws: number;
-  };
-}
-
-/**
- * Props for TransferWorkModal
- */
 interface TransferWorkModalProps {
   work: Work;
   onClose: () => void;
-  onSuccess: (result: { sourcePatientId: number; targetPatientId: number }) => void;
+  /** The work moved: the caller refreshes both patients and toasts (once). */
+  onSuccess: (result: { workId: number; targetPatientId: number }) => void;
 }
 
 /**
- * TransferWorkModal Component
- * Two-step modal for transferring a work to a different patient
+ * TransferWorkModal — two steps: pick the target patient, then confirm against a
+ * preview of what moves with the work. Opened from the (translated) Works page, so
+ * it is translated too, and its From → To diagram reads the right way under RTL.
  */
 const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   work,
   onClose,
   onSuccess
 }) => {
+  const { t } = useTranslation('works');
   const toast = useToast();
-  const [step, setStep] = useState<'search' | 'confirm'>('search');
   const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
+  const [nameQuery, setNameQuery] = useState('');
+  const [phoneIdQuery, setPhoneIdQuery] = useState('');
   const [transferring, setTransferring] = useState(false);
+  // The dialog opens to pick a patient, so focus starts in the name search (the
+  // Modal would otherwise focus its first focusable, the header's close button).
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load the transfer preview once a target patient is chosen (gated on selection
-  // in the search step). The factory is keyed on the work id and stays disabled
-  // until a patient is selected.
+  // The jump-list source (shared with the patient search), minus the work's own patient.
+  // It used to be a three-AsyncSelect `PatientQuickSearch` kept alive for this one
+  // dialog (audit FE-F4-13).
+  const { data: patientsData } = useQuery(patientPhonesQuery());
+  const candidates = (patientsData ?? []).filter((p) => p.id !== work.person_id);
+
+  // The preview loads once a target is chosen; the confirm step shows when it has.
   const {
-    data: previewData,
+    data: preview,
     isLoading: loading,
-    isError: previewError,
-    error: previewErrorObj,
+    error: previewError,
   } = useQuery({
     ...transferPreviewQuery(work.work_id),
     enabled: selectedPatient !== null,
   });
-  const preview = (previewData ?? null) as TransferPreview | null;
+  const step: 'search' | 'confirm' = selectedPatient && preview ? 'confirm' : 'search';
 
-  // Advance to the confirm step once the preview is available. Done during render
-  // (tracking the previous ready-state so it only fires on the transition) rather
-  // than in an effect, so the React Compiler can optimize.
-  const previewReady = !!preview && selectedPatient !== null;
-  const [prevPreviewReady, setPrevPreviewReady] = useState(previewReady);
-  if (previewReady !== prevPreviewReady) {
-    setPrevPreviewReady(previewReady);
-    if (previewReady) setStep('confirm');
-  }
+  const selectPatient = (personId: number) => {
+    const patient = candidates.find((p) => p.id === personId);
+    if (patient) setSelectedPatient({ person_id: patient.id, patient_name: patient.name });
+  };
 
-  // Surface a load failure as a toast.
-  useEffect(() => {
-    if (previewError) {
-      toast.error(httpErrorMessage(previewErrorObj, 'Failed to load transfer preview'));
-    }
-  }, [previewError, previewErrorObj, toast]);
-
-  // Handle patient selection from QuickSearch
-  const handleSelectPatient = useCallback((patient: SelectedPatient): void => {
-    setSelectedPatient(patient);
-  }, []);
-
-  // Execute transfer
   const handleTransfer = async (): Promise<void> => {
     if (!selectedPatient) return;
 
     setTransferring(true);
     try {
-      await postJSON(`/api/work/${work.work_id}/transfer`, { targetPatientId: selectedPatient.person_id });
-
-      toast.success(`Work transferred to ${selectedPatient.patient_name}`);
-      onSuccess({
-        sourcePatientId: work.person_id,
-        targetPatientId: selectedPatient.person_id
+      await postJSON(`/api/work/${work.work_id}/transfer`, { targetPatientId: selectedPatient.person_id }, {
+        schema: workContract.transfer.response,
       });
+      onSuccess({ workId: work.work_id, targetPatientId: selectedPatient.person_id });
     } catch (error) {
-      // Preserve the status-specific messaging the route returns (409/404), reading
-      // off the thrown HttpError instead of the raw Response.
+      // The server's own 404/409 text, read off the envelope's `error` (this used to
+      // read `data.message`, which the envelope never carries: FE-F7-11).
       const status = (error as HttpError).status;
-      const data = (error as HttpError).data as { message?: string } | undefined;
-      if (status === 409) {
-        toast.error(data?.message || 'Target patient already has an active work');
-      } else if (status === 404) {
-        toast.error(data?.message || 'Work or patient not found');
-      } else {
-        toast.error(httpErrorMessage(error, 'Transfer failed'));
-      }
+      const fallback = status === 409
+        ? t('transfer.conflict')
+        : status === 404
+          ? t('transfer.notFound')
+          : t('transfer.failed');
+      toast.error(httpErrorMessage(error, fallback));
     } finally {
       setTransferring(false);
     }
   };
 
-  // Get total related records count
-  const getTotalRelatedRecords = (): number => {
-    if (!preview) return 0;
-    const r = preview.relatedRecords;
-    return r.visits + r.invoices + r.diagnoses + r.workItems +
-           r.alignerSets + r.alignerBatches + r.wires + r.implants + r.screws;
-  };
+  const statusLabel = work.status === WORK_STATUS.FINISHED
+    ? t('card.statusCompleted')
+    : work.status === WORK_STATUS.DISCONTINUED
+      ? t('card.statusDiscontinued')
+      : t('card.statusActive');
+
+  // What moves with the work. A wire on a visit is a lookup, not a record of the
+  // patient's, so it is not counted; aligner batches are listed as well as counted.
+  const related = preview?.relatedRecords;
+  const relatedRows = related ? [
+    { key: 'visits', n: related.visits, icon: 'fa-calendar-check', label: t('transfer.records.visits', { n: related.visits }) },
+    { key: 'invoices', n: related.invoices, icon: 'fa-dollar-sign', label: t('transfer.records.payments', { n: related.invoices }) },
+    { key: 'diagnoses', n: related.diagnoses, icon: 'fa-stethoscope', label: t('transfer.records.diagnoses', { n: related.diagnoses }) },
+    { key: 'workItems', n: related.workItems, icon: 'fa-list', label: t('transfer.records.workItems', { n: related.workItems }) },
+    { key: 'alignerSets', n: related.alignerSets, icon: 'fa-teeth', label: t('transfer.records.alignerSets', { n: related.alignerSets }) },
+    { key: 'alignerBatches', n: related.alignerBatches, icon: 'fa-layer-group', label: t('transfer.records.alignerBatches', { n: related.alignerBatches }) },
+    { key: 'implants', n: related.implants, icon: 'fa-tooth', label: t('transfer.records.implants', { n: related.implants }) },
+    { key: 'screws', n: related.screws, icon: 'fa-cog', label: t('transfer.records.screws', { n: related.screws }) },
+  ].filter((r) => r.n > 0) : [];
+  const relatedTotal = relatedRows.reduce((sum, r) => sum + r.n, 0);
+
+  const groupLabels = { ID: t('transfer.groupId'), Phone: t('transfer.groupPhone') };
 
   return (
-    <Modal isOpen={true} onClose={onClose} contentClassName={styles.modalContent} ariaLabelledBy="transfer-work-modal-title">
-        {/* Header */}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      contentClassName={styles.modalContent}
+      ariaLabelledBy="transfer-work-modal-title"
+      initialFocusRef={nameInputRef}
+    >
         <ModalHeader
           titleId="transfer-work-modal-title"
-          title="Transfer Work"
+          title={t('transfer.title')}
           icon={<i className="fas fa-exchange-alt" />}
           onClose={onClose}
         />
 
-        {/* Body */}
         <div className={styles.modalBody}>
           {step === 'search' && (
             <>
               {/* Current work info */}
               <div className={styles.currentInfo}>
                 <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Work Type:</span>
-                  <span className={styles.infoValue}>{work.type_name || 'Unknown'}</span>
+                  <span className={styles.infoLabel}>{t('common.workType')}</span>
+                  <span className={styles.infoValue}>{work.type_name || t('card.otherTreatment')}</span>
                 </div>
                 <div className={styles.infoRow}>
-                  <span className={styles.infoLabel}>Status:</span>
-                  <span className={styles.infoValue}>{work.status_name || 'Unknown'}</span>
+                  <span className={styles.infoLabel}>{t('transfer.status')}</span>
+                  <span className={styles.infoValue}>{statusLabel}</span>
                 </div>
                 {work.doctor_name && (
                   <div className={styles.infoRow}>
-                    <span className={styles.infoLabel}>Doctor:</span>
+                    <span className={styles.infoLabel}>{t('common.doctor')}</span>
                     <span className={styles.infoValue}>{work.doctor_name}</span>
                   </div>
                 )}
               </div>
 
-              {/* Search section using reusable PatientQuickSearch */}
               <div className={styles.searchSection}>
-                <span className={styles.searchLabel}>
-                  Search for target patient:
-                </span>
-                <PatientQuickSearch
-                    onSelect={handleSelectPatient}
-                    excludePatientIds={[work.person_id]}
-                    layout="vertical"
-                    showHeader={false}
-                    // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
-                    autoFocus={true}
-                />
-                {loading && (
+                <span className={styles.searchLabel}>{t('transfer.searchLabel')}</span>
+                <div className={styles.searchFields}>
+                  <label className={styles.searchField} htmlFor="transfer-search-name">
+                    {t('transfer.byName')}
+                    <PatientSearchCombobox
+                      id="transfer-search-name"
+                      value={nameQuery}
+                      onChange={setNameQuery}
+                      onJump={selectPatient}
+                      patients={candidates}
+                      mode="name"
+                      rtl
+                      placeholder={t('transfer.namePlaceholder')}
+                      hint={t('transfer.pickHint')}
+                      inputRef={nameInputRef}
+                    />
+                  </label>
+                  <label className={styles.searchField} htmlFor="transfer-search-phone-id">
+                    {t('transfer.byPhoneId')}
+                    <PatientSearchCombobox
+                      id="transfer-search-phone-id"
+                      value={phoneIdQuery}
+                      onChange={setPhoneIdQuery}
+                      onJump={selectPatient}
+                      patients={candidates}
+                      mode="phoneId"
+                      placeholder={t('transfer.phoneIdPlaceholder')}
+                      hint={t('transfer.pickHint')}
+                      groupLabels={groupLabels}
+                    />
+                  </label>
+                </div>
+                {selectedPatient && loading && (
                   <div className={styles.loadingIndicator}>
-                    <i className="fas fa-spinner fa-spin"></i>
-                    <span>Loading preview...</span>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                    <span>{t('transfer.loadingPreview')}</span>
+                  </div>
+                )}
+                {selectedPatient && previewError && (
+                  <div className={styles.loadingIndicator} role="alert">
+                    <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span>{httpErrorMessage(previewError, t('transfer.previewFailed'))}</span>
                   </div>
                 )}
               </div>
@@ -205,76 +200,48 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
 
           {step === 'confirm' && preview && selectedPatient && (
             <div className={styles.confirmSection}>
-              {/* Transfer summary */}
               <div className={styles.transferSummary}>
-                <h4>Transfer Summary</h4>
+                <h4>{t('transfer.summary')}</h4>
 
                 <div className={styles.transferArrow}>
                   <div className={styles.patientBox}>
-                    <span className={styles.boxLabel}>From</span>
+                    <span className={styles.boxLabel}>{t('transfer.from')}</span>
                     <span className={styles.boxName}>{preview.work.currentPatient.name}</span>
                     <span className={styles.boxId}>#{preview.work.currentPatient.personId}</span>
                   </div>
                   <div className={styles.arrowIcon}>
-                    <i className="fas fa-arrow-right"></i>
+                    <i className="fas fa-arrow-right" aria-hidden="true"></i>
                   </div>
                   <div className={styles.patientBox}>
-                    <span className={styles.boxLabel}>To</span>
+                    <span className={styles.boxLabel}>{t('transfer.to')}</span>
                     <span className={styles.boxName}>{selectedPatient.patient_name}</span>
                     <span className={styles.boxId}>#{selectedPatient.person_id}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Related records */}
-              {getTotalRelatedRecords() > 0 && (
+              {relatedRows.length > 0 && (
                 <div className={styles.relatedRecords}>
                   <h4>
-                    <i className="fas fa-link"></i>
-                    Related Records ({getTotalRelatedRecords()} total)
+                    <i className="fas fa-link" aria-hidden="true"></i>
+                    {t('transfer.related', { n: relatedTotal })}
                   </h4>
                   <ul>
-                    {preview.relatedRecords.visits > 0 && (
-                      <li><i className="fas fa-calendar-check"></i> {preview.relatedRecords.visits} visit(s)</li>
-                    )}
-                    {preview.relatedRecords.invoices > 0 && (
-                      <li><i className="fas fa-dollar-sign"></i> {preview.relatedRecords.invoices} payment(s)</li>
-                    )}
-                    {preview.relatedRecords.diagnoses > 0 && (
-                      <li><i className="fas fa-stethoscope"></i> {preview.relatedRecords.diagnoses} diagnosis(es)</li>
-                    )}
-                    {preview.relatedRecords.workItems > 0 && (
-                      <li><i className="fas fa-list"></i> {preview.relatedRecords.workItems} work item(s)</li>
-                    )}
-                    {preview.relatedRecords.alignerSets > 0 && (
-                      <li><i className="fas fa-teeth"></i> {preview.relatedRecords.alignerSets} aligner set(s)</li>
-                    )}
-                    {preview.relatedRecords.wires > 0 && (
-                      <li><i className="fas fa-bezier-curve"></i> {preview.relatedRecords.wires} wire(s)</li>
-                    )}
-                    {preview.relatedRecords.implants > 0 && (
-                      <li><i className="fas fa-tooth"></i> {preview.relatedRecords.implants} implant(s)</li>
-                    )}
-                    {preview.relatedRecords.screws > 0 && (
-                      <li><i className="fas fa-cog"></i> {preview.relatedRecords.screws} screw(s)</li>
-                    )}
+                    {relatedRows.map((r) => (
+                      <li key={r.key}><i className={`fas ${r.icon}`} aria-hidden="true"></i> {r.label}</li>
+                    ))}
                   </ul>
                 </div>
               )}
 
-              {/* Warning */}
               <div className={styles.warningBox}>
-                <i className="fas fa-exclamation-triangle"></i>
-                <p>
-                  This action cannot be undone. The source patient will lose access
-                  to this work and all related records.
-                </p>
+                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                <p>{t('transfer.warning')}</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div className={styles.modalFooter}>
           {step === 'search' && (
             <button
@@ -282,20 +249,17 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
               onClick={onClose}
               className={styles.btnSecondary}
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           )}
           {step === 'confirm' && (
             <>
               <button
                 type="button"
-                onClick={() => {
-                  setStep('search');
-                  setSelectedPatient(null);
-                }}
+                onClick={() => setSelectedPatient(null)}
                 className={styles.btnSecondary}
               >
-                <i className="fas fa-arrow-left"></i> Back
+                <i className={`fas fa-arrow-left ${styles.backIcon}`} aria-hidden="true"></i> {t('transfer.back')}
               </button>
               <button
                 type="button"
@@ -305,11 +269,11 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
               >
                 {transferring ? (
                   <>
-                    <i className="fas fa-spinner fa-spin"></i> Transferring...
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> {t('transfer.transferring')}
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-exchange-alt"></i> Confirm Transfer
+                    <i className="fas fa-exchange-alt" aria-hidden="true"></i> {t('transfer.confirm')}
                   </>
                 )}
               </button>

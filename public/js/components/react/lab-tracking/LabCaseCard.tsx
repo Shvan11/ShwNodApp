@@ -5,6 +5,7 @@ import { labelForStage } from '@/config/labStages';
 import { useAdvanceLabCase, useUpdateLabCase } from '@/hooks/useLabCases';
 import { useToast } from '@/contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
+import { toLocalDateString } from '@/utils/calendarDate';
 import styles from './LabCaseCard.module.css';
 
 interface LabCaseCardProps {
@@ -22,7 +23,9 @@ function daysSince(dateStr: string): number {
 
 function isOverdue(dueDate: string | null, status: string): boolean {
     if (!dueDate || status === 'delivered' || status === 'cancelled') return false;
-    return dueDate < new Date().toISOString().slice(0, 10);
+    // LOCAL today: toISOString() is the UTC date, which between 00:00 and 03:00
+    // Baghdad time is still yesterday, so a case due yesterday read as not overdue.
+    return dueDate < toLocalDateString(new Date());
 }
 
 /**

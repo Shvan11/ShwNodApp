@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatLocaleDate } from '../../utils/formatters';
 import styles from './AnalogClock.module.css';
 
 // Static SVG geometry — same every render, so compute once at module load.
@@ -108,7 +109,7 @@ const AnalogClock = ({ size, showDate = true, className }: AnalogClockProps) => 
     // useMemo keyed on the day behind an exhaustive-deps disable, which made React
     // Compiler skip the whole component (audit FE-F10-20).
     const dateLabel = showDate
-        ? now.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+        ? formatLocaleDate(now.date, { weekday: 'short', month: 'short', day: 'numeric' })
         : null;
 
     return (

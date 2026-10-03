@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { PortalNextAppointment } from '../portal.schemas';
 import { portalNextAppointmentResponseSchema } from '../portal.schemas';
+import { formatLocaleDate, formatLocaleTime } from '../../utils/formatters';
 import styles from '../portal.module.css';
 
 function formatAppointmentDate(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return { date: iso, time: '' };
-  const date = d.toLocaleDateString(undefined, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  return { date, time };
+  // English, like the rest of the portal's text — never the phone's own locale (FE-F3-3).
+  const date = formatLocaleDate(iso, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  if (!date) return { date: iso, time: '' };
+  return { date, time: formatLocaleTime(iso, { hour: '2-digit', minute: '2-digit' }) };
 }
 
 const AppointmentTab = () => {

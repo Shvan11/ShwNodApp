@@ -17,14 +17,23 @@ import { z } from 'zod';
 // chairId comes from localStorage (string); a number is also accepted.
 const chairId = z.union([z.string(), z.number()]);
 
-// POST /api/chair-display/patient-loaded — { chairId, personId }.
+// Transport ordering (audit FE-F4-10): the sending tab's random id + its
+// increasing counter, so the server can drop a beacon that arrives after a newer
+// one from the same tab. Optional — a tab still running an older build sends
+// neither and is ordered by arrival, as before.
+const ordering = {
+  src: z.string().min(1).max(64).optional(),
+  seq: z.number().int().nonnegative().optional(),
+};
+
+// POST /api/chair-display/patient-loaded — { chairId, personId, src?, seq? }.
 export const patientLoaded = {
-  body: z.object({ chairId, personId: z.union([z.number(), z.string()]) }),
+  body: z.object({ chairId, personId: z.union([z.number(), z.string()]), ...ordering }),
 } as const;
 export type PatientLoadedBody = z.infer<typeof patientLoaded.body>;
 
-// POST /api/chair-display/patient-cleared — { chairId }.
+// POST /api/chair-display/patient-cleared — { chairId, src?, seq? }.
 export const patientCleared = {
-  body: z.object({ chairId }),
+  body: z.object({ chairId, ...ordering }),
 } as const;
 export type PatientClearedBody = z.infer<typeof patientCleared.body>;

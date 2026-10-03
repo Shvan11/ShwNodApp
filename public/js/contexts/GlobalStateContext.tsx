@@ -16,22 +16,27 @@ export interface UserData {
 }
 
 /**
- * Read-only by design. Every member here has a consumer (grep `useGlobalState`);
- * the setters, the `currentPatient` slot and the per-date `appointmentsCache`
- * that used to sit beside them were removed in the F3 audit — nothing had read
- * them since React Query took over server state, and the day's appointments now
- * live under `qk.appointments.daily`. Add a member only with a consumer.
+ * WhatsApp client status, mirrored from the shared SSE channel (see below).
+ * Read-only by design, like the auth user.
  */
-export interface GlobalStateContextValue {
-  /** Authoritative identity, mirrored from `authMeQuery`. */
-  user: UserData | null;
-
-  // WhatsApp client status, mirrored from the shared SSE channel (see below).
-  whatsappClientReady: boolean;
-  whatsappQrCode: string | null;
+export interface WhatsAppStatus {
+  clientReady: boolean;
+  qrCode: string | null;
 }
 
-const GlobalStateContext = createContext<GlobalStateContextValue | null>(null);
+/**
+ * Two contexts, not one (audit FE-F3-6). The auth user and the WhatsApp status
+ * change for unrelated reasons, and while the client is unpaired whatsapp-web.js
+ * mints a new QR about every 20 s: in one shared value, each rotation re-rendered
+ * every screen that only wanted `user` (header, dashboard, statistics, works,
+ * expenses, aligner sets…). Each now re-renders only its own readers.
+ *
+ * The setters, a `currentPatient` slot and a per-date `appointmentsCache` that
+ * used to sit here were removed in the F3 audit — nothing read them since React
+ * Query took over server state. Add a member only with a consumer.
+ */
+const AuthUserContext = createContext<{ user: UserData | null } | null>(null);
+const WhatsAppStatusContext = createContext<WhatsAppStatus | null>(null);
 
 /**
  * Props for GlobalStateProvider
@@ -51,12 +56,18 @@ interface WhatsAppQRData {
 }
 
 /**
- * Global State Provider — shared app-wide state.
- * The SSE WhatsApp channel is a singleton (`sseWhatsapp`); this provider
- * holds a refcount on it so QR/ready state stays live even on pages that
- * don't mount a feature hook.
+ * Global State Provider — the auth user and the WhatsApp client status, each in
+ * its own context.
  */
 export function GlobalStateProvider({ children }: GlobalStateProviderProps): React.ReactElement {
+  return (
+    <AuthUserProvider>
+      <WhatsAppStatusProvider>{children}</WhatsAppStatusProvider>
+    </AuthUserProvider>
+  );
+}
+
+function AuthUserProvider({ children }: GlobalStateProviderProps): React.ReactElement {
   const [user, setUser] = useState<UserData | null>(() => {
     try {
       const cached = sessionStorage.getItem('currentUser');
@@ -89,6 +100,20 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     }
   }, [meData]);
 
+  // Memoized: the identity changes only when the user does (every context in the
+  // tree does this — ToastContext carries the note about the refetch storm a fresh
+  // object per render causes).
+  const value = useMemo(() => ({ user }), [user]);
+
+  return <AuthUserContext.Provider value={value}>{children}</AuthUserContext.Provider>;
+}
+
+/**
+ * The SSE WhatsApp channel is a singleton (`sseWhatsapp`); this provider holds a
+ * refcount on it so QR/ready state stays live even on pages that don't mount a
+ * feature hook.
+ */
+function WhatsAppStatusProvider({ children }: GlobalStateProviderProps): React.ReactElement {
   const [whatsappClientReady, setWhatsappClientReady] = useState(false);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
 
@@ -164,27 +189,28 @@ export function GlobalStateProvider({ children }: GlobalStateProviderProps): Rea
     };
   }, []);
 
-  // Memoized so the identity only changes when one of the three published values
-  // does — every other context in the tree does the same, and without it any
-  // provider re-render hands every consumer a fresh object (ToastContext carries
-  // the note about the refetch storm that causes).
-  const value = useMemo<GlobalStateContextValue>(
-    () => ({ user, whatsappClientReady, whatsappQrCode }),
-    [user, whatsappClientReady, whatsappQrCode]
+  const value = useMemo<WhatsAppStatus>(
+    () => ({ clientReady: whatsappClientReady, qrCode: whatsappQrCode }),
+    [whatsappClientReady, whatsappQrCode]
   );
 
-  return <GlobalStateContext.Provider value={value}>{children}</GlobalStateContext.Provider>;
+  return <WhatsAppStatusContext.Provider value={value}>{children}</WhatsAppStatusContext.Provider>;
 }
 
-/**
- * Hook to access global state
- */
-export function useGlobalState(): GlobalStateContextValue {
-  const context = useContext(GlobalStateContext);
+/** The signed-in staff user (from `/api/auth/me`, seeded from sessionStorage for first paint). */
+export function useAuthUser(): UserData | null {
+  const context = useContext(AuthUserContext);
   if (!context) {
-    throw new Error('useGlobalState must be used within GlobalStateProvider');
+    throw new Error('useAuthUser must be used within GlobalStateProvider');
+  }
+  return context.user;
+}
+
+/** The WhatsApp client's ready flag and current pairing QR. */
+export function useWhatsAppStatus(): WhatsAppStatus {
+  const context = useContext(WhatsAppStatusContext);
+  if (!context) {
+    throw new Error('useWhatsAppStatus must be used within GlobalStateProvider');
   }
   return context;
 }
-
-export default GlobalStateContext;

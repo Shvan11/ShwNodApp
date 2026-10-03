@@ -418,22 +418,18 @@ export function getPatientTypes(): Promise<LookupItem[]> {
 }
 
 /**
- * Tag / patient-type dropdown feeds for the patient-management search panel.
+ * Tag dropdown feed for the patient-management search panel.
  *
- * These alias their name column differently from the `LookupItem` helpers above
- * (`tag` / `type`, not `name`) because that is the shape the contract and the
- * react-select mapping already expect — so they get their own readers rather
- * than a cast over `getPatientTypes()`. `type` (not interface) so an array of
- * them feeds the looseObject `sendData` args (CLAUDE.md / TS2345).
+ * Aliases its name column `tag` (not `name` like the `LookupItem` helpers above)
+ * because that is the shape the contract and the react-select mapping expect —
+ * so it gets its own reader. `type` (not interface) so an array of them feeds
+ * the looseObject `sendData` args (CLAUDE.md / TS2345). (Its patient-type twin,
+ * aliased `type`, was retired with `/api/patients/type-options`: the filter reads
+ * `getPatientTypes()` through `/api/patient-types` like the edit form.)
  */
 export type TagOption = {
   id: number;
   tag: string;
-};
-
-export type PatientTypeOption = {
-  id: number;
-  type: string | null;
 };
 
 /** Every tag option, alphabetically. */
@@ -442,15 +438,6 @@ export function getTagOptions(): Promise<TagOption[]> {
     .selectFrom('tag_options')
     .select(['id as id', 'tag as tag'])
     .orderBy('tag')
-    .execute();
-}
-
-/** Every patient type, alphabetically — aliased `type` for the search filters. */
-export function getPatientTypeOptions(): Promise<PatientTypeOption[]> {
-  return getKysely()
-    .selectFrom('patient_types')
-    .select(['id as id', 'patient_type as type'])
-    .orderBy('patient_type')
     .execute();
 }
 

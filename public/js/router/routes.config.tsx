@@ -82,6 +82,7 @@ const Expenses = React.lazy(() => import('../routes/Expenses'));
 const Videos = React.lazy(() => import('../routes/Videos'));
 const PatientManagement = lazyRoute(() => import('../routes/PatientManagement'));
 const TasksHistory = React.lazy(() => import('../routes/TasksHistory'));
+const ApprovalsHistory = React.lazy(() => import('../routes/ApprovalsHistory'));
 
 // Lazy-loaded route components - Settings & Templates
 const SettingsComponent = React.lazy(() => import('../components/react/SettingsComponent'));
@@ -226,6 +227,16 @@ export const routesConfig: RouteObject[] = [
         element: (
           <RouteErrorBoundary routeName="Completed Tasks">
             <TasksHistory />
+          </RouteErrorBoundary>
+        ),
+      },
+
+      // Decided approvals + notices (admin; linked from the Approvals bell)
+      {
+        path: '/approvals/history',
+        element: (
+          <RouteErrorBoundary routeName="Approval History">
+            <ApprovalsHistory />
           </RouteErrorBoundary>
         ),
       },

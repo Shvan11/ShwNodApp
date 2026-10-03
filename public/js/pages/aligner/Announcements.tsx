@@ -24,6 +24,7 @@ import {
     type AnnouncementType,
     type CreateAnnouncementBody,
 } from '@shared/contracts/announcement.contract';
+import { formatLocaleDateTime } from '@/utils/formatters';
 import styles from './Announcements.module.css';
 
 const TYPE_ICON: Record<AnnouncementType, string> = {
@@ -69,9 +70,7 @@ function isExpired(a: AnnouncementRow): boolean {
 }
 
 function fmtDateTime(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
+    return formatLocaleDateTime(iso) || '—';
 }
 
 /** Expandable read-receipts panel (fetched lazily when a row is expanded). */

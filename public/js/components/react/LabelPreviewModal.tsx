@@ -12,6 +12,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useToast } from '../../contexts/ToastContext';
+import { groupByPatient, type PatientGroupOf, type PrintQueueItem } from '../../contexts/PrintQueueContext';
 import { prefetchCsrfToken } from '../../core/http';
 import { buildLabelsFromRanges, type AlignerLabel } from '../../utils/aligner-labels';
 import Modal from './Modal';
@@ -42,27 +43,9 @@ interface Patient {
     last_name?: string;
 }
 
-interface QueuedItem {
-    id: string;
-    batchNumber: number;
-    personId: number;
-    patientName: string;
-    doctorName?: string;
-    doctorLogoPath?: string;
-    includeLogo?: boolean;
-    labels: string[];
-    originalLabels?: string[];
-}
-
-interface QueueBatch extends QueuedItem {
-    includeLogo: boolean;
+/** A queued batch as this modal edits it: the context's item + its labels as queued (for Reset). */
+interface QueueBatch extends PrintQueueItem {
     originalLabels: string[];
-}
-
-interface PatientGroup {
-    personId: number;
-    patientName: string;
-    batches: QueueBatch[];
 }
 
 interface QueueStats {
@@ -90,7 +73,7 @@ interface LabelPreviewModalProps {
     isGenerating?: boolean;
     // Queue mode props
     queueMode?: boolean;
-    queuedItems?: QueuedItem[];
+    queuedItems?: PrintQueueItem[];
     onQueuePrintSuccess?: () => void;
 }
 
@@ -199,12 +182,11 @@ const LabelPreviewModal = ({
     // Initialize queue mode. Adjust-during-render keyed on the queued-items
     // identity, so a fresh queue re-seeds the editable batches once, without a
     // setState-in-effect bailout.
-    const [seededQueuedItems, setSeededQueuedItems] = useState<QueuedItem[] | null>(null);
+    const [seededQueuedItems, setSeededQueuedItems] = useState<PrintQueueItem[] | null>(null);
     if (queueMode && queuedItems.length > 0 && queuedItems !== seededQueuedItems) {
         setSeededQueuedItems(queuedItems);
         const batches: QueueBatch[] = queuedItems.map(item => ({
             ...item,
-            includeLogo: item.includeLogo !== undefined ? item.includeLogo : !!item.doctorLogoPath,
             originalLabels: [...item.labels] // Store original for reset
         }));
         setQueueBatches(batches);
@@ -228,21 +210,10 @@ const LabelPreviewModal = ({
         : patientName.trim() !== '' && doctorName.trim() !== '' && labels.length > 0;
 
     // Group queue batches by patient
-    const groupedQueueBatches = useMemo((): PatientGroup[] => {
-        if (!queueMode) return [];
-        const groups: Record<number, PatientGroup> = {};
-        queueBatches.forEach(batch => {
-            if (!groups[batch.personId]) {
-                groups[batch.personId] = {
-                    personId: batch.personId,
-                    patientName: batch.patientName,
-                    batches: []
-                };
-            }
-            groups[batch.personId].batches.push(batch);
-        });
-        return Object.values(groups);
-    }, [queueMode, queueBatches]);
+    const groupedQueueBatches = useMemo(
+        (): PatientGroupOf<QueueBatch>[] => (queueMode ? groupByPatient(queueBatches) : []),
+        [queueMode, queueBatches]
+    );
 
     // Queue stats
     const queueStats = useMemo((): QueueStats | null => {

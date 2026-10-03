@@ -8,10 +8,13 @@
  *
  * Surface is deliberately minimal: `toggleLogo`, `updateLabels`,
  * `buildLabelsForPrint`, `isModalOpen`/`setIsModalOpen`, the `addedAt` field and
- * a `RichLabel` type were removed in the F3 audit — none had a consumer, because
- * LabelPreviewModal carries its own copies of the grouping/label-building logic
- * and RootLayout holds its own modal flag. If you re-add one, wire it to the
- * modal rather than leaving a second implementation behind.
+ * a `RichLabel` type were removed in the F3 audit — none had a consumer. The
+ * label-building belongs to LabelPreviewModal (it builds from its own EDITED copy
+ * of the queue) and the modal flag to RootLayout. What the two share lives here:
+ * the item type (`PrintQueueItem`, which the modal takes as `queuedItems`) and
+ * `groupByPatient` (the indicator groups the live queue, the modal its edited
+ * copy — audit FE-F3-14). If you re-add a helper, wire it to the modal rather
+ * than leaving a second implementation behind.
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
@@ -68,10 +71,33 @@ export interface PrintQueueStats {
     doctorCount: number;
 }
 
-export interface PatientGroup {
+/** Queue items of one patient, in queue order. */
+export interface PatientGroupOf<T> {
     personId: number;
     patientName: string;
-    batches: PrintQueueItem[];
+    batches: T[];
+}
+
+export type PatientGroup = PatientGroupOf<PrintQueueItem>;
+
+/**
+ * Group queue items by patient, keeping first-seen patient order and queue order
+ * within each. Generic so the label modal can group its edited copies with the
+ * same rule the indicator uses for the live queue.
+ */
+export function groupByPatient<T extends { personId: number; patientName: string }>(
+    items: readonly T[]
+): PatientGroupOf<T>[] {
+    const grouped = new Map<number, PatientGroupOf<T>>();
+    for (const item of items) {
+        let group = grouped.get(item.personId);
+        if (!group) {
+            group = { personId: item.personId, patientName: item.patientName, batches: [] };
+            grouped.set(item.personId, group);
+        }
+        group.batches.push(item);
+    }
+    return [...grouped.values()];
 }
 
 export interface PrintQueueContextValue {
@@ -235,20 +261,7 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
     /**
      * Get queue grouped by patient
      */
-    const getGroupedQueue = useCallback((): PatientGroup[] => {
-        const grouped: Record<number, PatientGroup> = {};
-        queue.forEach(item => {
-            if (!grouped[item.personId]) {
-                grouped[item.personId] = {
-                    personId: item.personId,
-                    patientName: item.patientName,
-                    batches: []
-                };
-            }
-            grouped[item.personId].batches.push(item);
-        });
-        return Object.values(grouped);
-    }, [queue]);
+    const getGroupedQueue = useCallback((): PatientGroup[] => groupByPatient(queue), [queue]);
 
     const value: PrintQueueContextValue = {
         queue,

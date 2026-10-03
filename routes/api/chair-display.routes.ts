@@ -20,6 +20,7 @@ import { authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import * as chairContract from '../../shared/contracts/chair-display.contract.js';
+import { chairBeaconOrder } from '../../services/messaging/chair-beacon-order.js';
 
 const router = Router();
 
@@ -50,6 +51,8 @@ router.post(
       log.warn('chair-display patient-loaded: invalid payload', { chairId, personId });
       return;
     }
+    // Superseded in transit by a newer beacon from the same tab (FE-F4-10).
+    if (!chairBeaconOrder.accept(chairId, req.body.src, req.body.seq)) return;
 
     if (wsEmitter) {
       wsEmitter.emit(InternalEmitterEvents.CHAIR_PATIENT_LOAD, String(personId), chairId);
@@ -69,6 +72,9 @@ router.post(
       log.warn('chair-display patient-cleared: invalid chairId', { chairId: req.body?.chairId });
       return;
     }
+    // A CLEAR that lands after the same tab's next LOAD would blank the kiosk
+    // with the new patient open at the chair (FE-F4-10).
+    if (!chairBeaconOrder.accept(chairId, req.body.src, req.body.seq)) return;
 
     if (wsEmitter) {
       wsEmitter.emit(InternalEmitterEvents.CHAIR_PATIENT_CLEAR, chairId);

@@ -10,10 +10,11 @@ import ExpenseSummary from '../components/expenses/ExpenseSummary';
 import ExpenseModal from '../components/expenses/ExpenseModal';
 import DeleteConfirmModal from '../components/expenses/DeleteConfirmModal';
 import { useToast } from '../contexts/ToastContext';
-import { useGlobalState } from '../contexts/GlobalStateContext';
+import { useAuthUser } from '../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { httpErrorMessage } from '@/core/http';
 import { expenseByIdQuery } from '@/query/queries';
+import { toLocalDateString } from '@/utils/calendarDate';
 import styles from './Expenses.module.css';
 
 /**
@@ -31,16 +32,6 @@ interface FiltersState {
 }
 
 /**
- * Format a Date object as YYYY-MM-DD string
- */
-function formatDateString(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
  * Get default date range (current month)
  */
 function getDefaultDateRange(): FiltersState {
@@ -49,8 +40,8 @@ function getDefaultDateRange(): FiltersState {
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   return {
-    startDate: formatDateString(firstDay),
-    endDate: formatDateString(lastDay),
+    startDate: toLocalDateString(firstDay),
+    endDate: toLocalDateString(lastDay),
     categoryId: undefined,
     subcategoryId: undefined,
     currency: undefined
@@ -63,7 +54,7 @@ export default function Expenses() {
   // Toast notifications (now using unified global toast system)
   const toast = useToast();
 
-  const { user } = useGlobalState();
+  const user = useAuthUser();
   const caps = roleCaps(user?.role as UserRole | undefined);
 
   const [searchParams] = useSearchParams();

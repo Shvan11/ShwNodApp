@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import type { z } from 'zod';
 import Chart from '../../utils/chartSetup';
 import DailyInvoicesModal from './DailyInvoicesModal';
 import DoctorCommissionsView from './DoctorCommissionsView';
@@ -9,9 +10,11 @@ import RevenueBreakdownView from './RevenueBreakdownView';
 import { formatCurrency as formatCurrencyUtil, formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
+import type * as reportsContract from '@shared/contracts/reports.contract';
 import { httpErrorMessage } from '@/core/http';
+import { parseLocalDate } from '@/utils/calendarDate';
 import {
     statisticsQuery,
     yearlyStatisticsQuery,
@@ -19,69 +22,10 @@ import {
 } from '@/query/queries';
 import styles from './StatisticsComponent.module.css';
 
-// Types
-interface DailyData {
-    Day: string;
-    /** null when that day has no exchange rate to convert with. */
-    GrandTotal?: number | null;
-    SumIQD?: number;
-    SumUSD?: number;
-    ExpensesIQD?: number;
-    ExpensesUSD?: number;
-    FinalIQDSum?: number;
-    FinalUSDSum?: number;
-    ExpectedCashIQD?: number;
-    ExpectedCashUSD?: number;
-}
-
-interface CurrencyTotals {
-    IQD: number;
-    USD: number;
-}
-
-interface SummaryData {
-    totalRevenue: CurrencyTotals;
-    totalExpenses: CurrencyTotals;
-    netProfit: CurrencyTotals;
-    /** null on both legs when no exchange rate has ever been recorded. */
-    grandTotal: { IQD: number | null; USD: number | null };
-}
-
-interface StatisticsData {
-    success: boolean;
-    error?: string;
-    dailyData: DailyData[];
-    summary: SummaryData;
-    /**
-     * Reference rate the server resolved for this month (days with their own rate use
-     * that). null = no rate on record at all, so nothing here is converted — the app
-     * does not substitute a house rate.
-     */
-    exchangeRate?: number | null;
-}
-
-interface MonthlyDataItem {
-    Month: number;
-    Year: number;
-    GrandTotal?: number | null;
-}
-
-interface YearlyDataItem {
-    Year: number;
-    GrandTotal?: number | null;
-}
-
-interface YearlyData {
-    success: boolean;
-    error?: string;
-    monthlyData: MonthlyDataItem[];
-}
-
-interface MultiYearData {
-    success: boolean;
-    error?: string;
-    yearlyData: YearlyDataItem[];
-}
+// Types — the parsed contract payloads; the screen reads them as they arrive
+// (three hand-written interfaces used to re-type them by assertion: FE-F5-10).
+type StatisticsData = z.infer<typeof reportsContract.statistics.response>;
+type DailyData = StatisticsData['dailyData'][number];
 
 interface ChartDataItem {
     label: string;
@@ -92,6 +36,64 @@ interface ChartDataItem {
 // View mode constants
 const VIEW_MODES = { DAILY: 'daily', MONTHLY: 'monthly', YEARLY: 'yearly', COMMISSIONS: 'commissions', BREAKDOWN: 'breakdown' } as const;
 type ViewMode = typeof VIEW_MODES[keyof typeof VIEW_MODES];
+const isViewMode = (v: string | null): v is ViewMode =>
+    v != null && (Object.values(VIEW_MODES) as string[]).includes(v);
+
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
+
+/**
+ * A year field that commits only a whole year inside `[min, max]`: at the 4th digit
+ * (or a spinner step) and on Enter/blur. Committing every keystroke fetched
+ * `year=2`, `20`, `202` and wrote `year=NaN` to the URL on clear; a range check on
+ * every keystroke reverted each digit, so the Yearly From/To could not be typed into
+ * at all (FE-F5-9). An invalid draft snaps back to the committed value on blur.
+ */
+const YearInput = ({ value, min, max, onCommit, id, className, ariaLabel }: {
+    value: number;
+    min: number;
+    max: number;
+    onCommit: (year: number) => void;
+    id?: string;
+    className?: string;
+    ariaLabel?: string;
+}) => {
+    const [draft, setDraft] = useState(String(value));
+    const [shown, setShown] = useState(value);
+    if (value !== shown) {
+        setShown(value);
+        setDraft(String(value));
+    }
+    const valid = (v: string): number | null => {
+        if (!/^\d{4}$/.test(v)) return null;
+        const n = parseInt(v, 10);
+        return n >= min && n <= max ? n : null;
+    };
+    const settle = () => {
+        const n = valid(draft);
+        if (n == null) setDraft(String(value));
+        else if (n !== value) onCommit(n);
+    };
+    return (
+        <input
+            id={id}
+            type="number"
+            inputMode="numeric"
+            value={draft}
+            min={min}
+            max={max}
+            aria-label={ariaLabel}
+            className={className}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                setDraft(e.target.value);
+                const n = valid(e.target.value);
+                if (n != null && n !== value) onCommit(n);
+            }}
+            onBlur={settle}
+            onKeyDown={(e) => { if (e.key === 'Enter') settle(); }}
+        />
+    );
+};
 
 // Self-contained tabs that own their own date-range picker + query and so hide the
 // month-nav, summary cards, and daily table the time-based views share.
@@ -117,15 +119,16 @@ const TAB_META: Record<ViewMode, { label: string; icon: string }> = {
 
 const StatisticsComponent = () => {
     const { resolvedTheme } = useTheme();
-    const { user } = useGlobalState();
-    const isAdmin = user?.role === 'admin';
+    const user = useAuthUser();
     // Clinic-wide money is admin + front-desk only (front desk runs the cash box and
     // hands the drawer over); the server enforces the same line with
     // authorize(FINANCE_ROLES). Identity can resolve a beat after first paint on a cold
     // tab, so "not yet known" is treated as neither allowed nor denied — the page shows
     // its loading state instead of flashing an access error or firing a request that 403s.
     const roleKnown = !!user?.role;
-    const canViewFinance = roleCaps(user?.role as UserRole | undefined).viewFinance;
+    const caps = roleCaps(user?.role as UserRole | undefined);
+    const canViewFinance = caps.viewFinance;
+    const canViewReports = caps.viewReports;
     const [searchParams, setSearchParams] = useSearchParams();
     const [month, setMonth] = useState(parseInt(searchParams.get('month') || '', 10) || new Date().getMonth() + 1);
     const [year, setYear] = useState(parseInt(searchParams.get('year') || '', 10) || new Date().getFullYear());
@@ -135,14 +138,25 @@ const StatisticsComponent = () => {
     // For Yearly view: year range
     const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 4);
     const [yearRangeEnd, setYearRangeEnd] = useState(new Date().getFullYear());
-    const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || VIEW_MODES.DAILY);
+    // `?view=` round-trips like month/year/day (it used to be read once, unvalidated,
+    // and never written back, so a tab was lost on reload or Back: FE-F5-15d).
+    const viewParam = searchParams.get('view');
+    const viewMode: ViewMode = isViewMode(viewParam) ? viewParam : VIEW_MODES.DAILY;
+    const setViewMode = (mode: ViewMode) => {
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            if (mode === VIEW_MODES.DAILY) next.delete('view');
+            else next.set('view', mode);
+            return next;
+        }, { replace: true });
+    };
 
     // Non-admins can't reach the admin-only tabs — if one is selected via a deep link
     // (?view=breakdown / ?view=commissions), coerce it to Daily for rendering. Derived
     // (not a setState-in-effect) so it's recomputed every render: an admin whose identity
     // resolves a beat after first paint snaps straight to their tab with no bounce.
     const effectiveViewMode: ViewMode =
-        !isAdmin && isAdminOnlyView(viewMode) ? VIEW_MODES.DAILY : viewMode;
+        !canViewReports && isAdminOnlyView(viewMode) ? VIEW_MODES.DAILY : viewMode;
 
     // Statistics for the selected month — the headline read. `isFetching` drives the
     // refresh spinner; `keepPreviousData` keeps the last month on screen during a
@@ -160,23 +174,29 @@ const StatisticsComponent = () => {
         // read the monthly stats — don't fetch them while one of those tabs is open.
         enabled: roleKnown && canViewFinance && !isCustomView(effectiveViewMode),
     });
-    const statistics = (statisticsData ?? null) as StatisticsData | null;
+    const statistics: StatisticsData | null = statisticsData ?? null;
     const error = isError ? httpErrorMessage(statsError, 'Failed to fetch statistics') : null;
 
     // 12-month rollup — only fetched in Monthly view (cleared between fetches, so no
     // keepPreviousData here).
-    const { data: yearlyDataRaw, isFetching: loadingYearly } = useQuery({
+    const { data: yearlyData = null, isFetching: loadingYearly, refetch: refetchYearly } = useQuery({
         ...yearlyStatisticsQuery(periodStartMonth, periodStartYear),
         enabled: effectiveViewMode === VIEW_MODES.MONTHLY,
     });
-    const yearlyData = (yearlyDataRaw ?? null) as YearlyData | null;
 
     // Multi-year rollup — only fetched in Yearly view.
-    const { data: multiYearDataRaw, isFetching: loadingMultiYear } = useQuery({
+    const { data: multiYearData = null, isFetching: loadingMultiYear, refetch: refetchMultiYear } = useQuery({
         ...multiYearStatisticsQuery(yearRangeStart, yearRangeEnd),
         enabled: effectiveViewMode === VIEW_MODES.YEARLY,
     });
-    const multiYearData = (multiYearDataRaw ?? null) as MultiYearData | null;
+
+    // Refresh re-reads whatever the open view shows: in Monthly/Yearly that is the
+    // rollup behind the chart too, not just the month (FE-F5-15c).
+    const refreshAll = () => {
+        void refetchStatistics();
+        if (effectiveViewMode === VIEW_MODES.MONTHLY) void refetchYearly();
+        if (effectiveViewMode === VIEW_MODES.YEARLY) void refetchMultiYear();
+    };
 
     // Modal open-state lives in the URL (?day=YYYY-MM-DD) so browser back/forward
     // and deep links re-open it; the full row is looked up from the loaded month.
@@ -245,13 +265,23 @@ const StatisticsComponent = () => {
         return { endMonth, endYear };
     };
 
+    // Chart label for a daily row: "d/m" on the clinic's calendar day.
+    const dayLabel = (day: string | undefined): string => {
+        if (!day) return '';
+        const date = parseLocalDate(day);
+        return `${date.getDate()}/${date.getMonth() + 1}`;
+    };
+
     // Helper: Aggregate for monthly view (show all months of the year)
     const aggregateByMonth = (dailyData: DailyData[]): ChartDataItem[] => {
         // Starts at null and only becomes a number once a convertible day contributes,
         // so a month with no exchange rate stays a gap rather than plotting as zero.
         const months: Record<number, { grandTotal: number | null; month: number }> = {};
         dailyData.forEach(day => {
-            const date = new Date(day.Day);
+            if (!day.Day) return;
+            // Date-only strings parse as UTC midnight through `new Date()`; read with
+            // local getters that is the previous day west of UTC (FE-F5-15b).
+            const date = parseLocalDate(day.Day);
             const monthKey = date.getMonth();
             if (!months[monthKey]) {
                 months[monthKey] = { grandTotal: null, month: monthKey };
@@ -299,7 +329,7 @@ const StatisticsComponent = () => {
         switch (effectiveViewMode) {
             case VIEW_MODES.DAILY:
                 chartData = statistics.dailyData.map(day => ({
-                    label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
+                    label: dayLabel(day.Day),
                     grandTotal: day.GrandTotal ?? null
                 }));
                 chartTitle = 'Daily Grand Total (USD)';
@@ -340,7 +370,7 @@ const StatisticsComponent = () => {
                 break;
             default:
                 chartData = statistics.dailyData.map(day => ({
-                    label: `${new Date(day.Day).getDate()}/${new Date(day.Day).getMonth() + 1}`,
+                    label: dayLabel(day.Day),
                     grandTotal: day.GrandTotal ?? null
                 }));
         }
@@ -393,6 +423,7 @@ const StatisticsComponent = () => {
                     title: {
                         display: true,
                         text: chartTitle,
+                        color: chartColors.title,
                         font: { size: 16, weight: 'bold' },
                         padding: { top: 10, bottom: 20 }
                     },
@@ -467,7 +498,7 @@ const StatisticsComponent = () => {
     };
 
     // Format currency
-    const formatCurrency = (amount: number | undefined, currency: string = 'IQD'): string => {
+    const formatCurrency = (amount: number | null | undefined, currency: string = 'IQD'): string => {
         return formatCurrencyUtil(amount || 0, currency);
     };
 
@@ -479,8 +510,9 @@ const StatisticsComponent = () => {
     };
 
     // Format date
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString);
+    const formatDate = (dateString: string | undefined): string => {
+        if (!dateString) return '';
+        const date = parseLocalDate(dateString);
         return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
     };
 
@@ -517,7 +549,7 @@ const StatisticsComponent = () => {
                     </div>
                     <div className={styles.viewTabs} role="tablist" aria-label="Statistics views">
                         {Object.values(VIEW_MODES)
-                            .filter((value) => isAdmin || !isAdminOnlyView(value))
+                            .filter((value) => canViewReports || !isAdminOnlyView(value))
                             .map((value) => (
                                 <button
                                     key={value}
@@ -563,12 +595,12 @@ const StatisticsComponent = () => {
                                 <option key={index + 1} value={index + 1}>{name}</option>
                             ))}
                         </select>
-                        <input
-                            type="number"
+                        <YearInput
                             value={year}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) => setYear(parseInt(e.target.value, 10))}
-                            min="2000"
-                            max="2100"
+                            min={MIN_YEAR}
+                            max={MAX_YEAR}
+                            onCommit={setYear}
+                            ariaLabel="Year"
                             className={styles.formInput}
                         />
                     </div>
@@ -577,7 +609,7 @@ const StatisticsComponent = () => {
                     </button>
                 </div>
                 <div className={styles.actions}>
-                    <button onClick={() => refetchStatistics()} className={styles.btnAction} disabled={loading}>
+                    <button onClick={refreshAll} className={styles.btnAction} disabled={loading}>
                         <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i> Refresh
                     </button>
                     <button onClick={handlePrint} className={styles.btnAction}>
@@ -600,7 +632,7 @@ const StatisticsComponent = () => {
             ) : statistics ? (
                 <>
                     {/* Summary Cards — month-scoped totals (admin-only) */}
-                    {isAdmin && (
+                    {canViewReports && (
                     <div className={styles.summaryCards}>
                         <div className={`${styles.summaryCard} ${styles.revenue}`}>
                             <div className={styles.cardHeader}>
@@ -678,12 +710,12 @@ const StatisticsComponent = () => {
                                                     <option key={index + 1} value={index + 1}>{name}</option>
                                                 ))}
                                             </select>
-                                            <input
-                                                type="number"
+                                            <YearInput
                                                 value={periodStartYear}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => setPeriodStartYear(parseInt(e.target.value, 10))}
-                                                min="2000"
-                                                max="2100"
+                                                min={MIN_YEAR}
+                                                max={MAX_YEAR}
+                                                onCommit={setPeriodStartYear}
+                                                ariaLabel="Start year"
                                                 className={styles.formInput}
                                             />
                                         </div>
@@ -715,18 +747,12 @@ const StatisticsComponent = () => {
                                     <div className={styles.periodSelectorControls}>
                                         <div className={styles.periodSelectorField}>
                                             <label htmlFor="year-range-start">From</label>
-                                            <input
+                                            <YearInput
                                                 id="year-range-start"
-                                                type="number"
                                                 value={yearRangeStart}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                                    const newStart = parseInt(e.target.value, 10);
-                                                    if (newStart <= yearRangeEnd && newStart >= 2000) {
-                                                        setYearRangeStart(newStart);
-                                                    }
-                                                }}
-                                                min="2000"
+                                                min={MIN_YEAR}
                                                 max={yearRangeEnd}
+                                                onCommit={setYearRangeStart}
                                                 className={styles.formInput}
                                             />
                                         </div>
@@ -735,18 +761,12 @@ const StatisticsComponent = () => {
                                         </div>
                                         <div className={styles.periodSelectorField}>
                                             <label htmlFor="year-range-end">To</label>
-                                            <input
+                                            <YearInput
                                                 id="year-range-end"
-                                                type="number"
                                                 value={yearRangeEnd}
-                                                onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                                                    const newEnd = parseInt(e.target.value, 10);
-                                                    if (newEnd >= yearRangeStart && newEnd <= 2100) {
-                                                        setYearRangeEnd(newEnd);
-                                                    }
-                                                }}
                                                 min={yearRangeStart}
-                                                max="2100"
+                                                max={MAX_YEAR}
+                                                onCommit={setYearRangeEnd}
                                                 className={styles.formInput}
                                             />
                                         </div>
@@ -820,7 +840,7 @@ const StatisticsComponent = () => {
                                         </tr>
                                     ))}
                                 </tbody>
-                                {isAdmin && (
+                                {canViewReports && (
                                 <tfoot>
                                     <tr className={styles.totalRow}>
                                         <td data-label="Period"><strong>MONTH TOTAL</strong></td>

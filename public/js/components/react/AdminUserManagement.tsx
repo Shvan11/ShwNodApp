@@ -9,6 +9,7 @@ import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
 import { ASSIGNABLE_ROLES, ROLE_LABELS, type UserRole } from '@shared/auth/roles';
 import { MIN_PASSWORD_LENGTH } from '@shared/validation';
+import { formatLocaleDate } from '@/utils/formatters';
 
 const ROLE_BADGE_CLASS: Record<UserRole, string> = {
   admin: styles.roleAdmin,
@@ -279,8 +280,8 @@ export default function AdminUserManagement() {
                       {user.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</td>
-                  <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                  <td>{formatLocaleDate(user.lastLogin) || 'Never'}</td>
+                  <td>{formatLocaleDate(user.createdAt)}</td>
                   <td>
                     <div className={styles.actions}>
                       <button

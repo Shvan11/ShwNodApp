@@ -4,12 +4,14 @@
  * Provides a comprehensive tabbed form for patient registration
  * - Desktop: Tabbed interface for organized data entry
  * - Mobile: Accordion/stacked layout for easy mobile access
+ * Exactly one of the two is rendered (`useMediaQuery`), never both.
  */
 
-import { useState, ChangeEvent, FormEvent } from 'react';
+import { useState, useEffect, useRef, ChangeEvent, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { qk } from '@/query/keys';
 import {
     referralSourcesQuery,
     addressesQuery,
@@ -19,7 +21,11 @@ import * as patientContract from '@shared/contracts/patient.contract';
 import { WORK_TYPE_IDS } from '@shared/treatment-taxonomy';
 import { PATIENT_LANGUAGE_OPTIONS } from '@shared/patient-language';
 import PhoneInput from './PhoneInput';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import styles from './AddPatientForm.module.css';
+
+/** The accordion breakpoint (matches the stylesheet's 768px block). */
+const MOBILE_QUERY = '(max-width: 768px)';
 
 // Intake selector — Regular (no auto-work) / X-ray (imaging work) / Consult work.
 type IntakeKind = 'regular' | 'xray' | 'consult';
@@ -101,6 +107,7 @@ interface Tab {
 
 const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     const { t } = useTranslation('patients');
+    const queryClient = useQueryClient();
     const [formData, setFormData] = useState<FormData>({
         patientName: '',
         firstName: '',
@@ -144,6 +151,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     const dropdownError =
         referralSourcesQ.isError || addressesQ.isError || gendersQ.isError;
 
+    // One layout at a time. Both used to be rendered, one hidden by CSS: on desktop
+    // the hidden accordion kept a second `required` name input mounted, so from any
+    // tab but Basic an empty name cancelled Save with no message, and every id and
+    // the intake radio group were doubled (audit FE-F6-5).
+    const isMobile = useMediaQuery(MOBILE_QUERY);
+
     // Tab state for desktop view
     const [activeTab, setActiveTab] = useState('basic');
 
@@ -174,9 +187,18 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         }));
     };
 
-    // IMaskInput handler - receives unmasked (digits only) value
+    // IMaskInput handlers - receive the unmasked (digits only) value
     const handlePhoneChange = (value: string) => {
         setFormData(prev => ({ ...prev, phone: value }));
+    };
+    const handlePhone2Change = (value: string) => {
+        setFormData(prev => ({ ...prev, phone2: value }));
+    };
+
+    // Digits only: a typed "+964" reached the SMS builder as "++964…" (FE-F6-7e).
+    const handleCountryCodeChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.replace(/\D/g, '');
+        setFormData(prev => ({ ...prev, countryCode: value }));
     };
 
     // Selecting an intake kind seeds its preset fee (Consult = free/0; X-ray = the
@@ -202,11 +224,18 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         setIntakeCurrency('IQD');
     };
 
+    // The success redirect, cancelled if the form unmounts first: clicking away
+    // inside the 1.5 s window used to still navigate to the new patient (FE-F6-9).
+    const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => {
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    }, []);
+
     const showAlert = (message: string, type: 'danger' | 'success' = 'danger', personId: number | null = null) => {
         setAlert({ show: true, message, type });
 
         if (type === 'success' && personId) {
-            setTimeout(() => {
+            redirectTimerRef.current = setTimeout(() => {
                 onSuccess(personId);
             }, 1500);
         }
@@ -261,6 +290,8 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             const result = await postJSON<patientContract.CreatePatientResponse>('/api/patients', payload, { schema: patientContract.createPatient.response });
 
             succeeded = true;
+            // The new patient belongs in the jump comboboxes and message pickers (FE-F6-9).
+            void queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
             showAlert(
                 t('add.toast.success', { name: formData.patientName }),
                 'success',
@@ -375,10 +406,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         type="text"
                         name="countryCode"
                         value={formData.countryCode}
-                        onChange={handleInputChange}
+                        onChange={handleCountryCodeChange}
                         className="form-control"
                         placeholder={t('fields.countryCodePlaceholder')}
-                        maxLength={5}
+                        inputMode="numeric"
+                        maxLength={4}
+                        dir="ltr"
                     />
                 </div>
                 <div className={styles.formGroup}>
@@ -532,14 +565,12 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         <i className="fas fa-phone-alt"></i>
                         {t('fields.secondaryPhone')}
                     </label>
-                    <input
+                    {/* The same masked input as the primary phone and the edit form, so a
+                        number the Add form stores is one the Edit form can hold (FE-F6-4). */}
+                    <PhoneInput
                         id="add-phone2"
-                        type="tel"
-                        name="phone2"
                         value={formData.phone2}
-                        onChange={handleInputChange}
-                        className="form-control"
-                        placeholder={t('fields.secondaryPhonePlaceholder')}
+                        onChange={handlePhone2Change}
                     />
                 </div>
                 <div className={styles.formGroup}>
@@ -653,7 +684,6 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         onChange={handleInputChange}
                         className="form-control"
                         rows={3}
-                        maxLength={100}
                         placeholder={t('add.notesPlaceholder')}
                     />
                 </div>
@@ -740,66 +770,91 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                         <i className="fas fa-user-plus"></i>
                         {t('add.title')}
                     </h2>
-                    <div className={`${styles.formActions} ${styles.headerActions}`}>
-                        {renderActions()}
-                    </div>
+                    {!isMobile && (
+                        <div className={styles.formActions}>
+                            {renderActions()}
+                        </div>
+                    )}
                 </div>
 
                 {alert.show && (
-                    <div className={`${styles.alert} ${alert.type === 'success' ? styles.alertSuccess : styles.alertDanger}`}>
-                        <i className={`fas ${alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`}></i>
+                    <div
+                        className={`${styles.alert} ${alert.type === 'success' ? styles.alertSuccess : styles.alertDanger}`}
+                        role={alert.type === 'success' ? 'status' : 'alert'}
+                    >
+                        <i className={`fas ${alert.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}`} aria-hidden="true"></i>
                         {alert.message}
                     </div>
                 )}
 
-                {/* Desktop Tabbed View */}
-                <div className={`${styles.formTabsContainer} ${styles.desktopOnly}`}>
-                    <div className={styles.tabsHeader}>
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                type="button"
-                                className={`${styles.tabButton} ${activeTab === tab.id ? styles.tabButtonActive : ''}`}
-                                onClick={() => setActiveTab(tab.id)}
-                            >
-                                <i className={tab.icon}></i>
-                                <span className={styles.tabLabel}>{tab.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                    <div className={styles.tabsContent}>
-                        {renderTabContent(activeTab)}
-                    </div>
-                </div>
-
-                {/* Mobile Accordion View */}
-                <div className={`${styles.formAccordionContainer} ${styles.mobileOnly}`}>
-                    {tabs.map(tab => (
-                        <div key={tab.id} className={styles.accordionSection}>
-                            <button
-                                type="button"
-                                className={`${styles.accordionHeader} ${expandedSections[tab.id as keyof ExpandedSections] ? styles.accordionHeaderExpanded : ''}`}
-                                onClick={() => toggleAccordion(tab.id as keyof ExpandedSections)}
-                            >
-                                <div className={styles.accordionTitle}>
-                                    <i className={tab.icon}></i>
-                                    <span>{tab.label}</span>
-                                </div>
-                                <i className={`fas fa-chevron-${expandedSections[tab.id as keyof ExpandedSections] ? 'up' : 'down'}`}></i>
-                            </button>
-                            {expandedSections[tab.id as keyof ExpandedSections] && (
-                                <div className={styles.accordionContent}>
-                                    {renderTabContent(tab.id)}
-                                </div>
-                            )}
+                {!isMobile ? (
+                    /* Desktop Tabbed View */
+                    <div className={styles.formTabsContainer}>
+                        <div className={styles.tabsHeader} role="tablist" aria-label={t('add.title')}>
+                            {tabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    id={`add-tab-${tab.id}`}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeTab === tab.id}
+                                    aria-controls="add-tabpanel"
+                                    className={`${styles.tabButton} ${activeTab === tab.id ? styles.tabButtonActive : ''}`}
+                                    onClick={() => setActiveTab(tab.id)}
+                                >
+                                    <i className={tab.icon} aria-hidden="true"></i>
+                                    <span className={styles.tabLabel}>{tab.label}</span>
+                                </button>
+                            ))}
                         </div>
-                    ))}
-                </div>
 
-                {/* Bottom bar — mobile accordion only (submit after filling) */}
-                <div className={`${styles.formActions} ${styles.bottomActions}`}>
-                    {renderActions()}
-                </div>
+                        <div
+                            className={styles.tabsContent}
+                            id="add-tabpanel"
+                            role="tabpanel"
+                            aria-labelledby={`add-tab-${activeTab}`}
+                        >
+                            {renderTabContent(activeTab)}
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* Mobile Accordion View */}
+                        <div className={styles.formAccordionContainer}>
+                            {tabs.map(tab => {
+                                const expanded = expandedSections[tab.id as keyof ExpandedSections];
+                                return (
+                                    <div key={tab.id} className={styles.accordionSection}>
+                                        <button
+                                            type="button"
+                                            className={`${styles.accordionHeader} ${expanded ? styles.accordionHeaderExpanded : ''}`}
+                                            onClick={() => toggleAccordion(tab.id as keyof ExpandedSections)}
+                                            aria-expanded={expanded}
+                                            aria-controls={`add-section-${tab.id}`}
+                                        >
+                                            <div className={styles.accordionTitle}>
+                                                <i className={tab.icon} aria-hidden="true"></i>
+                                                <span>{tab.label}</span>
+                                            </div>
+                                            <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} aria-hidden="true"></i>
+                                        </button>
+
+                                        {expanded && (
+                                            <div className={styles.accordionContent} id={`add-section-${tab.id}`}>
+                                                {renderTabContent(tab.id)}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Bottom bar — the accordion is tall, so its actions follow it */}
+                        <div className={`${styles.formActions} ${styles.bottomActions}`}>
+                            {renderActions()}
+                        </div>
+                    </>
+                )}
             </form>
         </div>
     );

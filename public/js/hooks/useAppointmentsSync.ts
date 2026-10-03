@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import sseAppointments, { type Freshness } from '../services/sse-appointments';
+import { toLocalDateString } from '../utils/calendarDate';
 
 // Periodic safety net for missed SSE messages on the today view.
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -32,13 +33,7 @@ export interface UseAppointmentsSyncReturn {
   dataFreshness: Freshness;
 }
 
-function getTodayDate(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+const getTodayDate = (): string => toLocalDateString(new Date());
 
 /**
  * Real-time appointment sync — **today-only by design.**

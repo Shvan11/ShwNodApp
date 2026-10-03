@@ -9,7 +9,7 @@
     "lastNameEnglish": "Last Name (English)",
     "lastNamePlaceholder": "Last name",
     "countryCode": "Country Code",
-    "countryCodePlaceholder": "e.g., +1, +44",
+    "countryCodePlaceholder": "e.g., 964 (digits only)",
     "primaryPhone": "Primary Phone",
     "phone": "Phone",
     "phone2": "Phone 2",
@@ -124,7 +124,8 @@
       "deleteSuccess": "Patient and photo folder deleted",
       "deleteFolderWarning": "Patient deleted, but its photo folder could not be removed.",
       "deleteFailed": "Delete failed"
-    }
+    },
+    "dismissError": "Dismiss"
   },
   "view": {
     "loading": "Loading patient information...",
@@ -140,7 +141,10 @@
       "loading": "Loading alerts...",
       "empty": "No alerts for this patient",
       "editTitle": "Edit alert",
-      "archiveTitle": "Archive alert"
+      "archiveTitle": "Archive alert",
+      "archiveConfirm": "Archive this alert? It leaves the patient's alert list.",
+      "archiveConfirmTitle": "Archive alert",
+      "archiveConfirmButton": "Archive"
     },
     "cards": {
       "contact": "Contact Information",
@@ -173,7 +177,11 @@
       "alertDeleted": "Alert deleted",
       "alertDeleteFailed": "Failed to delete alert",
       "costSaved": "Cost updated successfully",
-      "costSaveFailed": "Failed to save cost"
-    }
+      "costSaveFailed": "Failed to save cost",
+      "refreshFailed": "Could not refresh the patient record: {{error}}",
+      "alertArchived": "Alert archived"
+    },
+    "saveCost": "Save cost",
+    "cancelCost": "Cancel"
   }
 }

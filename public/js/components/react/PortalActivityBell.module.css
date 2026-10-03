@@ -1,32 +1,5 @@
-/* PortalActivityBell — header bell + popover for doctor-portal activity.
-   Mirrors TasksBell.module.css: white icon button in the header band, portaled
-   surface-card popover (position:fixed set inline off the bell rect). Logical
-   props throughout for RTL. */
-
-.wrap {
-    position: relative;
-    display: inline-flex;
-}
-
-.bellBtn {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 42px;
-    height: 42px;
-    border: none;
-    border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-white);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.bellBtn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
+/* PortalActivityBell — the badge and the popover content for doctor-portal
+   activity (the shell is HeaderPopover's). Logical props throughout for RTL. */
 
 .badge {
     position: absolute;
@@ -42,17 +15,6 @@
     font-weight: var(--font-weight-bold);
     line-height: 18px;
     text-align: center;
-}
-
-.popover {
-    width: 380px;
-    max-width: calc(100vw - 24px);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    z-index: var(--z-index-popover);
-    overflow: hidden;
 }
 
 .popHeader {

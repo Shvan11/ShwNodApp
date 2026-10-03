@@ -9,7 +9,7 @@
     "lastNameEnglish": "اسم العائلة (بالإنجليزية)",
     "lastNamePlaceholder": "اسم العائلة",
     "countryCode": "رمز الدولة",
-    "countryCodePlaceholder": "مثال: +1، +44",
+    "countryCodePlaceholder": "مثال: 964 (أرقام فقط)",
     "primaryPhone": "الهاتف الأساسي",
     "phone": "الهاتف",
     "phone2": "الهاتف الثاني",
@@ -124,7 +124,8 @@
       "deleteSuccess": "تم حذف المريض ومجلد الصور",
       "deleteFolderWarning": "تم حذف المريض، لكن تعذّر إزالة مجلد صوره.",
       "deleteFailed": "فشل الحذف"
-    }
+    },
+    "dismissError": "إغلاق"
   },
   "view": {
     "loading": "جارٍ تحميل معلومات المريض...",
@@ -140,7 +141,10 @@
       "loading": "جارٍ تحميل التنبيهات...",
       "empty": "لا توجد تنبيهات لهذا المريض",
       "editTitle": "تعديل التنبيه",
-      "archiveTitle": "أرشفة التنبيه"
+      "archiveTitle": "أرشفة التنبيه",
+      "archiveConfirm": "أرشفة هذا التنبيه؟ سيُزال من قائمة تنبيهات المريض.",
+      "archiveConfirmTitle": "أرشفة التنبيه",
+      "archiveConfirmButton": "أرشفة"
     },
     "cards": {
       "contact": "معلومات الاتصال",
@@ -173,7 +177,11 @@
       "alertDeleted": "تم حذف التنبيه",
       "alertDeleteFailed": "فشل حذف التنبيه",
       "costSaved": "تم تحديث التكلفة بنجاح",
-      "costSaveFailed": "فشل حفظ التكلفة"
-    }
+      "costSaveFailed": "فشل حفظ التكلفة",
+      "refreshFailed": "تعذّر تحديث سجل المريض: {{error}}",
+      "alertArchived": "تمت أرشفة التنبيه"
+    },
+    "saveCost": "حفظ التكلفة",
+    "cancelCost": "إلغاء"
   }
 }

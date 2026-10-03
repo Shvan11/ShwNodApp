@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, putJSON, httpErrorMessage } from '@/core/http';
-import { notifyTasksChanged } from '@/services/tasks';
+import { invalidateTasks } from '@/services/tasks';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 
@@ -26,11 +27,12 @@ interface FormErrors {
     alertDetails?: string;
 }
 
+/** The alert being edited — the contract's alert row (nullable as the contract has it). */
 interface EditAlertData {
     alert_id: number;
-    alert_type_id?: number;
+    alert_type_id?: number | null;
     alert_severity?: number;
-    alert_details: string;
+    alert_details: string | null;
     surface_mode?: string;
     expires_at?: string | null;
     escalate_at?: string | null;
@@ -50,6 +52,7 @@ interface AlertModalProps {
  * Modal for creating or editing patient alerts
  */
 const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }: AlertModalProps) => {
+    const { t } = useTranslation('tasks');
     const toast = useToast();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState<AlertFormData>({
@@ -114,15 +117,15 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
         const newErrors: FormErrors = {};
 
         if (!formData.alertTypeId) {
-            newErrors.alertTypeId = 'Please select an alert type';
+            newErrors.alertTypeId = t('alert.typeRequired');
         }
 
         if (!formData.alertSeverity) {
-            newErrors.alertSeverity = 'Please select a severity level';
+            newErrors.alertSeverity = t('alert.severityRequired');
         }
 
         if (!formData.alertDetails.trim()) {
-            newErrors.alertDetails = 'Please enter alert details';
+            newErrors.alertDetails = t('alert.detailsRequired');
         }
 
         setErrors(newErrors);
@@ -132,7 +135,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
     // Handle save
     const handleSave = async () => {
         if (!validateForm()) {
-            toast.error('Please fill in all required fields');
+            toast.error(t('alert.fillRequired'));
             return;
         }
 
@@ -153,8 +156,10 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             };
             await (isEditMode ? putJSON(url, body) : postJSON(url, body));
 
-            toast.success(`Alert ${isEditMode ? 'updated' : 'created'} successfully`);
-            notifyTasksChanged();
+            toast.success(isEditMode ? t('alert.updated') : t('alert.created'));
+            // A context alert is in this patient's list; one shown in the header is
+            // also a task in the bell.
+            void invalidateTasks(personId);
 
             // Reset form
             setFormData({
@@ -175,8 +180,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
             // Close modal
             onClose();
         } catch (error) {
-            console.error(`Error ${isEditMode ? 'updating' : 'creating'} alert:`, error);
-            toast.error(httpErrorMessage(error, `Failed to ${isEditMode ? 'update' : 'create'} alert`));
+            toast.error(httpErrorMessage(error, isEditMode ? t('alert.updateFailed') : t('alert.createFailed')));
         } finally {
             setLoading(false);
         }
@@ -208,9 +212,9 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                     variant="warning"
                     titleId="alert-modal-title"
                     icon={<i className="fas fa-exclamation-triangle" />}
-                    title={isEditMode ? 'Edit Alert' : 'Add New Alert'}
+                    title={isEditMode ? t('alert.editTitle') : t('alert.addTitle')}
                     onClose={handleCancel}
-                    closeLabel="Close modal"
+                    closeLabel={t('alert.close')}
                 />
 
                 <div className="modal-body">
@@ -218,7 +222,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                         {/* Alert Type */}
                         <div className="form-group">
                             <label htmlFor="alertTypeId">
-                                Alert Type <span className="required">*</span>
+                                {t('alert.type')} <span className="required">*</span>
                             </label>
                             <select
                                 id="alertTypeId"
@@ -228,7 +232,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                                 className={errors.alertTypeId ? 'error' : ''}
                                 disabled={loading}
                             >
-                                <option value="">Select alert type...</option>
+                                <option value="">{t('alert.selectType')}</option>
                                 {alertTypes.map(type => (
                                     <option key={type.alert_type_id} value={type.alert_type_id}>
                                         {type.type_name}
@@ -243,7 +247,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                         {/* Severity */}
                         <div className="form-group">
                             <span>
-                                Severity Level <span className="required">*</span>
+                                {t('alert.severity')} <span className="required">*</span>
                             </span>
                             <div className="severity-options">
                                 <label className="severity-option">
@@ -255,7 +259,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
-                                    <span className="severity-badge severity-1">Mild</span>
+                                    <span className="severity-badge severity-1">{t('severity.mild')}</span>
                                 </label>
                                 <label className="severity-option">
                                     <input
@@ -266,7 +270,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
-                                    <span className="severity-badge severity-2">Moderate</span>
+                                    <span className="severity-badge severity-2">{t('severity.moderate')}</span>
                                 </label>
                                 <label className="severity-option">
                                     <input
@@ -277,7 +281,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                                         onChange={handleChange}
                                         disabled={loading}
                                     />
-                                    <span className="severity-badge severity-3">Severe</span>
+                                    <span className="severity-badge severity-3">{t('severity.severe')}</span>
                                 </label>
                             </div>
                             {errors.alertSeverity && (
@@ -288,14 +292,14 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                         {/* Alert Details */}
                         <div className="form-group">
                             <label htmlFor="alertDetails">
-                                Alert Details <span className="required">*</span>
+                                {t('alert.details')} <span className="required">*</span>
                             </label>
                             <textarea
                                 id="alertDetails"
                                 name="alertDetails"
                                 value={formData.alertDetails}
                                 onChange={handleChange}
-                                placeholder="Enter details about this alert..."
+                                placeholder={t('alert.detailsPlaceholder')}
                                 rows={4}
                                 className={errors.alertDetails ? 'error' : ''}
                                 disabled={loading}
@@ -315,12 +319,12 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                                     onChange={(e) => setFormData(prev => ({ ...prev, showInHeader: e.target.checked }))}
                                     disabled={loading}
                                 />
-                                {' '}Also show in the header Tasks bell
+                                {' '}{t('alert.showInHeader')}
                             </label>
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="escalateAt">Escalate to header on <span className="optional-hint">(optional)</span></label>
+                            <label htmlFor="escalateAt">{t('alert.escalateAt')} <span className="optional-hint">{t('alert.optional')}</span></label>
                             <input
                                 type="date"
                                 id="escalateAt"
@@ -332,7 +336,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="expiresAt">Expires <span className="optional-hint">(optional)</span></label>
+                            <label htmlFor="expiresAt">{t('alert.expires')} <span className="optional-hint">{t('alert.optional')}</span></label>
                             <input
                                 type="date"
                                 id="expiresAt"
@@ -352,7 +356,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                         onClick={handleCancel}
                         disabled={loading}
                     >
-                        Cancel
+                        {t('alert.cancel')}
                     </button>
                     <button
                         type="button"
@@ -362,13 +366,13 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                     >
                         {loading ? (
                             <>
-                                <i className="fas fa-spinner fa-spin"></i>
-                                Saving...
+                                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                                {t('alert.saving')}
                             </>
                         ) : (
                             <>
-                                <i className="fas fa-save"></i>
-                                Save Alert
+                                <i className="fas fa-save" aria-hidden="true"></i>
+                                {t('alert.save')}
                             </>
                         )}
                     </button>

@@ -23,7 +23,7 @@ import {
   dailyAppointmentsQuery,
   workKeywordsQuery,
   tagOptionsQuery,
-  typeOptionsQuery,
+  patientTypesQuery,
   alignerDoctorsQuery,
   templatesQuery,
   templateQuery,
@@ -311,11 +311,12 @@ export async function templateDesignerLoader({
  *
  * It returns `null`: the component reads the same five keys with `useQuery`.
  * This used to issue five raw `fetchJSON` calls that duplicated
- * `patientPhonesQuery`/`workTypesQuery`/`workKeywordsQuery`/`tagOptionsQuery`/
- * `typeOptionsQuery` verbatim and returned the rows as loader data, so the
- * results never entered the cache — which is why `typeOptionsQuery` read as dead
- * code, and why a work type or patient tag edited through Settings → Lookups
- * could not reach these dropdowns until a full route re-navigation.
+ * the lookup factories verbatim and returned the rows as loader data, so the
+ * results never entered the cache — and a work type or patient tag edited
+ * through Settings → Lookups could not reach these dropdowns until a full route
+ * re-navigation. (The patient-type filter reads `patientTypesQuery`, the same
+ * `/api/patient-types` feed as the edit form; its own `/api/patients/type-options`
+ * twin was retired in FE-F6-14.)
  *
  * `ensureQueryData` rather than `loaderQuery` on purpose: `loaderQuery` maps a
  * failure onto a `Response` for the route errorElement, and here each lookup is
@@ -335,7 +336,7 @@ export async function patientManagementLoader(): Promise<null> {
       emptyOnHttpError(queryClient.ensureQueryData(workTypesQuery())),
       emptyOnHttpError(queryClient.ensureQueryData(workKeywordsQuery())),
       emptyOnHttpError(queryClient.ensureQueryData(tagOptionsQuery())),
-      emptyOnHttpError(queryClient.ensureQueryData(typeOptionsQuery())),
+      emptyOnHttpError(queryClient.ensureQueryData(patientTypesQuery())),
     ]);
   } catch (error) {
     // Network/abort — the screen still renders; its useQuery reads will report

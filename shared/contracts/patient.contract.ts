@@ -301,7 +301,20 @@ export const patientSearch = {
     offset: optionalNonNegIntQuery,
   }),
   response: z.object({
-    patients: z.array(z.looseObject({ person_id: z.number(), patient_name: z.string() })),
+    // The columns the patient-management table renders are modeled, so they reach
+    // it parsed instead of through a hand-written interface (audit FE-F6-10).
+    patients: z.array(
+      z.looseObject({
+        person_id: z.number(),
+        patient_name: z.string(),
+        first_name: z.string().nullable(),
+        last_name: z.string().nullable(),
+        phone: z.string().nullable(),
+        date_added: z.string().nullable(),
+        last_visit: z.string().nullable(),
+        TagName: z.string().nullable(),
+      })
+    ),
     totalCount: z.number().optional(),
     hasMore: z.boolean().optional(),
   }),
@@ -312,12 +325,6 @@ export type PatientSearchResponse = z.infer<typeof patientSearch.response>;
 // GET /api/patients/tag-options — [{ id, tag }] (tag_options.tag is NOT NULL).
 export const tagOptions = {
   response: z.array(z.looseObject({ id: z.number(), tag: z.string() })),
-} as const;
-
-// GET /api/patients/type-options — [{ id, type }] (both fields consumed by the
-// patient-management loader's react-select mapping).
-export const typeOptions = {
-  response: z.array(z.looseObject({ id: z.number(), type: z.string().nullable() })),
 } as const;
 
 // GET /api/patients/:personId — single patient (raw `patients` columns) + active
@@ -499,7 +506,10 @@ export type EstimatedCostBody = z.infer<typeof estimatedCost.body>;
 export const alertBody = z.object({
   // Optional so a category-less header task can be edited via PUT /api/alerts/:id;
   // the patient AlertModal still always sends one (client-side required field).
-  alertTypeId: intId.optional(),
+  // `null` clears the category (task edit, "None"); omitted leaves it untouched —
+  // the edit form used to omit it for "None", so a category could never be
+  // removed (audit FE-F5-5). The POST quick-add maps a missing one to General.
+  alertTypeId: intId.nullable().optional(),
   alertSeverity: intId,
   alertDetails: z.string().min(1),
   surfaceMode: surfaceMode.optional(),

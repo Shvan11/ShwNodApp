@@ -145,7 +145,6 @@ export const qk = {
     referralSources: () => ['lookups', 'referral-sources'] as const,
     patientTypes: () => ['lookups', 'patient-types'] as const,
     tagOptions: () => ['lookups', 'tag-options'] as const,
-    typeOptions: () => ['lookups', 'type-options'] as const,
     workTypes: () => ['lookups', 'work-types'] as const,
     workKeywords: () => ['lookups', 'work-keywords'] as const,
     teeth: () => ['lookups', 'teeth'] as const,
@@ -364,6 +363,8 @@ export const qk = {
   },
   /** Reports — daily-invoices modal (keyed by date). */
   dailyInvoices: (date: string) => ['daily-invoices', date] as const,
+  /** Every day's daily-invoices entry — an invoice deleted on approval names no date. */
+  dailyInvoicesAll: () => ['daily-invoices'] as const,
   /** Clinic branding (header logo + display name) — header + General settings. */
   branding: () => ['branding'] as const,
   /**

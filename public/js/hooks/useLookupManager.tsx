@@ -21,6 +21,7 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { QueryKey } from '@tanstack/react-query';
 import LookupContextMenu from '../components/react/LookupContextMenu';
 import LookupManagerModal from '../components/react/LookupManagerModal';
@@ -28,9 +29,14 @@ import LookupManagerModal from '../components/react/LookupManagerModal';
 interface UseLookupManagerOptions {
   /** Whitelist key of the lookup table to manage (e.g. 'tblLabs'). */
   tableKey: string;
-  /** Modal title override; defaults to `Manage <displayName>`. */
+  /** Modal title override; defaults to `common:lookups.manage` ("Manage <displayName>"). */
   title?: string;
-  /** Context-menu item label; defaults to 'Edit values'. */
+  /**
+   * Context-menu item label; defaults to `common:lookups.editValues`. The defaults
+   * are catalog strings, not literals: this shared hook renders on translated
+   * screens, where the i18n lint ratchet (which checks per FILE) cannot see a
+   * literal living in here (audit FE-F3-13).
+   */
   menuLabel?: string;
   /** Query keys of dropdown feeds to invalidate after any edit. */
   invalidateKeys?: QueryKey[];
@@ -48,10 +54,11 @@ interface UseLookupManagerResult {
 export function useLookupManager({
   tableKey,
   title,
-  menuLabel = 'Edit values',
+  menuLabel,
   invalidateKeys,
   onChanged,
 }: UseLookupManagerOptions): UseLookupManagerResult {
+  const { t } = useTranslation('common');
   const queryClient = useQueryClient();
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,6 +75,18 @@ export function useLookupManager({
     onChanged?.();
   };
 
+  const menuItems = [
+    {
+      key: 'edit',
+      label: menuLabel ?? t('lookups.editValues'),
+      icon: 'fa-pen',
+      onClick: () => {
+        setMenuPos(null);
+        setIsModalOpen(true);
+      },
+    },
+  ];
+
   const overlay = (
     <>
       {menuPos && (
@@ -75,17 +94,7 @@ export function useLookupManager({
           x={menuPos.x}
           y={menuPos.y}
           onClose={() => setMenuPos(null)}
-          items={[
-            {
-              key: 'edit',
-              label: menuLabel,
-              icon: 'fa-pen',
-              onClick: () => {
-                setMenuPos(null);
-                setIsModalOpen(true);
-              },
-            },
-          ]}
+          items={menuItems}
         />
       )}
       <LookupManagerModal

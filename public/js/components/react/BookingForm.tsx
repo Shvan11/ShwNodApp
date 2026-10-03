@@ -8,6 +8,7 @@ import { formatAppointmentDateTime } from '@/utils/formatters';
 import { parseLocalDate } from '@/utils/calendarDate';
 import { doctorsQuery, appointmentDetailsQuery } from '@/query/queries';
 import styles from './AppointmentForm.module.css';
+import { isClinicDoctorName } from '@shared/clinic-doctor';
 
 /** The four booking fields, as the form's selects and the picker hold them. */
 export interface BookingValues {
@@ -84,7 +85,7 @@ const BookingForm = ({
         const list = (doctorsData ?? []).map(d => ({ id: d.id, label: d.employee_name }));
         // "Clinic" is the most common assignment, so it floats to the top; everyone
         // else keeps the server's order (Array.sort is stable).
-        list.sort((a, b) => (a.label === 'Clinic' ? -1 : b.label === 'Clinic' ? 1 : 0));
+        list.sort((a, b) => (isClinicDoctorName(a.label) ? -1 : isClinicDoctorName(b.label) ? 1 : 0));
         if (currentDoctor && !list.some(d => d.id === currentDoctor.id)) {
             list.push({ id: currentDoctor.id, label: t('form.currentDoctor', { name: currentDoctor.name }) });
         }

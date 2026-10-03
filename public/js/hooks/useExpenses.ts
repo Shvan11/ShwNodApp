@@ -2,20 +2,19 @@
  * Custom hooks for Expenses Management
  *
  * Reads are thin wrappers over the React Query `queryOptions` factories in
- * `query/queries.ts` (shared/deduped cache); mutations write via `core/http`
- * then invalidate `qk.expenses.all()` so every expense read refreshes —
- * replacing the old caller-supplied `onSuccess`→`refetch` wiring.
+ * `query/queries.ts` (shared/deduped cache); mutations are `useApiMutation`s
+ * that write via `core/http` then invalidate `qk.expenses.all()` so every
+ * expense read refreshes.
  *
  * The entity types below stay frontend-owned (the expense responses predate full
  * contract modelling); the factories keep these as their return generics while
  * the contract `.response` still validates the boundary at runtime.
  */
-import { useState, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
-import { notifyApprovalsChanged } from '@/services/approvals';
 import * as expenseContract from '@shared/contracts/expense.contract';
 import { qk } from '@/query/keys';
+import { useApiMutation } from '@/query/useApiMutation';
 import {
   expensesQuery,
   expenseCategoriesQuery,
@@ -157,83 +156,56 @@ export function useAllEmployees(): { employees: Array<{ id: number; employee_nam
 }
 
 /**
- * Hook for expense mutations (create, update, delete)
- */
-/**
+ * Expense writes, each its own `useApiMutation` (audit FE-F3-12): the expense
+ * invalidation is AWAITED before the caller's `await` resolves, `loading` ORs
+ * the per-operation pending flags instead of sharing one boolean two writes
+ * could race over, and a 5xx is reported like every other mutation's.
+ *
  * A failed write rejects with the funnel's error: callers show it through
  * `httpErrorMessage(err, …)`, so the server's reason (a 400's message) reaches
  * the user. (A computed `error` field used to sit here unread — FE-F8-8.)
+ *
+ * A held edit/delete (`outcome: 'pending'`) changed no row, so it refreshes the
+ * approval reads instead: the bells poll on a 5-minute timer and otherwise only
+ * hear about a request when an admin RESOLVES one, so without this the
+ * submitter's MyApprovalsBadge and the admin's ApprovalsBell sit stale and the
+ * request looks lost.
  */
+type HoldOutcome = { outcome: 'applied' | 'pending' };
+
+const afterHoldableWrite = (data: { outcome: string }) =>
+  data.outcome === 'pending' ? [qk.approvals.all()] : [qk.expenses.all()];
+
 export function useExpenseMutations(): {
   createExpense: (expenseData: ExpenseData) => Promise<expenseContract.CreateExpenseResponse>;
-  updateExpense: (id: number, expenseData: ExpenseData) => Promise<{ outcome: 'applied' | 'pending' }>;
-  deleteExpense: (id: number) => Promise<{ outcome: 'applied' | 'pending' }>;
+  updateExpense: (id: number, expenseData: ExpenseData) => Promise<HoldOutcome>;
+  deleteExpense: (id: number) => Promise<HoldOutcome>;
   loading: boolean;
 } {
-  const queryClient = useQueryClient();
-  const [loading, setLoading] = useState(false);
+  const create = useApiMutation({
+    mutationFn: (expenseData: ExpenseData) =>
+      postJSON<expenseContract.CreateExpenseResponse>('/api/expenses', expenseData, { schema: expenseContract.createExpense.response }),
+    invalidate: [qk.expenses.all()],
+  });
+  const update = useApiMutation({
+    mutationFn: ({ id, expenseData }: { id: number; expenseData: ExpenseData }) =>
+      putJSON<{ outcome: string }>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response }),
+    invalidate: afterHoldableWrite,
+  });
+  const remove = useApiMutation({
+    mutationFn: (id: number) =>
+      deleteJSON<{ outcome: string }>(`/api/expenses/${id}`, { schema: expenseContract.deleteExpense.response }),
+    invalidate: afterHoldableWrite,
+  });
 
-  const createExpense = useCallback(
-    async (expenseData: ExpenseData): Promise<expenseContract.CreateExpenseResponse> => {
-      try {
-        setLoading(true);
-        const data = await postJSON<expenseContract.CreateExpenseResponse>('/api/expenses', expenseData, { schema: expenseContract.createExpense.response });
-        void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
-        return data;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [queryClient]
-  );
-
-  const updateExpense = useCallback(
-    async (id: number, expenseData: ExpenseData): Promise<{ outcome: 'applied' | 'pending' }> => {
-      try {
-        setLoading(true);
-        const data = await putJSON<{ outcome: string }>(`/api/expenses/${id}`, expenseData, { schema: expenseContract.updateExpense.response });
-        if (data.outcome === 'pending') {
-          // The row did NOT change (so no expense invalidation), but an approval
-          // request was just created — tell the bells. They poll on a 5-minute
-          // timer and otherwise only hear about a request when an admin RESOLVES
-          // one, so without this the submitter's own MyApprovalsBadge and the
-          // admin's ApprovalsBell sit stale and the request looks lost.
-          notifyApprovalsChanged();
-          return { outcome: 'pending' };
-        }
-        void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
-        return { outcome: 'applied' };
-      } finally {
-        setLoading(false);
-      }
-    },
-    [queryClient]
-  );
-
-  const deleteExpense = useCallback(
-    async (id: number): Promise<{ outcome: 'applied' | 'pending' }> => {
-      try {
-        setLoading(true);
-        const data = await deleteJSON<{ outcome: string }>(`/api/expenses/${id}`, { schema: expenseContract.deleteExpense.response });
-        if (data.outcome === 'pending') {
-          // Held for approval — no row changed, but a request was created. See the
-          // note in updateExpense above.
-          notifyApprovalsChanged();
-          return { outcome: 'pending' };
-        }
-        void queryClient.invalidateQueries({ queryKey: qk.expenses.all() });
-        return { outcome: 'applied' };
-      } finally {
-        setLoading(false);
-      }
-    },
-    [queryClient]
-  );
+  const toHoldOutcome = (data: { outcome: string }): HoldOutcome => ({
+    outcome: data.outcome === 'pending' ? 'pending' : 'applied',
+  });
 
   return {
-    createExpense,
-    updateExpense,
-    deleteExpense,
-    loading,
+    createExpense: create.mutateAsync,
+    updateExpense: (id, expenseData) => update.mutateAsync({ id, expenseData }).then(toHoldOutcome),
+    deleteExpense: (id) => remove.mutateAsync(id).then(toHoldOutcome),
+    loading: create.isPending || update.isPending || remove.isPending,
   };
 }

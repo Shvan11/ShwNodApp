@@ -2,19 +2,25 @@ import React, { useState, useMemo, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import WorkCard, { type Work, type WorkStatus } from './WorkCard';
+import WorkCard, { type Work } from './WorkCard';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
+import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
+import { parseLocalDate } from '../../utils/calendarDate';
+import { workBalance } from '../../utils/workBalance';
+import { LANGUAGES } from '../../core/language';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
+import { WORK_STATUS } from '@shared/treatment-taxonomy';
 import { postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { qk } from '@/query/keys';
-import { notifyApprovalsChanged } from '@/services/approvals';
+import { invalidateApprovals } from '@/services/approvals';
 import {
     worksQuery,
     patientInfoQuery,
@@ -23,28 +29,10 @@ import {
     galleryQuery,
 } from '@/query/queries';
 import { buildWorkingContentUrl } from './files/fileHelpers';
-import {
-    deleteInvoice as deleteInvoiceContract,
-    type PaymentHistoryResponse,
-} from '@shared/contracts/payment.contract';
+import { deleteInvoice as deleteInvoiceContract } from '@shared/contracts/payment.contract';
 import { deleteWork as deleteWorkContract } from '@shared/contracts/work.contract';
 import * as appointmentContract from '@shared/contracts/appointment.contract';
 import styles from './WorkComponent.module.css';
-
-interface PatientInfo {
-    person_id: number;
-    patient_name: string;
-    Name?: string;
-    Phone?: string;
-    estimatedCost?: number;
-    currency?: string;
-    name?: string;
-    activeAlert?: {
-        alertType: string;
-        alertSeverity: number;
-        alertDetails: string;
-    };
-}
 
 /** Blocking-record counts carried on a work-delete 409 (`details.dependencies`). */
 interface WorkDeleteDependencies {
@@ -60,13 +48,6 @@ interface WorkDeleteDependencies {
 interface WorkComponentProps {
     personId?: number | null;
 }
-
-// Work Status Constants (must match backend)
-const WORK_STATUS: WorkStatus = {
-    ACTIVE: 1,
-    FINISHED: 2,
-    DISCONTINUED: 3
-};
 
 type FilterStatus = 'all' | 'active' | 'completed' | 'discontinued';
 
@@ -89,36 +70,37 @@ const FILTER_OPTIONS = [
 const WorkComponent = ({ personId }: WorkComponentProps) => {
     const navigate = useNavigate();
     const { t } = useTranslation('works');
+    const { language } = useLanguage();
     const toast = useToast();
     const confirm = useConfirm();
     const queryClient = useQueryClient();
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     // Clinical staff see payments/receipts read-only — money mutations stay
     // hidden (Add Payment, payment delete), reads/printing stay visible (history,
     // receipt). Work edit/lifecycle/delete is `editRecords`, Transfer `adminWrites`
     // — each mirrors the server gate on its route, so no button leads to a 403
     // (FE-F7-7).
     const caps = roleCaps(user?.role as UserRole | undefined);
-    // Works list read — the headline gap-fix target. On useQuery so a work
-    // mutation's invalidateQueries(qk.patient.all) refreshes it live (Phase 3).
-    // Loose contract models only { work_id }; the rows carry the full Work shape.
+    // Works list read. On useQuery so a work mutation's invalidateQueries(qk.patient.all)
+    // refreshes it live. The rows are the contract's `WorkRow`, used as parsed — the card
+    // reads the same type (a curated `Work` used to be bridged in with a cast: FE-F7-17).
     const { data: worksData, isLoading: loading } = useQuery({
         ...worksQuery(personId ?? ''),
         enabled: !!personId,
     });
-    // WorkCard's `Work` is a curated display shape (narrower than the wire row:
-    // required type_of_work, currency as a 'USD'|'IQD' union), so a single assertion
-    // off the typed WorkRow[] bridges it — display-only, no `unknown` laundering.
-    const works = useMemo(() => (worksData ?? []) as Work[], [worksData]);
+    const works = useMemo(() => worksData ?? [], [worksData]);
 
     // Patient demographics, appointment flag, and the two form lookups — all on
     // useQuery so they share the cache (patient info is deduped across screens)
     // and a patient-scoped invalidation refreshes them live.
+    // Read as the contract parses it. The card used to read `Phone` and `activeAlert`
+    // through a cast — fields the row does not have (`phone`; `activeAlert` was retired
+    // with patients.alerts), so the phone and the alert badge never rendered (FE-F7-10).
     const { data: patientInfoData } = useQuery({
         ...patientInfoQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const patientInfo = (patientInfoData ?? null) as PatientInfo | null;
+    const patientInfo = patientInfoData ?? null;
 
     const { data: appointmentData, isLoading: loadingAppointment } = useQuery({
         ...hasAppointmentQuery(personId ?? ''),
@@ -140,18 +122,24 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     });
     const smile = initialGallery?.i13 ?? null;
 
-    // Payment-related state
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
-    const [selectedWorkForPayment, setSelectedWorkForPayment] = useState<Work | null>(null);
+    // Payment-related state. PaymentModal is a form seeded once from the row it opens
+    // with, so it keeps that row; the history box shows the LIVE row (below).
+    const [paymentWork, setPaymentWork] = useState<Work | null>(null);
+    // The payment-history box reads the work from the live works list by id. It used
+    // to read a click-time snapshot, so after a payment delete it kept the old totals,
+    // and it left the discount out of the balance — "Balance Remaining 50,000" and an
+    // "Add New Payment" on a work its own card showed as paid (FE-F7-6).
+    const [historyWorkId, setHistoryWorkId] = useState<number | null>(null);
+    const historyWork = historyWorkId == null ? null : works.find(w => w.work_id === historyWorkId) ?? null;
+    const historyBalance = historyWork ? workBalance(historyWork) : null;
 
     // Payment history read on useQuery, gated to its open modal + selected work.
     // (Work-detail rows now load inside each WorkCard's inline WorkDetailsPanel.)
     const { data: paymentHistoryData, isLoading: loadingPayments } = useQuery({
-        ...paymentHistoryQuery(selectedWorkForPayment?.work_id ?? 0),
-        enabled: showPaymentHistoryModal && !!selectedWorkForPayment,
+        ...paymentHistoryQuery(historyWorkId ?? 0),
+        enabled: historyWorkId != null,
     });
-    const paymentHistory = (paymentHistoryData ?? []) as PaymentHistoryResponse;
+    const paymentHistory = paymentHistoryData ?? [];
 
     // Check-in state
     const [checkingIn, setCheckingIn] = useState(false);
@@ -175,20 +163,25 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [workToTransfer, setWorkToTransfer] = useState<Work | null>(null);
 
-    // Auto-expand the first active work when works are loaded. Done during render
-    // (adjust-state-during-render), keyed on the works-data identity, rather than in
-    // an effect so the React Compiler can optimize it. `expandedWorks` is also user-
-    // editable (expand/collapse), so this only re-seeds when the works data changes.
-    const [autoExpandedFor, setAutoExpandedFor] = useState<Work[] | null>(null);
-    if (worksData != null && autoExpandedFor !== works) {
-        setAutoExpandedFor(works);
-        if (works.length > 0) {
-            const firstActiveWork = works.find(work => work.status === WORK_STATUS.ACTIVE);
-            if (firstActiveWork) {
-                setExpandedWorks(new Set([firstActiveWork.work_id]));
-            }
-        }
+    // Auto-expand the first active work once per patient, when their works first load.
+    // Done during render (adjust-state-during-render) so the React Compiler can optimize
+    // it. It used to key on the works-data identity, so every refetch that changed data
+    // (a payment, a colleague's edit) collapsed the cards the user had opened — and
+    // unmounted any treatment item they were typing into (FE-F7-14).
+    const [autoExpandedFor, setAutoExpandedFor] = useState<number | null | undefined>(undefined);
+    if (worksData != null && autoExpandedFor !== personId) {
+        setAutoExpandedFor(personId);
+        const firstActiveWork = works.find(work => work.status === WORK_STATUS.ACTIVE);
+        setExpandedWorks(firstActiveWork ? new Set([firstActiveWork.work_id]) : new Set());
     }
+
+    // A lifecycle write changes the patient's works list AND the work's own reads (the
+    // shell's work header on the visits/diagnosis pages, the cached transfer preview),
+    // which used to stay fresh-but-wrong for 30 s (FE-F7-8).
+    const invalidateWorkWrite = (workId: number) => {
+        void queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+        void queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
+    };
 
     const handlePrintNoWorkReceipt = () => {
         if (!hasNextAppointment) {
@@ -265,7 +258,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             await postJSON(endpoint, body);
 
             toast.success(successMessage);
-            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+            invalidateWorkWrite(work.work_id);
         } catch (err) {
             const failFallback = type === 'complete'
                 ? t('toast.failComplete')
@@ -332,14 +325,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             });
 
             if (deleteResult.outcome === 'pending') {
-                toast.success('Submitted for admin approval');
+                toast.success(t('toast.submittedForApproval'));
                 // A request was created but no row changed — tell the approval bells
                 // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
-                notifyApprovalsChanged();
+                void invalidateApprovals();
                 return;
             }
             toast.success(t('toast.deleted'));
-            queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+            void queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+            // The work is gone: drop its own reads rather than refetch them into a 404.
+            queryClient.removeQueries({ queryKey: qk.work.all(work.work_id) });
         } catch (err) {
             // A 409 carries a `details.dependencies` breakdown of the blocking records.
             const httpErr = err as HttpError;
@@ -380,39 +375,23 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         setShowTransferModal(true);
     };
 
-    const handleTransferSuccess = (_result: { sourcePatientId: number; targetPatientId: number }) => {
+    // The modal toasts nothing on success itself (it used to, so a transfer toasted twice).
+    const handleTransferSuccess = (result: { workId: number; targetPatientId: number }) => {
         setShowTransferModal(false);
         setWorkToTransfer(null);
-        // Refresh works since the work was transferred away
-        queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+        // The work left this patient for another: refresh both patients and the work's
+        // own reads — the target's list used to stay stale for 30 s (FE-F7-8).
+        invalidateWorkWrite(result.workId);
+        void queryClient.invalidateQueries({ queryKey: qk.patient.all(result.targetPatientId) });
         toast.success(t('toast.transferred'));
     };
 
-    const getProgressPercentage = (work: Work): number => {
-        if (work.status === WORK_STATUS.FINISHED) return 100;
-        if (work.status === WORK_STATUS.DISCONTINUED) return 0;
-        if (!work.start_date) return 0;
-
-        const start = new Date(work.start_date).getTime();
-        if (Number.isNaN(start)) return 0;
-
-        // Estimate progress from elapsed treatment time against the estimated
-        // duration (in months; fall back to a typical ortho course when unset).
-        // Clamped to 5–95% while active so the bar always shows movement and
-        // never implies completion before the work is actually marked finished.
-        const months = work.estimated_duration && work.estimated_duration > 0
-            ? work.estimated_duration
-            : 18;
-        const totalMs = months * 30 * 24 * 60 * 60 * 1000;
-        if (totalMs <= 0) return 5;
-        const pct = Math.round(((Date.now() - start) / totalMs) * 100);
-        return Math.min(95, Math.max(5, pct));
-    };
-
+    // The search box matches the work type as well as the notes and the doctor (FE-F7-16).
+    const needle = searchTerm.trim().toLowerCase();
     const filteredWorks = works
         .filter(work => {
-            const matchesSearch = work.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                work.doctor_name?.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesSearch = !needle ||
+                [work.type_name, work.notes, work.doctor_name].some(v => v?.toLowerCase().includes(needle));
 
             const matchesFilter = filterStatus === 'all' ||
                 (filterStatus === 'active' && work.status === WORK_STATUS.ACTIVE) ||
@@ -432,18 +411,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             return dateA.getTime() - dateB.getTime();
         });
 
-    const formatCurrency = (amount?: number | null, currency?: string | null): string => {
-        if (!amount && amount !== 0) return t('common.na');
+    const formatCurrency = (amount: number | null, currency: string | null): string => {
+        if (amount == null) return t('common.na');
         return formatCurrencyUtil(amount, currency || 'USD');
     };
 
-    const formatDate = (dateString?: string): string => {
+    // In the app's language with Western digits — the browser's locale used to pick the
+    // digits (FE-F3-3) — and a date-only string on its own calendar day.
+    const formatDate = (dateString: string | null): string => {
         if (!dateString) return t('common.notSet');
-        return new Date(dateString).toLocaleDateString();
-    };
-
-    const isAlignerWork = (work: Work): boolean => {
-        return [19, 20, 21].includes(work.type_of_work);
+        return parseLocalDate(dateString).toLocaleDateString(LANGUAGES[language].locale);
     };
 
     const handleAddAlignerSet = (work: Work) => {
@@ -451,14 +428,12 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     };
 
     const handleAddPayment = (work: Work) => {
-        setSelectedWorkForPayment(work);
-        setShowPaymentModal(true);
+        setPaymentWork(work);
     };
 
     const handleViewPaymentHistory = (work: Work) => {
-        setSelectedWorkForPayment(work);
-        setShowPaymentHistoryModal(true);
-        // The payment-history query (gated on the open modal + work) loads itself.
+        setHistoryWorkId(work.work_id);
+        // The payment-history query (gated on the open modal's work) loads itself.
     };
 
     const handlePrintReceipt = (work: Work) => {
@@ -486,7 +461,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 { schema: appointmentContract.quickCheckin.response }
             );
 
-            const patientLabel = patientInfo?.name || t('common.patient');
+            const patientLabel = patientInfo?.patient_name || t('common.patient');
             if (result.alreadyCheckedIn) {
                 toast.success(t('checkin.toastAlready', { name: patientLabel }));
                 setCheckedIn(true);
@@ -537,21 +512,27 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     {patientInfo.patient_name}
                                 </h3>
                                 <div className={styles.patientMetaInfo}>
-                                    <span><i className="fas fa-id-card"></i>{patientInfo.person_id}</span>
-                                    {patientInfo.Phone && (
-                                        <span><i className="fas fa-phone"></i>{patientInfo.Phone}</span>
+                                    <span><i className="fas fa-id-card" aria-hidden="true"></i>{patientInfo.person_id}</span>
+                                    {patientInfo.phone && (
+                                        <span dir="ltr"><i className="fas fa-phone" aria-hidden="true"></i>{formatPhoneForDisplay(patientInfo.phone)}</span>
                                     )}
-                                    {patientInfo.estimatedCost && (
+                                    {/* A 0 estimate is "none" — `{0 && …}` would render a bare 0 (FE-F7-9). */}
+                                    {patientInfo.estimatedCost != null && patientInfo.estimatedCost > 0 && (
                                         <span className={styles.patientCostBadge}>
-                                            <i className="fas fa-dollar-sign"></i>
-                                            {patientInfo.estimatedCost.toLocaleString()} {patientInfo.currency || 'IQD'}
+                                            <i className="fas fa-dollar-sign" aria-hidden="true"></i>
+                                            {formatCurrencyUtil(patientInfo.estimatedCost, patientInfo.currency || 'IQD')}
                                         </span>
                                     )}
-                                    {patientInfo.activeAlert && (
-                                        <span className={`${styles.patientAlertBadge} ${patientInfo.activeAlert.alertSeverity === 1 ? styles.patientAlertBadgeSeverity1 : patientInfo.activeAlert.alertSeverity === 2 ? styles.patientAlertBadgeSeverity2 : styles.patientAlertBadgeSeverity3}`}>
-                                            <i className="fas fa-exclamation-triangle"></i>
-                                            {patientInfo.activeAlert.alertType}: {patientInfo.activeAlert.alertDetails}
-                                        </span>
+                                    {patientInfo.AlertCount > 0 && (
+                                        <button
+                                            type="button"
+                                            className={`${styles.patientAlertBadge} ${styles.patientAlertBadgeSeverity2}`}
+                                            onClick={() => navigate(`/patient/${patientInfo.person_id}/patient-info`)}
+                                            title={t('patientCard.alertsTitle')}
+                                        >
+                                            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
+                                            {t('patientCard.alerts', { n: patientInfo.AlertCount })}
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -578,6 +559,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             <input
                                 type="text"
                                 placeholder={t('controls.searchPlaceholder')}
+                                aria-label={t('controls.searchPlaceholder')}
                                 value={searchTerm}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                                 className={styles.searchInput}
@@ -625,7 +607,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         key={work.work_id}
                         work={work}
                         personId={personId}
-                        isAlignerWork={isAlignerWork}
                         isExpanded={expandedWorks.has(work.work_id)}
                         canTransfer={caps.adminWrites}
                         editRecords={caps.editRecords}
@@ -645,8 +626,6 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         onPrintReceipt={handlePrintReceipt}
                         formatDate={formatDate}
                         formatCurrency={formatCurrency}
-                        getProgressPercentage={getProgressPercentage}
-                        WORK_STATUS={WORK_STATUS}
                     />
                 ))}
                 {filteredWorks.length === 0 && (
@@ -662,12 +641,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             </div>
 
             {/* Payment Modal */}
-            {showPaymentModal && selectedWorkForPayment && (
+            {paymentWork && (
                 <PaymentModal
-                    workData={selectedWorkForPayment}
+                    workData={paymentWork}
                     onClose={() => {
-                        setShowPaymentModal(false);
-                        setSelectedWorkForPayment(null);
+                        setPaymentWork(null);
                         queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                     }}
                     onSuccess={() => {
@@ -676,19 +654,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 />
             )}
 
-            {/* Payment History Modal */}
-            {showPaymentHistoryModal && selectedWorkForPayment && (
+            {/* Payment History Modal — the work row is the live one from the works list */}
+            {historyWork && historyBalance && (
                 <Modal
                     isOpen={true}
-                    onClose={() => setShowPaymentHistoryModal(false)}
+                    onClose={() => setHistoryWorkId(null)}
                     contentClassName={`${styles.modal} ${styles.detailsModal}`}
                     ariaLabelledBy="payment-history-title"
                 >
                         <ModalHeader
-                            title={t('paymentHistory.title', { name: selectedWorkForPayment.type_name || t('paymentHistory.workFallback', { id: selectedWorkForPayment.work_id }) })}
+                            title={t('paymentHistory.title', { name: historyWork.type_name || t('paymentHistory.workFallback', { id: historyWork.work_id }) })}
                             titleId="payment-history-title"
                             icon={<i className="fas fa-receipt" />}
-                            onClose={() => setShowPaymentHistoryModal(false)}
+                            onClose={() => setHistoryWorkId(null)}
                         />
                         <div className={styles.modalContentScroll}>
 
@@ -697,19 +675,27 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>{t('paymentHistory.totalRequired')}</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueTotal}`}>
-                                            {formatCurrency(selectedWorkForPayment.total_required, selectedWorkForPayment.currency)}
+                                            {formatCurrency(historyWork.total_required, historyWork.currency)}
                                         </span>
                                     </div>
+                                    {historyBalance.discount > 0 && (
+                                        <div className={styles.paymentSummaryItem}>
+                                            <span className={styles.paymentSummaryLabel}>{t('paymentHistory.discount')}</span>
+                                            <span className={styles.paymentSummaryValue}>
+                                                -{formatCurrency(historyBalance.discount, historyWork.currency)}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>{t('paymentHistory.totalPaid')}</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValuePaid}`}>
-                                            {formatCurrency(selectedWorkForPayment.TotalPaid, selectedWorkForPayment.currency)}
+                                            {formatCurrency(historyWork.TotalPaid, historyWork.currency)}
                                         </span>
                                     </div>
                                     <div className={styles.paymentSummaryItem}>
                                         <span className={styles.paymentSummaryLabel}>{t('paymentHistory.balanceRemaining')}</span>
                                         <span className={`${styles.paymentSummaryValue} ${styles.paymentSummaryValueBalance}`}>
-                                            {formatCurrency((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0), selectedWorkForPayment.currency)}
+                                            {formatCurrency(historyBalance.remaining, historyWork.currency)}
                                         </span>
                                     </div>
                                 </div>
@@ -725,20 +711,20 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                         <thead>
                                             <tr>
                                                 <th>{t('paymentHistory.table.date')}</th>
-                                                <th>{t('paymentHistory.table.amountPaid', { currency: selectedWorkForPayment.currency })}</th>
+                                                <th>{t('paymentHistory.table.amountPaid', { currency: historyWork.currency })}</th>
                                                 <th>{t('paymentHistory.table.change')}</th>
                                                 {caps.writeFinance && <th>{t('paymentHistory.table.actions')}</th>}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {paymentHistory.map((payment, index) => (
-                                                <tr key={payment.InvoiceID || index}>
+                                            {paymentHistory.map((payment) => (
+                                                <tr key={payment.InvoiceID}>
                                                     {/* data-label feeds the ≤768px card layout's ::before row labels
                                                         (the table stacks instead of side-scrolling on a phone), so
                                                         these are visible text and stay translated. */}
                                                     <td data-label={t('paymentHistory.table.date')}>{formatDate(payment.date_of_payment)}</td>
-                                                    <td data-label={t('paymentHistory.table.amountPaid', { currency: selectedWorkForPayment.currency })} className={styles.paymentAmount}>
-                                                        {formatCurrency(payment.amount_paid, selectedWorkForPayment.currency)}
+                                                    <td data-label={t('paymentHistory.table.amountPaid', { currency: historyWork.currency })} className={styles.paymentAmount}>
+                                                        {formatCurrency(payment.amount_paid, historyWork.currency)}
                                                     </td>
                                                     {/* Change is always handed back in IQD (the clinic's cash float),
                                                         whatever the work is denominated in. It used to be formatted
@@ -750,43 +736,34 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                                         <td data-label={t('paymentHistory.table.actions')}>
                                                             <div className={styles.paymentActions}>
                                                                 <button
-                                                                    onClick={() => {
-                                                                        toast.info(t('paymentHistory.editComingSoon', { id: payment.InvoiceID, amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency) }));
-                                                                    }}
-                                                                    className={styles.btnActionEdit}
-                                                                    title={t('paymentHistory.editTitle')}
-                                                                >
-                                                                    <i className="fas fa-edit"></i>
-                                                                </button>
-                                                                <button
                                                                     onClick={async () => {
-                                                                        if (await confirm(t('paymentHistory.deleteConfirm', { amount: formatCurrency(payment.amount_paid, selectedWorkForPayment.currency), date: formatDate(payment.date_of_payment) }), { title: t('paymentHistory.deleteTitle'), danger: true, confirmText: t('paymentHistory.deleteConfirmButton') })) {
+                                                                        if (await confirm(t('paymentHistory.deleteConfirm', { amount: formatCurrency(payment.amount_paid, historyWork.currency), date: formatDate(payment.date_of_payment) }), { title: t('paymentHistory.deleteTitle'), danger: true, confirmText: t('paymentHistory.deleteConfirmButton') })) {
                                                                             try {
                                                                                 const invResult = await deleteJSON<{ outcome: string }>(`/api/deleteInvoice/${payment.InvoiceID}`, {
                                                                                     schema: deleteInvoiceContract.response,
                                                                                 });
                                                                                 if (invResult.outcome === 'pending') {
-                                                                                    toast.success('Submitted for admin approval');
+                                                                                    toast.success(t('toast.submittedForApproval'));
                                                                                     // A request was created but no row changed — tell the approval bells
                                                                                     // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
-                                                                                    notifyApprovalsChanged();
+                                                                                    void invalidateApprovals();
                                                                                     return;
                                                                                 }
                                                                                 // qk.work.all covers the payment-history child key, so this
-                                                                                // one invalidation refreshes the open modal's list too.
-                                                                                queryClient.invalidateQueries({ queryKey: qk.work.all(selectedWorkForPayment.work_id) });
+                                                                                // one invalidation refreshes the open modal's list too; the
+                                                                                // patient key refreshes the works row the summary reads.
+                                                                                invalidateWorkWrite(historyWork.work_id);
                                                                                 toast.success(t('paymentHistory.deleteSuccess'));
-                                                                                queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                                                                             } catch (error) {
-                                                                                console.error('Error deleting payment:', error);
                                                                                 toast.error(t('paymentHistory.deleteError', { error: httpErrorMessage(error, t('paymentHistory.unknownError')) }));
                                                                             }
                                                                         }
                                                                     }}
                                                                     className={styles.btnActionDelete}
                                                                     title={t('paymentHistory.deleteTitle')}
+                                                                    aria-label={t('paymentHistory.deleteTitle')}
                                                                 >
-                                                                    <i className="fas fa-trash"></i>
+                                                                    <i className="fas fa-trash" aria-hidden="true"></i>
                                                                 </button>
                                                             </div>
                                                         </td>
@@ -806,21 +783,21 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                             )}
 
                             <div className={styles.paymentHistoryFooter}>
-                                {((selectedWorkForPayment.total_required || 0) - (selectedWorkForPayment.TotalPaid || 0)) > 0 ? (
+                                {!historyBalance.fullyPaid ? (
                                     // Recording a payment is FINANCE_ROLES — a clinical user reads the
                                     // balance here but is not offered the write (FE-F7-7).
                                     caps.writeFinance && <button
                                         onClick={() => {
-                                            setShowPaymentHistoryModal(false);
-                                            handleAddPayment(selectedWorkForPayment);
+                                            setHistoryWorkId(null);
+                                            handleAddPayment(historyWork);
                                         }}
                                         className={`btn btn-primary ${styles.addPaymentBtn}`}
                                     >
-                                        <i className="fas fa-plus"></i> {t('paymentHistory.addPayment')}
+                                        <i className="fas fa-plus" aria-hidden="true"></i> {t('paymentHistory.addPayment')}
                                     </button>
                                 ) : (
                                     <div className={styles.paymentFullyPaid}>
-                                        <i className="fas fa-check-circle"></i> {t('paymentHistory.fullyPaid')}
+                                        <i className="fas fa-check-circle" aria-hidden="true"></i> {t('paymentHistory.fullyPaid')}
                                     </div>
                                 )}
                             </div>

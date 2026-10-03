@@ -1,0 +1,134 @@
+/*
+ * Fullscreen aligner photo viewer. An always-dark media surface (like the
+ * slideshow/video players), so its colours are literal and do not theme.
+ * Moved out of aligner-common.css's global `.aligner-photo-viewer-*` rules when
+ * the viewer moved onto <Modal> (audit FE-F0-4).
+ */
+
+/* Overrides Modal's default scrim; same specificity, loaded after Modal's sheet. */
+.overlay {
+    background: rgba(0, 0, 0, 0.9);
+    padding: 0;
+}
+
+/*
+ * The dialog box is just the photo + its caption; clicks on the dark area land
+ * on the overlay, which is Modal's backdrop dismiss. The close/prev/next buttons
+ * live inside the dialog (focus trap) but sit `fixed` against the viewport —
+ * which needs `draggable={false}`, since a drag transform would re-anchor them.
+ */
+.content {
+    max-width: 90%;
+    max-height: 85%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+.image {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.details {
+    margin-top: var(--spacing-lg);
+    color: white;
+    text-align: center;
+}
+
+.filename {
+    font-size: 1.15rem;
+    font-weight: bold;
+    margin-bottom: var(--spacing-sm);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.meta,
+.counter {
+    font-size: 0.85rem;
+    color: #cbd5e0;
+}
+
+.counter {
+    margin-top: var(--spacing-sm);
+    letter-spacing: 0.03em;
+}
+
+.close {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2.2rem;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.close:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Prev/next across the photos of one set (mirrors the patient-files preview). */
+.nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    font-size: 1.35rem;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s, background 0.2s;
+}
+
+.nav:hover:not(:disabled) {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.nav:disabled {
+    opacity: 0.2;
+    cursor: default;
+}
+
+.prev {
+    left: 24px;
+}
+
+.next {
+    right: 24px;
+}
+
+@media (max-width: 768px) {
+    .nav {
+        width: 40px;
+        height: 40px;
+        font-size: 1.1rem;
+    }
+
+    .prev {
+        left: 8px;
+    }
+
+    .next {
+        right: 8px;
+    }
+}

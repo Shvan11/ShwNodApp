@@ -3,6 +3,7 @@
  * Used application-wide for consistent number formatting with thousands separators
  */
 import { LANGUAGES, getActiveLanguageMeta, type Language } from '../core/language';
+import { parseLocalDate } from './calendarDate';
 
 /**
  * Format a number with thousands separators
@@ -47,15 +48,6 @@ export const formatCurrency = (
     return `0 ${currency}`;
   }
   return `${formatNumber(amount)} ${currency}`;
-};
-
-/**
- * Format money input value for display (handles both input and display contexts)
- * @param value - The value to format
- * @returns Formatted string suitable for input or display
- */
-export const formatMoneyInput = (value: number | string | null | undefined): string => {
-  return formatNumber(value);
 };
 
 /**
@@ -229,3 +221,73 @@ export const formatScheduleDate = (date: Date, lang: Language): string => {
     day: 'numeric',
   });
 };
+
+export interface RelativeAgeParts {
+  n: number;
+  unit: 'minutes' | 'hours' | 'days';
+}
+
+/**
+ * Whole minutes (at least 1), hours or days between `iso` and `now` — the header
+ * bells' "5m / 3h / 2d" age. The caller words it (`common:age.*`). Null for a
+ * missing or unparseable stamp.
+ */
+export const relativeAge = (
+  iso: string | null | undefined,
+  now: number = Date.now()
+): RelativeAgeParts | null => {
+  if (!iso) return null;
+  const diff = now - new Date(iso).getTime();
+  if (Number.isNaN(diff)) return null;
+  const day = 86_400_000;
+  if (diff < 3_600_000) return { n: Math.max(1, Math.floor(diff / 60_000)), unit: 'minutes' };
+  if (diff < day) return { n: Math.floor(diff / 3_600_000), unit: 'hours' };
+  return { n: Math.floor(diff / day), unit: 'days' };
+};
+
+/**
+ * Locale-Pinned Date Formatting
+ *
+ * `toLocaleDateString()` / `toLocaleDateString(undefined, …)` format in the
+ * BROWSER's locale — i.e. the host OS's. On an Arabic-locale Windows box that
+ * renders `٢٠٢٦/١٠/٠٣` beside money the app pins to Western digits (audit
+ * FE-F3-3). These three always pass an app locale from `LANGUAGES`, so the
+ * Arabic entry's `-u-nu-latn` pin holds.
+ *
+ * `lang` defaults to English: an untranslated screen's chrome is English, so its
+ * dates are too, whatever the language setting. A translated screen passes
+ * `useLanguage().language` EXPLICITLY (same reason as the weekday helpers above:
+ * a visible dependency, so React Compiler re-runs the format on a live toggle).
+ *
+ * A date-only `'YYYY-MM-DD'` (a PG `date`) is read as a LOCAL day, never UTC
+ * midnight. Missing or unparseable input returns `''`, so each caller keeps its
+ * own placeholder (`|| '—'`).
+ */
+export type DateInput = Date | string | number | null | undefined;
+
+const toValidDate = (value: DateInput): Date | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const d = typeof value === 'number' ? new Date(value) : parseLocalDate(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/** A calendar date in an app locale — `toLocaleDateString` with the locale pinned. */
+export const formatLocaleDate = (
+  value: DateInput,
+  options?: Intl.DateTimeFormatOptions,
+  lang: Language = 'en'
+): string => toValidDate(value)?.toLocaleDateString(LANGUAGES[lang].locale, options) ?? '';
+
+/** A date and time in an app locale — `toLocaleString` with the locale pinned. */
+export const formatLocaleDateTime = (
+  value: DateInput,
+  options?: Intl.DateTimeFormatOptions,
+  lang: Language = 'en'
+): string => toValidDate(value)?.toLocaleString(LANGUAGES[lang].locale, options) ?? '';
+
+/** A wall-clock time in an app locale — `toLocaleTimeString` with the locale pinned. */
+export const formatLocaleTime = (
+  value: DateInput,
+  options?: Intl.DateTimeFormatOptions,
+  lang: Language = 'en'
+): string => toValidDate(value)?.toLocaleTimeString(LANGUAGES[lang].locale, options) ?? '';

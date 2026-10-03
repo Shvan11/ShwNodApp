@@ -106,6 +106,9 @@
   color: var(--text-primary);
   line-height: var(--line-height-normal);
   word-break: break-word;
+  /* A multi-line message (the work-delete dependency list) keeps its line breaks
+     instead of running on as one line (audit FE-F7-13). */
+  white-space: pre-line;
 }
 
 /* Toast Close Button */

@@ -36,6 +36,7 @@ import {
 } from '../validation.js';
 import { withPendingOutcome } from './approvals.contract.js';
 import { WORK_CURRENCIES } from '../work-currency.js';
+import { LAB_CASE_STATUSES } from './lab-case.contract.js';
 
 // ---------------------------------------------------------------------------
 // Shared building blocks.
@@ -239,9 +240,42 @@ export const teeth = {
   }),
 } as const;
 
-// GET /api/getworkdetailslist?workId= — work items for a work.
+// GET /api/getworkdetailslist?workId= — the treatment items (work_items rows) of a work,
+// each with its teeth and the joined manufacturer / lab names and lab-case stage
+// (work-item-queries.ts#getWorkDetailsList). Closed and fully enumerated: it used to be
+// `{ id }`, which left a hand-written 20-field interface with an index signature as the
+// de-facto contract, bridged in with a cast (audit FE-F7-17).
+const workItemRow = z.object({
+  id: z.number(),
+  work_id: z.number(),
+  /** The item's lab case, once "Start Lab Flow" has been used (Crown/Bridge, Veneers). */
+  lab_case_id: z.number().nullable(),
+  lab_status: z.enum(LAB_CASE_STATUSES).nullable(),
+  filling_type: z.string().nullable(),
+  filling_depth: z.string().nullable(),
+  canals_no: z.number().nullable(),
+  working_length: z.string().nullable(),
+  implant_length: z.number().nullable(),
+  implant_diameter: z.number().nullable(),
+  implant_manufacturer_id: z.number().nullable(),
+  ImplantManufacturerName: z.string().nullable(),
+  material: z.string().nullable(),
+  lab_id: z.number().nullable(),
+  lab_name: z.string().nullable(),
+  shade_system: z.string().nullable(),
+  shade: z.string().nullable(),
+  item_cost: z.number().nullable(),
+  start_date: z.string().nullable(),
+  completed_date: z.string().nullable(),
+  note: z.string().nullable(),
+  /** Tooth codes, comma-joined ("UR1, UR2"); null when the item has no teeth. */
+  Teeth: z.string().nullable(),
+  TeethIds: z.array(z.number()),
+});
+export type WorkItemRow = z.infer<typeof workItemRow>;
+
 export const getWorkDetailsList = {
-  response: z.array(z.looseObject({ id: z.number() })),
+  response: z.array(workItemRow),
 } as const;
 
 // ===========================================================================
@@ -421,13 +455,34 @@ export type DiagnosisBody = z.infer<typeof diagnosis.body>;
 // TRANSFER (admin)
 // ===========================================================================
 
-// GET /api/work/:workId/transfer-preview — { work, relatedRecords }.
+// GET /api/work/:workId/transfer-preview — the work as the confirm step names it, and
+// the counts of what moves with it (work-transfer-queries.ts#getWorkRelatedCounts).
+// Fully modeled (it was `{ workId }` + an empty looseObject, so the modal re-declared
+// it by hand and cast the parsed read into that: audit FE-F7-17).
 export const transferPreview = {
   response: z.object({
-    work: z.looseObject({ workId: z.number() }),
-    relatedRecords: z.looseObject({}),
+    work: z.object({
+      workId: z.number(),
+      type: z.string().nullable(),
+      status: z.string().nullable(),
+      doctor: z.string().nullable(),
+      totalRequired: z.number().nullable(),
+      currency: z.string().nullable(),
+      currentPatient: z.object({ personId: z.number(), name: z.string() }),
+    }),
+    relatedRecords: z.object({
+      visits: z.number(),
+      invoices: z.number(),
+      diagnoses: z.number(),
+      workItems: z.number(),
+      alignerSets: z.number(),
+      alignerBatches: z.number(),
+      implants: z.number(),
+      screws: z.number(),
+    }),
   }),
 } as const;
+export type TransferPreview = z.infer<typeof transferPreview.response>;
 
 // POST /api/work/:workId/transfer — { targetPatientId } (the route's TransferWorkBody,
 // deleted) → now validated; response is the TransferWorkResult.

@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import type { CalendarDay, CalendarData, CalendarAppointment } from './calendar.types';
-import { formatTime12 } from '../../utils/formatters';
+import { formatTime12, formatLocaleDate } from '../../utils/formatters';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { anchorFrom, type MenuAnchor } from '../../hooks/useFloatingMenu';
 import styles from './MonthlyCalendarGrid.module.css';
@@ -150,11 +150,7 @@ const MonthlyCalendarGrid = ({
                                 // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- stops the panel's clicks from toggling the cell; its buttons carry their own keyboard handling
                                 <div className={styles.dayExpandedPanel} onClick={e => e.stopPropagation()}>
                                     <div className={styles.expandedHeader}>
-                                        {date.toLocaleDateString(undefined, {
-                                            weekday: 'short',
-                                            month: 'short',
-                                            day: 'numeric'
-                                        })}
+                                        {formatLocaleDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}
                                         <span className={styles.expandedCount}>
                                             {isHoliday ? `${day.holidayName || 'Holiday'} · ` : ''}
                                             {appointmentCount} appt{appointmentCount === 1 ? '' : 's'}

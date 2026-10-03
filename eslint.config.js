@@ -268,6 +268,16 @@ export default [
             "CallExpression[callee.name=/^(fetchJSON|apiLoader)$/]:not(:has(Property[key.name='schema']))",
           message:
             'Reads via fetchJSON/apiLoader must pass a Zod guard `{ schema: <contract>.response }` — it is the only fail-loud response validation in prod (the server sendData parse is dev-only). For a deliberately schema-less read (literal-null signal, raw passthrough, status ping, fire-and-forget) add an inline // eslint-disable-next-line no-restricted-syntax with a reason. (Shared-contract lock-in — D3.)'
+        },
+        {
+          // Browser-locale formatting (audit FE-F3-3 lock-in). With no locale, or
+          // `undefined`, these format in the HOST OS's locale — Arabic-Indic digits
+          // on an Arabic-locale Windows box, beside money the app pins to Western
+          // digits. The sweep left zero; this keeps it at zero.
+          selector:
+            "CallExpression[callee.property.name=/^toLocale(Date|Time)?String$/]:matches([arguments.length=0], [arguments.0.type='Identifier'][arguments.0.name='undefined'])",
+          message:
+            'Pass an app locale: use formatLocaleDate / formatLocaleDateTime / formatLocaleTime (dates) or formatNumber (numbers) from utils/formatters.ts. A bare toLocale*String() formats in the browser\'s locale, which on an Arabic-locale OS renders Arabic-Indic digits (audit FE-F3-3).'
         }
       ]
     }
@@ -325,11 +335,25 @@ export default [
       'public/js/components/react/SimplifiedCalendarPicker.tsx',
       'public/js/components/react/PatientAppointments.tsx',
       'public/js/components/react/PaymentModal.tsx',
+      'public/js/components/react/TransferWorkModal.tsx',
       'public/js/components/react/Navigation.tsx',
       'public/js/components/react/AddPatientForm.tsx',
       'public/js/components/react/EditPatientComponent.tsx',
       'public/js/components/react/ViewPatientInfo.tsx',
-      'public/js/components/react/PortalActivityBell.tsx'
+      'public/js/components/react/PortalActivityBell.tsx',
+      'public/js/components/react/HeaderPopover.tsx',
+      'public/js/components/react/TasksBell.tsx',
+      'public/js/components/react/TaskFormModal.tsx',
+      'public/js/components/react/AlertModal.tsx',
+      'public/js/components/react/ApprovalsBell.tsx',
+      'public/js/components/react/MyApprovalsBadge.tsx',
+      'public/js/routes/ApprovalsHistory.tsx',
+      // The lookup-manager chrome (context-menu item + modal title) renders on
+      // translated screens through a shared hook the per-file ratchet could not
+      // otherwise see (FE-F3-13). The LookupEditor body inside stays English
+      // until Settings is translated.
+      'public/js/hooks/useLookupManager.tsx',
+      'public/js/components/react/LookupManagerModal.tsx'
     ],
     plugins: {
       i18next
@@ -347,14 +371,21 @@ export default [
           // display text — the sibling of the allowed id/htmlFor). This extends
           // the plugin's DEFAULT jsx-attributes exclude (which `_.defaults` would
           // otherwise drop wholesale once this key is set) so the real user-facing
-          // attrs — title/label/placeholder/alt/aria-label — stay checked.
+          // attrs — title/label/placeholder/alt/aria-label — stay checked. `icon`
+          // is HeaderPopover's Font Awesome class name, and `contentClassName` /
+          // `overlayClassName` are <Modal>'s — all siblings of className. `mode` is
+          // PatientSearchCombobox's matching enum (name|phoneId), a sibling of `variant`.
           'jsx-attributes': {
             exclude: [
               'className', 'styleName', 'style', 'type', 'key', 'id', 'width', 'height',
-              'titleId', 'ariaLabelledBy', 'variant', 'to'
+              'titleId', 'ariaLabelledBy', 'variant', 'to', 'icon',
+              'contentClassName', 'overlayClassName', 'mode'
             ]
           },
-          words: { exclude: ['[0-9!-/:-@[-`{-~]+', '[A-Z_-]+'] }
+          // Punctuation-only text is not a translation: ASCII punctuation, plus the
+          // typographic dash, multiplication sign, middle dot and ellipsis used as
+          // glyphs ("—" for an empty cell, "×" on a remove chip).
+          words: { exclude: ['[0-9!-/:-@[-`{-~—–×·…]+', '[A-Z_-]+'] }
         }
       ]
     }

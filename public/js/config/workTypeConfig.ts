@@ -176,7 +176,7 @@ export const getWorkTypeConfig = (workTypeId: number): WorkTypeFieldConfig => {
 /**
  * Material options for Crown/Bridge/Veneers
  */
-export const MATERIAL_OPTIONS: readonly string[] = [
+export const MATERIAL_OPTIONS = [
   'Zirconia',
   'PFM (Porcelain Fused to Metal)',
   'E-Max',
@@ -185,6 +185,9 @@ export const MATERIAL_OPTIONS: readonly string[] = [
   'Acrylic',
   'Other',
 ] as const;
+
+/** One of `MATERIAL_OPTIONS` — a literal union, so code keyed on a material name is type-checked. */
+export type Material = (typeof MATERIAL_OPTIONS)[number];
 
 /**
  * Filling type options

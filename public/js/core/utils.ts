@@ -1,6 +1,7 @@
 /**
  * General utility functions
  */
+import { toLocalDateString } from '../utils/calendarDate';
 
 /**
  * Format a date to DD-MM-YYYY
@@ -52,10 +53,7 @@ export function formatISODate(date: string | Date | null | undefined = new Date(
 
   if (isNaN(d.getTime())) return '';
 
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return toLocalDateString(d);
 }
 
 /**

@@ -29,8 +29,6 @@ export const CONFIG = {
   DATE_RANGE_DAYS_FORWARD: 30,
 } as const;
 
-export type ConfigType = typeof CONFIG;
-
 // API Endpoints
 export const API_ENDPOINTS = {
   MESSAGE_COUNT: (date: string): string => `/api/messaging/count/${date}`,
@@ -46,8 +44,6 @@ export const API_ENDPOINTS = {
   SEND_EMAIL: (date: string): string => `/api/email/send-appointments?date=${date}`,
 } as const;
 
-export type ApiEndpointsType = typeof API_ENDPOINTS;
-
 // State Constants
 export const UI_STATES = {
   DISCONNECTED: 'disconnected',
@@ -59,24 +55,6 @@ export const UI_STATES = {
 } as const;
 
 export type UIState = (typeof UI_STATES)[keyof typeof UI_STATES];
-
-export const MESSAGE_TYPES = {
-  LOADING: 'loading',
-  SUCCESS: 'success',
-  ERROR: 'error',
-  WARNING: 'warning',
-} as const;
-
-export type MessageType = (typeof MESSAGE_TYPES)[keyof typeof MESSAGE_TYPES];
-
-export const BUTTON_STATES = {
-  NORMAL: 'normal',
-  LOADING: 'loading',
-  CONFIRMING: 'confirming',
-  DISABLED: 'disabled',
-} as const;
-
-export type ButtonState = (typeof BUTTON_STATES)[keyof typeof BUTTON_STATES];
 
 // Message Status Constants
 // PENDING = never attempted (SentWa IS NULL)

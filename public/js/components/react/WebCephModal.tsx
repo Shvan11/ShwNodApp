@@ -19,13 +19,14 @@ import {
 import styles from './WebCephModal.module.css';
 
 /** Minimal slice of the patient `/info` payload the WebCeph create step needs. */
+/** The fields read off the patient-info contract row (nullable as the contract has them). */
 interface WebCephPatientInfo {
     person_id: number;
-    patient_name?: string;
-    first_name?: string;
-    last_name?: string;
-    gender_display?: string;
-    DateOfBirth?: string;
+    patient_name?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    gender_display?: string | null;
+    DateOfBirth?: string | null;
 }
 
 interface Props {

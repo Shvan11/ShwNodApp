@@ -3,7 +3,7 @@ import type { FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Select, { SingleValue, StylesConfig } from 'react-select';
 import { useQuery } from '@tanstack/react-query';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useWhatsAppStatus } from '../../contexts/GlobalStateContext';
 import { postFormData, httpErrorMessage } from '@/core/http';
 import { patientPhonesQuery, googleContactsQuery } from '@/query/queries';
 
@@ -32,7 +32,7 @@ const SendMessage = () => {
     const navigate = useNavigate();
 
     // Use global state for WhatsApp client status
-    const { whatsappClientReady } = useGlobalState();
+    const { clientReady: whatsappClientReady } = useWhatsAppStatus();
 
     // Seed from the ?file= URL param once on mount (lazy initializers, so there's no
     // setState-in-effect just to read the launch URL).

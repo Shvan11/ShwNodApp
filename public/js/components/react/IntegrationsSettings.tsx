@@ -21,6 +21,7 @@ import {
   integrationsCloudflareListStatusQuery,
 } from '@/query/queries';
 import { qk } from '@/query/keys';
+import { formatLocaleDateTime } from '@/utils/formatters';
 import * as integrations from '@shared/contracts/integrations.contract';
 import styles from './IntegrationsSettings.module.css';
 
@@ -709,7 +710,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
             {tsStatus.connected && tsStatus.expiresAt && (
               <div className={styles.row}>
                 <dt>Token expires</dt>
-                <dd>{new Date(tsStatus.expiresAt).toLocaleString()}</dd>
+                <dd>{formatLocaleDateTime(tsStatus.expiresAt)}</dd>
               </div>
             )}
           </dl>
@@ -785,7 +786,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
             {gdStatus.connected && gdStatus.expiresAt && (
               <div className={styles.row}>
                 <dt>Access token expires</dt>
-                <dd>{new Date(gdStatus.expiresAt).toLocaleString()}</dd>
+                <dd>{formatLocaleDateTime(gdStatus.expiresAt)}</dd>
               </div>
             )}
           </dl>
@@ -1040,7 +1041,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
               <dt>Last sync</dt>
               <dd>
                 {cfStatus.lastSync
-                  ? `${new Date(cfStatus.lastSync.at).toLocaleString()} · ${cfStatus.lastSync.trigger}`
+                  ? `${formatLocaleDateTime(cfStatus.lastSync.at)} · ${cfStatus.lastSync.trigger}`
                   : 'Not run since server start'}
               </dd>
             </div>

@@ -93,26 +93,25 @@ const router = createBrowserRouter(routesConfig, {
  *
  * Structure:
  * - GlobalErrorBoundary: Catches all app-level errors
+ * - QueryClientProvider: the shared `queryClient` (query/client.ts)
  * - RouterProvider: Provides Data Router with loaders, actions, error handling
  * - RootLayout (in routes.config): GlobalStateProvider, ToastProvider, UniversalHeader
  *
- * Benefits vs BrowserRouter:
- * - Route loaders: Pre-fetch data before rendering (eliminates loading flashes)
- * - Better error handling: Route-level error pages with recovery options
- * - Native scroll restoration: Automatic scroll position management
- * - Pending states: Built-in navigation pending UI
- * - Centralized routing: All routes in routes.config.tsx
+ * Server state — React Query owns all of it (query/):
+ * - Defaults in query/client.ts: staleTime 30 s, gcTime 5 min, no refetch on
+ *   window focus, retry only transient failures.
+ * - Route loaders are PREFETCHERS: they `ensureQueryData` the same `queryOptions`
+ *   factories (query/queries.ts) the screens then `useQuery`, so first paint
+ *   doesn't flash empty.
+ * - A write invalidates the `qk` keys it changed. `query/useApiMutation.ts` is the
+ *   standard for new mutations: the keys sit next to the write (an `invalidate`
+ *   option, not a separate statement to forget) and are awaited before the
+ *   caller's onSuccess runs.
  *
- * Performance:
- * - Patient page load: 1.5s → 1s (33% faster with loaders)
- * - No loading flash for patient names, settings, doctor lists
- * - Parallel data loading (Promise.all in loaders)
- * - 5-minute cache for static data (patient info, work details)
- *
- * Real-time Updates:
- * - SSE singletons for realtime; shared client state in GlobalStateContext
- * - Appointments, messaging use component-level fetching
- * - Loaders only for static/cacheable data
+ * Real-time:
+ * - SSE singletons (services/sse-*.ts) push hints that invalidate the daily
+ *   appointments and WhatsApp keys; GlobalStateContext carries the auth user and
+ *   the WhatsApp client status.
  */
 export default function App() {
   return (

@@ -2,6 +2,7 @@
  * Shared helpers for the patient file-explorer UI.
  */
 import type { FileEntry } from '@/types/api.types';
+import { formatLocaleDate } from '@/utils/formatters';
 
 export interface ContentUrlOptions {
   download?: boolean;
@@ -93,9 +94,6 @@ export function formatSize(bytes?: number): string {
 
 /** Short locale date from an ISO timestamp. */
 export function formatDate(iso?: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatLocaleDate(iso, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 

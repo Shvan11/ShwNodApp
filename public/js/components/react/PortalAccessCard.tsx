@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
+import { formatLocaleDateTime } from '../../utils/formatters';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { portalStatusQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
@@ -38,15 +39,13 @@ interface PortalPinResetResponse {
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return 'Never';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
+  return formatLocaleDateTime(iso, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  }) || iso;
 }
 
 const PortalAccessCard = ({ personId }: Props) => {

@@ -6,7 +6,7 @@
  * text.
  */
 import { LAB_STAGE_META, type LabStage } from '@shared/contracts/lab-case.contract';
-import { MATERIAL_OPTIONS } from './workTypeConfig';
+import type { Material } from './workTypeConfig';
 
 export const LAB_STAGE_LABELS: Record<LabStage, string> = {
   sent_to_lab: 'Sent to Lab',
@@ -25,12 +25,18 @@ export const LAB_STAGE_LABELS: Record<LabStage, string> = {
 /**
  * `framework_tryin` reads differently depending on what the framework is made
  * of — a zirconia core check isn't the same appointment as a metal try-in.
- * Keyed off the exact `MATERIAL_OPTIONS` values (workTypeConfig.ts).
+ * Keyed BY NAME on the `MATERIAL_OPTIONS` literals (workTypeConfig.ts), so renaming
+ * a material is a compile error here and inserting one relabels nothing. (It was
+ * read by array index — `MATERIAL_OPTIONS[0]/[1]/[3]` — audit FE-F2-11.)
  */
+const FRAMEWORK_TRYIN_LABELS: Partial<Record<Material, string>> = {
+  'Zirconia': 'Zirconia Core Try-In',
+  'PFM (Porcelain Fused to Metal)': 'Metal Try-In',
+  'Full Metal': 'Metal Try-In',
+};
+
 function labelForFrameworkTryin(material?: string | null): string {
-  if (material === MATERIAL_OPTIONS[0]) return 'Zirconia Core Try-In'; // 'Zirconia'
-  if (material === MATERIAL_OPTIONS[1] || material === MATERIAL_OPTIONS[3]) return 'Metal Try-In'; // PFM / Full Metal
-  return 'Framework Try-In';
+  return (material && FRAMEWORK_TRYIN_LABELS[material as Material]) || 'Framework Try-In';
 }
 
 /** The display label for a stage — pass the case's `material` for the one stage whose label depends on it. */

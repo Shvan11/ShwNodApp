@@ -11,7 +11,7 @@ import {
 } from '../constants/sse-liveness';
 import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
 import { applyLanguageAttributes, getStoredLanguagePreference } from '../core/language';
-import { parseLocalDate } from '../utils/calendarDate';
+import { formatLocaleDate } from '../utils/formatters';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -261,14 +261,10 @@ const ChairDisplay = () => {
 
     const visitSummary = patient?.latestVisit?.Summary;
     const visitDate = patient?.latestVisit?.visit_date;
-    // Local midnight for a date-only string: `new Date('YYYY-MM-DD')` is UTC and
+    // A LOCAL day for a date-only string: `new Date('YYYY-MM-DD')` is UTC and
     // read a day early on a kiosk west of UTC (FE-F11-15a).
     const formattedVisitDate = visitDate
-        ? parseLocalDate(visitDate).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-          })
+        ? formatLocaleDate(visitDate, { year: 'numeric', month: 'short', day: 'numeric' })
         : null;
 
     return (

@@ -1,29 +1,5 @@
-/* MyApprovalsBadge — front-desk header badge for own submitted holds/notices. */
-
-.wrap {
-    position: relative;
-    display: inline-flex;
-}
-
-.bellBtn {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 42px;
-    height: 42px;
-    border: none;
-    border-radius: var(--radius-lg);
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--color-white);
-    font-size: var(--font-size-lg);
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.bellBtn:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
+/* MyApprovalsBadge — front-desk badge for own submitted holds/notices: the
+   badge and the popover content (the shell is HeaderPopover's). */
 
 .badge {
     position: absolute;
@@ -39,17 +15,6 @@
     font-weight: var(--font-weight-bold);
     line-height: 18px;
     text-align: center;
-}
-
-.popover {
-    width: 340px;
-    max-width: calc(100vw - 24px);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
-    z-index: var(--z-index-popover);
-    overflow: hidden;
 }
 
 .popHeader {

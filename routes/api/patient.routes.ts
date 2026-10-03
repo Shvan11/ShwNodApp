@@ -20,7 +20,6 @@ import {
   updatePatient,
   hasNextAppointment,
   getTagOptions,
-  getPatientTypeOptions,
   updateEstimatedCost
 } from '../../services/database/queries/patient-queries.js';
 import { searchPatients } from '../../services/database/queries/patient-search-queries.js';
@@ -225,27 +224,6 @@ router.get(
       ErrorResponses.internalError(
         res,
         'Failed to fetch tag options',
-        error as Error
-      );
-    }
-  }
-);
-
-/**
- * Get all patient type options
- * GET /patients/type-options
- * NOTE: Must be defined BEFORE /patients/:personId to avoid route conflicts
- */
-router.get(
-  '/patients/type-options',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      sendData(res, patientContract.typeOptions.response, await getPatientTypeOptions());
-    } catch (error) {
-      log.error('Error fetching patient type options:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to fetch patient type options',
         error as Error
       );
     }
@@ -511,9 +489,24 @@ router.put(
         return;
       }
 
-      // `date_of_birth` is passed THROUGH as the contract's 'YYYY-MM-DD' string —
-      // see the create handler above for why the `new Date()` round-trip was wrong.
-      await updatePatient(personId, { ...patientData, date_of_birth: patientData.date_of_birth || undefined });
+      // Trimmed exactly as the create handler trims: an untrimmed "علي " passed the
+      // `ix_name_id` unique index beside "علي", the duplicate guard both forms rely
+      // on (audit FE-F6-7a). `date_of_birth` is passed THROUGH as the contract's
+      // 'YYYY-MM-DD' string — see the create handler above for why the `new Date()`
+      // round-trip was wrong.
+      const trim = (v: string | undefined) => v?.trim();
+      await updatePatient(personId, {
+        ...patientData,
+        patient_name: patientData.patient_name.trim(),
+        first_name: trim(patientData.first_name),
+        last_name: trim(patientData.last_name),
+        phone: trim(patientData.phone),
+        phone2: trim(patientData.phone2),
+        email: trim(patientData.email),
+        notes: trim(patientData.notes),
+        country_code: trim(patientData.country_code),
+        date_of_birth: patientData.date_of_birth || undefined,
+      });
       sendSuccess(res, null, 'Patient updated successfully');
     } catch (error) {
       // Duplicate patient name → pg unique violation on index ix_name_id (was mssql 2601).
@@ -524,7 +517,7 @@ router.put(
         // Conflict code/context travel in `details` (unified error envelope).
         ErrorResponses.conflict(res, 'A patient with this name already exists', {
           code: 'DUPLICATE_PATIENT_NAME',
-          duplicateName: patientData.patient_name
+          duplicateName: patientData.patient_name.trim()
         });
         return;
       }

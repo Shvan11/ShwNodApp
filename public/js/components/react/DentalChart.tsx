@@ -4,8 +4,14 @@
  *
  * Keyboard: the chart is ONE tab stop (a roving tabindex) — it used to put all
  * 62 targets (32 teeth + 30 between-tooth slots) in the form's tab order.
- * ←/→ move along an arch, ↑/↓ switch arch at the same position, Home/End jump
- * to an arch's ends, Enter/Space inserts.
+ * ←/→ move along a row, ↑/↓ switch row at the matching position, Home/End jump
+ * to a row's ends, Enter/Space inserts.
+ *
+ * Primary (deciduous) teeth: a "Primary teeth" switch adds an A–E row under the
+ * upper arch and over the lower one (URE…URA | ULA…ULE, LRE…LRA | LLA…LLE), so a
+ * mixed-dentition visit note can click a primary tooth — clicking inserts e.g.
+ * "URC". Off by default, so the adult chart is unchanged (audit FE-F9-12, owner's
+ * call 2026-10-03). Same letters as the work-item TeethSelector.
  */
 
 import { useRef, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
@@ -18,9 +24,19 @@ interface DentalChartProps {
 
 type ChartItem =
     | { kind: 'tooth'; prefix: string; number: number; notation: string }
+    | { kind: 'primary'; notation: string; letter: string }
     | { kind: 'between'; notation: string; midline: boolean };
 
-/** One arch, right-to-left as the patient faces you: R8 … R1 | L1 … L8, with a slot between each pair. */
+interface ChartRow {
+    id: string;
+    label: string;
+    /** Number sits under the image on the upper arch, over it on the lower. */
+    isLower: boolean;
+    primary: boolean;
+    items: ChartItem[];
+}
+
+/** One permanent arch, right-to-left as the patient faces you: R8 … R1 | L1 … L8, with a slot between each pair. */
 function buildArch(rightPrefix: string, leftPrefix: string): ChartItem[] {
     const items: ChartItem[] = [];
     const tooth = (prefix: string, number: number): ChartItem =>
@@ -40,23 +56,48 @@ function buildArch(rightPrefix: string, leftPrefix: string): ChartItem[] {
     return items;
 }
 
-const ARCHES = [
-    { label: 'Upper Teeth', isLower: false, items: buildArch('UR', 'UL') },
-    { label: 'Lower Teeth', isLower: true, items: buildArch('LR', 'LL') },
-];
-const ARCH_LENGTH = ARCHES[0].items.length; // 31: 16 teeth + 15 slots
+const PRIMARY_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const;
+
+/** One primary arch, same orientation: RE … RA | LA … LE (teeth only). */
+function buildPrimaryArch(rightPrefix: string, leftPrefix: string): ChartItem[] {
+    const tooth = (prefix: string, letter: string): ChartItem =>
+        ({ kind: 'primary', letter, notation: `${prefix}${letter}` });
+    return [
+        ...[...PRIMARY_LETTERS].reverse().map((l) => tooth(rightPrefix, l)),
+        ...PRIMARY_LETTERS.map((l) => tooth(leftPrefix, l)),
+    ];
+}
+
+const UPPER: ChartRow = { id: 'upper', label: 'Upper Teeth', isLower: false, primary: false, items: buildArch('UR', 'UL') };
+const UPPER_PRIMARY: ChartRow = { id: 'upper-primary', label: 'Upper Primary', isLower: false, primary: true, items: buildPrimaryArch('UR', 'UL') };
+const LOWER_PRIMARY: ChartRow = { id: 'lower-primary', label: 'Lower Primary', isLower: true, primary: true, items: buildPrimaryArch('LR', 'LL') };
+const LOWER: ChartRow = { id: 'lower', label: 'Lower Teeth', isLower: true, primary: false, items: buildArch('LR', 'LL') };
+
+const PERMANENT_ROWS = [UPPER, LOWER];
+const MIXED_ROWS = [UPPER, UPPER_PRIMARY, LOWER_PRIMARY, LOWER];
+
+/** The item at the same relative position in a row of a different length. */
+const matchIndex = (index: number, fromLength: number, toLength: number): number =>
+    fromLength <= 1 ? 0 : Math.round((index * (toLength - 1)) / (fromLength - 1));
 
 const DentalChart = ({ onToothClick }: DentalChartProps) => {
-    // The one element in the tab order: [arch, index]. Starts on UR8.
-    const [active, setActive] = useState<[number, number]>([0, 0]);
+    const [showPrimary, setShowPrimary] = useState(false);
+    const rows = showPrimary ? MIXED_ROWS : PERMANENT_ROWS;
+
+    // The one element in the tab order: [row id, index]. Starts on UR8. A row
+    // that the switch just hid falls back to the start.
+    const [activeState, setActive] = useState<[string, number]>(['upper', 0]);
+    const active: [string, number] = rows.some((r) => r.id === activeState[0]) ? activeState : ['upper', 0];
     const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-    const moveTo = (arch: number, index: number) => {
-        setActive([arch, index]);
-        itemRefs.current.get(`${arch}:${index}`)?.focus();
+    const moveTo = (rowIndex: number, index: number) => {
+        const row = rows[rowIndex];
+        setActive([row.id, index]);
+        itemRefs.current.get(`${row.id}:${index}`)?.focus();
     };
 
-    const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>, arch: number, index: number, notation: string) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>, rowIndex: number, index: number, notation: string) => {
+        const length = rows[rowIndex].items.length;
         switch (e.key) {
             case 'Enter':
             case ' ':
@@ -65,43 +106,46 @@ const DentalChart = ({ onToothClick }: DentalChartProps) => {
                 return;
             case 'ArrowRight':
                 e.preventDefault();
-                moveTo(arch, Math.min(index + 1, ARCH_LENGTH - 1));
+                moveTo(rowIndex, Math.min(index + 1, length - 1));
                 return;
             case 'ArrowLeft':
                 e.preventDefault();
-                moveTo(arch, Math.max(index - 1, 0));
+                moveTo(rowIndex, Math.max(index - 1, 0));
                 return;
             case 'ArrowUp':
-            case 'ArrowDown':
+            case 'ArrowDown': {
                 e.preventDefault();
-                moveTo(e.key === 'ArrowUp' ? 0 : 1, index);
+                const target = e.key === 'ArrowUp' ? Math.max(rowIndex - 1, 0) : Math.min(rowIndex + 1, rows.length - 1);
+                moveTo(target, matchIndex(index, length, rows[target].items.length));
                 return;
+            }
             case 'Home':
                 e.preventDefault();
-                moveTo(arch, 0);
+                moveTo(rowIndex, 0);
                 return;
             case 'End':
                 e.preventDefault();
-                moveTo(arch, ARCH_LENGTH - 1);
+                moveTo(rowIndex, length - 1);
                 return;
             default:
         }
     };
 
-    const renderItem = (item: ChartItem, arch: number, index: number, isLower: boolean) => {
+    const renderItem = (item: ChartItem, row: ChartRow, rowIndex: number, index: number) => {
+        const key = `${row.id}:${index}`;
         const common = {
             ref: (el: HTMLDivElement | null) => {
-                if (el) itemRefs.current.set(`${arch}:${index}`, el);
-                else itemRefs.current.delete(`${arch}:${index}`);
+                if (el) itemRefs.current.set(key, el);
+                else itemRefs.current.delete(key);
             },
             role: 'button' as const,
-            tabIndex: active[0] === arch && active[1] === index ? 0 : -1,
+            tabIndex: active[0] === row.id && active[1] === index ? 0 : -1,
             'aria-label': item.notation,
             onClick: () => {
-                setActive([arch, index]);
+                setActive([row.id, index]);
                 onToothClick(item.notation);
             },
-            onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => handleKeyDown(e, arch, index, item.notation),
+            onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => handleKeyDown(e, rowIndex, index, item.notation),
         };
 
         if (item.kind === 'between') {
@@ -112,9 +156,17 @@ const DentalChart = ({ onToothClick }: DentalChartProps) => {
             );
         }
 
+        if (item.kind === 'primary') {
+            return (
+                <div key={item.notation} className={cn(styles.primaryTooth, index === 5 && styles.primaryMidline)} {...common}>
+                    <span aria-hidden="true">{item.letter}</span>
+                </div>
+            );
+        }
+
         return (
             <div key={item.notation} className={styles.tooth} {...common}>
-                {isLower && <span className={styles.toothNumber} aria-hidden="true">{item.number}</span>}
+                {row.isLower && <span className={styles.toothNumber} aria-hidden="true">{item.number}</span>}
                 <img
                     src={`/images/teeth/chart/${item.prefix}${item.number}.svg`}
                     alt=""
@@ -122,18 +174,26 @@ const DentalChart = ({ onToothClick }: DentalChartProps) => {
                         e.currentTarget.style.display = 'none';
                     }}
                 />
-                {!isLower && <span className={styles.toothNumber} aria-hidden="true">{item.number}</span>}
+                {!row.isLower && <span className={styles.toothNumber} aria-hidden="true">{item.number}</span>}
             </div>
         );
     };
 
     return (
         <div className={styles.container}>
-            {ARCHES.map((arch, archIndex) => (
-                <div key={arch.label} className={styles.arch}>
-                    <div className={styles.archLabel}>{arch.label}</div>
-                    <div className={styles.archTeeth} role="group" aria-label={arch.label}>
-                        {arch.items.map((item, index) => renderItem(item, archIndex, index, arch.isLower))}
+            <label className={styles.primarySwitch}>
+                <input
+                    type="checkbox"
+                    checked={showPrimary}
+                    onChange={(e) => setShowPrimary(e.target.checked)}
+                />
+                Primary teeth
+            </label>
+            {rows.map((row, rowIndex) => (
+                <div key={row.id} className={cn(styles.arch, row.primary && styles.primaryArch)}>
+                    <div className={styles.archLabel}>{row.label}</div>
+                    <div className={styles.archTeeth} role="group" aria-label={row.label}>
+                        {row.items.map((item, index) => renderItem(item, row, rowIndex, index))}
                     </div>
                 </div>
             ))}

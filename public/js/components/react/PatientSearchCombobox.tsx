@@ -1,9 +1,13 @@
-import React, { useEffect, useId, useState, ChangeEvent } from 'react';
+import React, { useEffect, useId, useState, ChangeEvent, type Ref } from 'react';
+import type { z } from 'zod';
 import cn from 'classnames';
+import type { patientPhones } from '@shared/contracts/patient.contract';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { matchesPatientName } from '../../utils/patientSearch';
-import type { PatientOption } from './PatientQuickSearch';
 import styles from './PatientSearchCombobox.module.css';
+
+/** One row of GET /api/patients/phones (`patientPhonesQuery`), as the contract parses it. */
+export type PatientOption = z.infer<typeof patientPhones.response>[number];
 
 interface ComboboxMatch {
     id: number;
@@ -32,6 +36,12 @@ export interface PatientSearchComboboxProps {
     placeholder?: string;
     /** id forwarded to the inner input so a sibling <label htmlFor> can associate with it */
     id?: string;
+    /** The dropdown's footer line. Defaults to the patient-list wording (pick = open, Enter = search). */
+    hint?: string;
+    /** Headers of the phone/ID mode's two groups (defaults: 'ID' / 'Phone'). */
+    groupLabels?: { ID: string; Phone: string };
+    /** The inner input, e.g. for a dialog's `initialFocusRef`. */
+    inputRef?: Ref<HTMLInputElement>;
 }
 
 const MAX_PER_GROUP = 4;
@@ -100,7 +110,10 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
     nameStartsWith = false,
     rtl = false,
     placeholder,
-    id
+    id,
+    hint = 'Pick a suggestion to open the patient · Enter to search the list',
+    groupLabels,
+    inputRef,
 }) => {
     const [open, setOpen] = useState(false);
     const [highlight, setHighlight] = useState(-1);
@@ -162,6 +175,7 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
         <div className={styles.combobox}>
             <input
                 id={id}
+                ref={inputRef}
                 type="text"
                 role="combobox"
                 aria-expanded={isOpen}
@@ -182,7 +196,7 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
                     {matches.map((m, i) => (
                         <React.Fragment key={`${m.group || ''}-${m.id}`}>
                             {m.group && m.group !== matches[i - 1]?.group && (
-                                <li className={styles.groupHeader} role="presentation">{m.group}</li>
+                                <li className={styles.groupHeader} role="presentation">{groupLabels?.[m.group] ?? m.group}</li>
                             )}
                             {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events -- aria-activedescendant combobox: the listbox is driven from the input's own onKeyDown (ArrowUp/Down + Enter) and options are deliberately not focusable, so a per-option key handler would be unreachable */}
                             <li
@@ -200,7 +214,7 @@ const PatientSearchCombobox: React.FC<PatientSearchComboboxProps> = ({
                         </React.Fragment>
                     ))}
                     <li className={styles.hint} role="presentation">
-                        Pick a suggestion to open the patient · Enter to search the list
+                        {hint}
                     </li>
                 </ul>
             )}

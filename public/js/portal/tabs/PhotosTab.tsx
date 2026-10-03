@@ -4,12 +4,13 @@ import {
   portalTimepointsResponseSchema,
   portalPhotosResponseSchema,
 } from '../portal.schemas';
+import { formatLocaleDate } from '../../utils/formatters';
 import styles from '../portal.module.css';
 
+// English, like the rest of the portal's text — never the phone's own locale,
+// which on an Arabic phone renders Arabic-Indic digits (audit FE-F3-3).
 function formatTpDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return formatLocaleDate(iso, { year: 'numeric', month: 'short', day: 'numeric' }) || iso;
 }
 
 // Portal images are served by the authenticated /api/portal/photos/:tp/:name

@@ -15,15 +15,6 @@ export interface MessageCountData {
   [key: string]: unknown;
 }
 
-/**
- * API Response with success flag
- */
-export interface ApiSuccessResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
 // Schema source of truth for the WhatsApp boundary responses.
 const apiSuccessSchema = z.object({
   success: z.boolean(),

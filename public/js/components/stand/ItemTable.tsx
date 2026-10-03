@@ -3,7 +3,7 @@
  * Displays stand inventory items in a table with stock badges, profit, expiry warnings, and action buttons
  */
 import type { StandItem } from '../../hooks/useStand';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, formatLocaleDate } from '../../utils/formatters';
 import styles from './ItemTable.module.css';
 
 interface ItemTableProps {
@@ -39,10 +39,7 @@ function isExpiringSoon(expiryDate: string | null): 'expired' | 'warning' | null
 }
 
 function formatDate(dateString: string | null): string {
-  if (!dateString) return '-';
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return '-';
-  return d.toLocaleDateString();
+  return formatLocaleDate(dateString) || '-';
 }
 
 export default function ItemTable({

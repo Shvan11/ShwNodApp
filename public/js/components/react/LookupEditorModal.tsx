@@ -106,8 +106,14 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
     // Fetch dropdown options for any reference columns. One query per referenced
     // table; React Query dedups + caches by key, so multiple columns pointing at
     // the same table share one fetch and re-opens reuse the cache.
-    const refQueries = useQueries({
+    // `combine` keeps the result's identity stable across renders (it is
+    // structurally shared), so the memo below recomputes only when a table's rows
+    // actually change — without it useQueries hands back a new array every render.
+    // `lookupAdmin.items.response` is `anyArray` on purpose (columns vary by
+    // tableName), so the row shape is asserted here, off `unknown[]`.
+    const refRows = useQueries({
         queries: refTables.map(table => adminLookupItemsQuery(table)),
+        combine: results => results.map(r => r.data as LookupItem[] | undefined),
     });
 
     // Map fetched rows into { id, label } per table for the select inputs. A table
@@ -115,9 +121,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
     const referenceOptions = useMemo(() => {
         const out: Record<string, ReferenceOption[]> = {};
         refTables.forEach((table, i) => {
-            // `lookupAdmin.items.response` is `anyArray` on purpose (columns vary by
-            // tableName), so the row shape is asserted here, off `unknown[]`.
-            const rows = refQueries[i]?.data as LookupItem[] | undefined;
+            const rows = refRows[i];
             if (!rows) return;
             const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;
             out[table] = rows.map(r => ({
@@ -126,7 +130,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
             }));
         });
         return out;
-    }, [refTables, refQueries, refColumns]);
+    }, [refTables, refRows, refColumns]);
 
     // Initialize form data when the modal opens or the edited item changes — keyed
     // adjust-during-render, no setState-in-effect. `columns` is the stable per-table
@@ -180,14 +184,21 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
         };
     }, [isOpen, anchorEl]);
 
-    // Close on escape key
+    // Close on Escape — and ONLY this popover. Capture phase + stopImmediate, the
+    // same as LookupContextMenu: the popover opens inside LookupManagerModal (a
+    // <Modal>), whose document listener otherwise closed the manager on the same
+    // key press. The key is swallowed mid-save too, so the manager can't close
+    // under a pending write.
     useEffect(() => {
         if (!isOpen) return;
         const handleEscape = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape' && !isSaving) onClose();
+            if (e.key !== 'Escape') return;
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            if (!isSaving) onClose();
         };
-        document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleEscape, true);
+        return () => document.removeEventListener('keydown', handleEscape, true);
     }, [isOpen, isSaving, onClose]);
 
     const handleInputChange = (columnName: string, value: any): void => {

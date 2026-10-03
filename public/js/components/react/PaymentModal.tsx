@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useReducer, useState } from 'react';
 import type { ChangeEvent, FormEvent, FocusEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import styles from './PaymentModal.module.css';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { formatNumber, formatCurrency } from '../../utils/formatters';
+import { workBalance } from '../../utils/workBalance';
 import { ENTRY_DATE_MIN, unusualEntryDate } from '../../utils/entryDate';
 import { formatISODate } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
@@ -18,18 +19,22 @@ import {
     addInvoice as addInvoiceContract,
     type AddInvoiceResponse,
 } from '@shared/contracts/payment.contract';
+import type { WorkRow } from '@shared/contracts/work.contract';
+import { parseWorkCurrency } from '@shared/work-currency';
+import {
+    cashTotals,
+    digitsOnly,
+    initialPaymentForm,
+    paymentFormReducer,
+    suggestedCash,
+    type EntryMode,
+    type MoneyField,
+    type PaymentCurrency,
+} from '../../utils/paymentForm';
 
 // Types
-interface WorkData {
-    work_id: number;
-    type_name?: string;
-    total_required?: number;
-    TotalPaid?: number;
-    currency?: 'USD' | 'IQD';
-    discount?: number | null;
-    discount_date?: string | null;
-    discount_reason?: string | null;
-}
+/** The fields of a works-list row this modal reads (the row itself is passed in). */
+type WorkData = Pick<WorkRow, 'work_id' | 'type_name' | 'total_required' | 'TotalPaid' | 'currency' | 'discount'>;
 
 /** What the success view shows: the amount just registered, in the work's currency. */
 interface PaidToday {
@@ -42,51 +47,6 @@ interface PaymentModalProps {
     onClose: () => void;
     onSuccess?: () => void;
 }
-
-interface FormData {
-    paymentDate: string;
-    paymentCurrency: 'USD' | 'IQD' | 'MIXED';
-    amountToRegister: number | string;
-    actualUSD: number | string;
-    actualIQD: number | string;
-    change: number;
-    changeManualOverride: boolean;
-    cashOverrideEnabled: boolean;
-}
-
-interface DisplayValues {
-    amountToRegister: string;
-    actualUSD: string;
-    actualIQD: string;
-    change: string;
-}
-
-interface Calculations {
-    accountCurrency: 'USD' | 'IQD';
-    remainingBalance: number;
-    suggestedUSD: number;
-    suggestedIQD: number;
-    calculatedChange: number;
-    totalReceived: number;
-    isShort: boolean;
-    isOver: boolean;
-}
-
-type EntryMode = 'amount' | 'cash';
-
-/**
- * Money is whole units in both currencies (the contract's `moneyInt`), so every
- * money field keeps DIGITS ONLY and shows exactly the number it will send. The old
- * fields took `-`, `.` and `e` (`1e3` parsed as 1,000) and displayed a rounded
- * value while submit `parseInt`-truncated it: `99.5` showed $100 and saved $99
- * (audit FE-F8-4). The same rule backs the rate editor, whose display used to
- * `parseFloat` a grouped string (`"1,56"` → 1) while Save stripped the commas
- * (→ 156) (FE-F8-3).
- */
-const digitsOnly = (raw: string): number | '' => {
-    const digits = raw.replace(/\D/g, '');
-    return digits ? Number(digits) : '';
-};
 
 /** Ask before recording a rate this far from the one in use (FE-F8-3). */
 const RATE_DEVIATION_CONFIRM = 0.1;
@@ -103,208 +63,51 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [paidToday, setPaidToday] = useState<PaidToday | null>(null);
 
-    // Entry mode: 'amount' = enter amount first (current), 'cash' = enter cash first (reverse)
-    const [entryMode, setEntryMode] = useState<EntryMode>('amount');
-    // Track if mode has been locked (after first input or manual toggle)
-    const [modeLocked, setModeLocked] = useState(false);
-
-    // Form state - numeric values for calculations
-    const [formData, setFormData] = useState<FormData>({
-        paymentDate: formatISODate(),
-        paymentCurrency: 'IQD', // 'USD', 'IQD', 'MIXED'
-        amountToRegister: '', // Amount in account currency
-        actualUSD: '',
-        actualIQD: '',
-        change: 0,
-        changeManualOverride: false,
-        cashOverrideEnabled: false // For USD override in IQD account + Amount mode
-    });
-
-    // Display state - formatted strings for display
-    const [displayValues, setDisplayValues] = useState<DisplayValues>({
-        amountToRegister: '',
-        actualUSD: '',
-        actualIQD: '',
-        change: ''
-    });
-
-    // Calculations and suggestions
-    const [calculations, setCalculations] = useState<Calculations>({
-        accountCurrency: 'IQD',
-        remainingBalance: 0,
-        suggestedUSD: 0,
-        suggestedIQD: 0,
-        calculatedChange: 0,
-        totalReceived: 0,
-        isShort: false,
-        isOver: false
-    });
+    // The form is one state machine (utils/paymentForm.ts): every input is an
+    // event, the auto-fills (suggested cash, cash → amount, change) run inside
+    // the reducer, and everything purely derived is computed below instead of
+    // stored. It was 18 useStates and six keyed render-phase blocks feeding each
+    // other over several render passes (audit FE-F8-13).
+    const accountCurrencyOfWork = parseWorkCurrency(workData?.currency) ?? 'IQD';
+    const [form, dispatch] = useReducer(paymentFormReducer, undefined, () =>
+        initialPaymentForm(formatISODate(), accountCurrencyOfWork, null)
+    );
 
     // The exchange rate in force on the payment date. The endpoint carries the last
     // known rate forward, so its 404 — which drives the inline "Set Rate" prompt, no
     // throw — means no rate has EVER been recorded, not just none for this day.
-    const { data: rateData } = useQuery(exchangeRateForDateQuery(formData.paymentDate));
+    const { data: rateData } = useQuery(exchangeRateForDateQuery(form.paymentDate));
     const exchangeRate = rateData?.exchangeRate ?? null;
     // True when the day has no rate of its own and an earlier one stood in for it.
     const rateIsCarriedForward = !!rateData?.isCarriedForward;
 
-    // The form/balance seed + the two recalculations below were setState-in-effect
-    // cascades; they are now keyed adjust-during-render blocks (matching the display
-    // formatting + rate blocks further down). Each runs the same logic on the same
-    // inputs, but during render — so there is no setState-in-effect / immutability,
-    // and React Compiler can optimise. The blocks form an acyclic cascade
-    // (seed → suggested cash → total/change), each writing only state outside its
-    // own key, so they converge in a couple of render passes.
-
-    // Seed form + balance from the work when the modal opens or the work changes.
-    const [seededInit, setSeededInit] = useState<{ work: WorkData | null; success: boolean }>({ work: null, success: false });
+    // Outside inputs enter the machine as events, during render, keyed on the
+    // machine's own copy — no setState-in-effect.
+    if (form.rate !== exchangeRate) {
+        dispatch({ type: 'rate', rate: exchangeRate });
+    }
+    // Re-seed when the modal opens on another work (not while showing a success).
+    const [seededInit, setSeededInit] = useState<{ work: WorkData | null; success: boolean }>({ work: workData, success: paymentSuccess });
     if (seededInit.work !== workData || seededInit.success !== paymentSuccess) {
         setSeededInit({ work: workData, success: paymentSuccess });
-        // Only initialize form data if not in payment success mode
-        if (workData && !paymentSuccess) {
-            const remainingBalance = (workData.total_required || 0) - Number(workData.discount ?? 0) - (workData.TotalPaid || 0);
-            const accountCurrency = workData.currency || 'IQD';
-            setCalculations(prev => ({ ...prev, accountCurrency: accountCurrency, remainingBalance: remainingBalance }));
-            setFormData(prev => ({ ...prev, paymentCurrency: accountCurrency, amountToRegister: '' }));
-        }
+        if (workData && !paymentSuccess) dispatch({ type: 'seed', accountCurrency: accountCurrencyOfWork });
     }
 
-    // Recalculate suggested cash when payment currency or amount changes, or when
-    // switching to amount mode.
-    const suggestKey = `${formData.amountToRegister}|${formData.paymentCurrency}|${exchangeRate}|${entryMode}|${calculations.accountCurrency}`;
-    const [seededSuggestKey, setSeededSuggestKey] = useState<string | null>(null);
-    if (suggestKey !== seededSuggestKey) {
-        setSeededSuggestKey(suggestKey);
-        // Only the CROSS-currency arms need a rate: an IQD work paid in IQD (or USD in
-        // USD) suggests the amount itself. Gating the whole block on the rate left
-        // "Auto" at 0 on a deployment that has never recorded one — day one of every
-        // new center (audit FE-F8-5).
-        if (entryMode === 'amount' && formData.amountToRegister) {
-            const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-            const accountCurrency = calculations.accountCurrency;
-            const paymentCurrency = formData.paymentCurrency;
-
-            if (paymentCurrency === 'MIXED') {
-                // For mixed, no suggestion - user must enter manually
-                setCalculations(prev => ({ ...prev, suggestedUSD: 0, suggestedIQD: 0 }));
-            } else {
-                // Single currency payment
-                let suggestedUSD = 0;
-                let suggestedIQD = 0;
-
-                if (paymentCurrency === 'USD') {
-                    if (accountCurrency === 'USD') {
-                        suggestedUSD = amountToRegister;
-                    } else if (exchangeRate) {
-                        // Account is IQD, paying in USD - Round UP to collect more
-                        suggestedUSD = Math.ceil(amountToRegister / exchangeRate);
-                    }
-                } else if (paymentCurrency === 'IQD') {
-                    if (accountCurrency === 'IQD') {
-                        suggestedIQD = amountToRegister;
-                    } else if (exchangeRate) {
-                        // Account is USD, paying in IQD - Round UP to nearest 1000 to collect more
-                        suggestedIQD = Math.ceil(amountToRegister * exchangeRate / 1000) * 1000;
-                    }
-                }
-
-                // Auto-fill suggested amounts ONLY if cash override is not enabled
-                if (!formData.cashOverrideEnabled) {
-                    setFormData(prev => ({ ...prev, actualUSD: suggestedUSD || '', actualIQD: suggestedIQD || '' }));
-                }
-
-                setCalculations(prev => ({ ...prev, suggestedUSD, suggestedIQD }));
-            }
-        }
-    }
-
-    // Recalculate total + change when actual cash amounts change.
-    const totalKey = `${formData.actualUSD}|${formData.actualIQD}|${formData.amountToRegister}|${exchangeRate}|${calculations.accountCurrency}`;
-    const [seededTotalKey, setSeededTotalKey] = useState<string | null>(null);
-    if (totalKey !== seededTotalKey) {
-        setSeededTotalKey(totalKey);
-        const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
-        const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
-        const accountCurrency = calculations.accountCurrency;
-        // Cash in the OTHER currency is the only leg that needs a rate. Without one this
-        // block used to bail entirely, leaving totalReceived/isShort stale even for an
-        // IQD work settled in IQD, where nothing is converted at all.
-        const foreignCash = accountCurrency === 'USD' ? actualIQD : actualUSD;
-
-        if (exchangeRate || foreignCash === 0) {
-            const amountToRegister = parseFloat(String(formData.amountToRegister)) || 0;
-            const rate = exchangeRate ?? 0; // only ever applied to a zero foreign leg when 0
-
-            // Convert total received to account currency - Round DOWN what patient gave (you benefit)
-            let totalInAccountCurrency: number;
-            if (accountCurrency === 'USD') {
-                // Patient gave IQD, convert to USD - Round DOWN
-                const iqdValueInUSD = rate ? Math.floor(actualIQD / rate) : 0;
-                totalInAccountCurrency = actualUSD + iqdValueInUSD;
-            } else {
-                // Patient gave USD, convert to IQD - Round DOWN to nearest 1000
-                const usdValueInIQD = rate ? Math.floor(actualUSD * rate / 1000) * 1000 : 0;
-                totalInAccountCurrency = usdValueInIQD + actualIQD;
-            }
-
-            // Calculate overpayment
-            const overpayment = totalInAccountCurrency - amountToRegister;
-
-            // Convert overpayment to IQD (change always in IQD) - Round DOWN to nearest 1000 (you give less)
-            // A USD-denominated overpayment can't be expressed in IQD without a rate, so it
-            // stays 0 until one exists (rateRequired keeps that case off the Save button).
-            let changeInIQD = 0;
-            if (overpayment > 0) {
-                if (accountCurrency === 'USD') {
-                    changeInIQD = rate ? Math.floor(overpayment * rate / 1000) * 1000 : 0;
-                } else {
-                    changeInIQD = Math.floor(overpayment / 1000) * 1000;
-                }
-            }
-
-            // The cash, the amount or the rate moved, so the change is recomputed —
-            // a manual override included. It used to stick: override 5,000, then lower
-            // the cash, and the stale 5,000 was submitted (only an entry-mode switch
-            // cleared it — FE-F8-13). Editing the Change field itself doesn't move
-            // this block's key, so an override holds until the inputs behind it change.
-            setFormData(prev => ({ ...prev, change: changeInIQD, changeManualOverride: false }));
-
-            setCalculations(prev => ({
-                ...prev,
-                totalReceived: Math.round(totalInAccountCurrency),
-                calculatedChange: changeInIQD,
-                isShort: totalInAccountCurrency < amountToRegister,
-                isOver: totalInAccountCurrency > amountToRegister
-            }));
-        }
-    }
-
-    // Auto-format display values when formData changes (handles auto-population) —
-    // done during render (keyed on the formatted fields) so there's no
-    // setState-in-effect. Mirrors the prior effect exactly.
-    const fmtKey = `${formData.amountToRegister}|${formData.actualUSD}|${formData.actualIQD}|${formData.change}`;
-    const [seededFmtKey, setSeededFmtKey] = useState<string | null>(null);
-    if (fmtKey !== seededFmtKey) {
-        setSeededFmtKey(fmtKey);
-        setDisplayValues(prev => ({
-            ...prev,
-            amountToRegister: formatNumber(formData.amountToRegister),
-            actualUSD: formatNumber(formData.actualUSD),
-            actualIQD: formatNumber(formData.actualIQD),
-            change: formatNumber(formData.change)
-        }));
-    }
-
-    // The rate editor writes to whatever date the form currently holds, so it must never
-    // outlive the date it was opened for. Changing the payment date closes it: otherwise
-    // staff could open it on a day with no rate, switch to an earlier date that HAS one,
-    // and the save would silently rewrite that day's recorded rate.
-    const [seededRateDate, setSeededRateDate] = useState(formData.paymentDate);
-    if (seededRateDate !== formData.paymentDate) {
-        setSeededRateDate(formData.paymentDate);
-        if (showRateInput) setShowRateInput(false);
-        if (newRateValue) setNewRateValue('');
-    }
+    const accountCurrency = form.accountCurrency;
+    const entryMode = form.entryMode;
+    const remainingBalance = workData ? workBalance(workData).remaining : 0;
+    const suggested = suggestedCash(form);
+    // Null while foreign cash waits for a rate (the Save button is gated on it then).
+    const totals = cashTotals(form);
+    const isShort = totals?.isShort ?? false;
+    const isOver = totals?.isOver ?? false;
+    // Each field shows exactly the number it will send, grouped.
+    const display = {
+        amountToRegister: formatNumber(form.amountToRegister),
+        actualUSD: formatNumber(form.actualUSD),
+        actualIQD: formatNumber(form.actualIQD),
+        change: formatNumber(form.change),
+    };
 
     const handleSetExchangeRate = async () => {
         const rate = newRateValue;
@@ -319,7 +122,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         // the day has no rate of its own (none at all, or one carried forward), and this
         // re-checks it against the rate actually loaded at save time.
         if (exchangeRate && !rateIsCarriedForward) {
-            toast.warning(t('validation.rateAlreadySet', { date: formData.paymentDate }));
+            toast.warning(t('validation.rateAlreadySet', { date: form.paymentDate }));
             setShowRateInput(false);
             setNewRateValue('');
             return;
@@ -342,9 +145,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
         // Recording a rate for a PAST day is legitimate (it's the rate that really stood
         // that day) but it does restate that day's totals — so it's confirmed, not silent.
-        if (formData.paymentDate < formatISODate()) {
+        if (form.paymentDate < formatISODate()) {
             const proceed = await confirm(
-                t('confirm.backdatedRateMessage', { date: formData.paymentDate, rate: formatNumber(rate) }),
+                t('confirm.backdatedRateMessage', { date: form.paymentDate, rate: formatNumber(rate) }),
                 { title: t('confirm.backdatedRateTitle'), confirmText: t('confirm.backdatedRateConfirm') }
             );
             if (!proceed) return;
@@ -354,7 +157,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             setLoading(true);
             // Enveloped (sendSuccess); a non-2xx now throws and is handled below.
             await postJSON('/api/updateExchangeRateForDate', {
-                date: formData.paymentDate,
+                date: form.paymentDate,
                 exchangeRate: rate
             }, { schema: updateExchangeRateContract.response });
 
@@ -372,136 +175,24 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
     };
 
-    // Reverse mode: Calculate amount to register from cash received when in cash entry mode.
-    // Uses same "benefit from conversion" rounding - round DOWN what patient gave. Keyed
-    // adjust-during-render (not an effect); entryMode gates it so it never competes with
-    // the amount-mode suggested-cash block above (the two are entry-mode-exclusive).
-    const reverseKey = `${formData.actualUSD}|${formData.actualIQD}|${entryMode}|${exchangeRate}|${calculations.accountCurrency}`;
-    const [seededReverseKey, setSeededReverseKey] = useState<string | null>(null);
-    if (reverseKey !== seededReverseKey) {
-        setSeededReverseKey(reverseKey);
-        const actualUSD = parseFloat(String(formData.actualUSD)) || 0;
-        const actualIQD = parseFloat(String(formData.actualIQD)) || 0;
-        const accountCurrency = calculations.accountCurrency;
-        // Same rule as the total/change block: only the foreign leg needs a rate, so
-        // MIXED-in-cash-mode settled entirely in the account's own currency still derives
-        // its amount (it used to sit empty and fail with "could not calculate").
-        const foreignCash = accountCurrency === 'USD' ? actualIQD : actualUSD;
-
-        if (entryMode === 'cash' && (exchangeRate || foreignCash === 0)) {
-            const rate = exchangeRate ?? 0;
-
-            if (actualUSD === 0 && actualIQD === 0) {
-                setFormData(prev => ({ ...prev, amountToRegister: '' }));
-            } else {
-                let amountToRegister: number;
-                if (accountCurrency === 'USD') {
-                    const iqdValueInUSD = rate ? Math.floor(actualIQD / rate) : 0;
-                    amountToRegister = actualUSD + iqdValueInUSD;
-                } else {
-                    const usdValueInIQD = rate ? Math.floor(actualUSD * rate / 1000) * 1000 : 0;
-                    amountToRegister = usdValueInIQD + actualIQD;
-                }
-
-                setFormData(prev => ({ ...prev, amountToRegister: amountToRegister }));
-            }
-        }
-    }
-
-    // Smart calculation for mixed payments
-    // MIXED payments: both cash fields are typed by hand (no suggestion is shown in
-    // MIXED — the per-field "collect" hints belong to the single-currency branch).
-    const handleMixedCashChange = (field: 'actualUSD' | 'actualIQD', value: string) => {
-        const amount = digitsOnly(value);
-
-        // Auto-detect mode for mixed payments (only if not locked)
-        if (!modeLocked && amount && !formData.amountToRegister) {
-            setEntryMode('cash');
-            setModeLocked(true);
-        }
-
-        setFormData(prev => ({ ...prev, [field]: amount }));
-        setDisplayValues(prev => ({ ...prev, [field]: formatNumber(amount) }));
-    };
-
     const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-
-        // When changing payment currency, clear the irrelevant cash field and reset override
         if (name === 'paymentCurrency') {
-            // Check if switching to same-currency (need to force amount mode)
-            const willBeSameCurrency =
-                (calculations.accountCurrency === 'USD' && value === 'USD') ||
-                (calculations.accountCurrency === 'IQD' && value === 'IQD');
-
-            if (value === 'USD') {
-                // Switching to USD only - clear IQD, reset override
-                setFormData(prev => ({ ...prev, paymentCurrency: value as 'USD', actualIQD: '', cashOverrideEnabled: false }));
-                setDisplayValues(prev => ({ ...prev, actualIQD: '' }));
-            } else if (value === 'IQD') {
-                // Switching to IQD only - clear USD, reset override
-                setFormData(prev => ({ ...prev, paymentCurrency: value as 'IQD', actualUSD: '', cashOverrideEnabled: false }));
-                setDisplayValues(prev => ({ ...prev, actualUSD: '' }));
-            } else {
-                // For MIXED, keep both values but reset override
-                setFormData(prev => ({ ...prev, paymentCurrency: value as 'MIXED', cashOverrideEnabled: false }));
-            }
-
-            // Force amount mode for same-currency payments (cash mode doesn't make sense)
-            if (willBeSameCurrency && entryMode === 'cash') {
-                setEntryMode('amount');
-                setModeLocked(false); // Allow re-detection on next input
-            }
-            return;
+            dispatch({ type: 'paymentCurrency', value: value as PaymentCurrency });
+        } else if (name === 'paymentDate') {
+            dispatch({ type: 'date', paymentDate: value });
+            // The rate editor writes to whatever date the form holds, so it must never
+            // outlive the date it was opened for: open it on a day with no rate, switch
+            // to an earlier date that HAS one, and the save would silently rewrite that
+            // day's recorded rate.
+            setShowRateInput(false);
+            setNewRateValue('');
         }
-
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
     };
 
-    // Handle formatted money input changes with auto-detect mode (only before mode is locked)
-    const handleMoneyInputChange = (fieldName: 'amountToRegister' | 'actualUSD' | 'actualIQD', value: string) => {
-        const numericValue = digitsOnly(value);
-
-        // Auto-detect entry mode ONLY if mode is not locked yet
-        if (!modeLocked && numericValue && numericValue > 0) {
-            if (fieldName === 'amountToRegister') {
-                // User typed in amount field first - lock to amount mode
-                setEntryMode('amount');
-                setModeLocked(true);
-            } else if ((fieldName === 'actualUSD' || fieldName === 'actualIQD') && !formData.amountToRegister) {
-                // User typed in cash field first (with empty amount) - lock to cash mode
-                setEntryMode('cash');
-                setModeLocked(true);
-            }
-        }
-
-        // Update formData with numeric value for calculations
-        setFormData(prev => ({
-            ...prev,
-            [fieldName]: numericValue
-        }));
-
-        // Show exactly the number that will be sent (grouped as it is typed).
-        setDisplayValues(prev => ({
-            ...prev,
-            [fieldName]: formatNumber(numericValue)
-        }));
-    };
-
-    // Handle blur - ensure proper formatting
-    const handleMoneyInputBlur = (fieldName: keyof FormData) => {
-        const numericValue = formData[fieldName];
-        // Only format if the value is a number or string (not boolean)
-        if (typeof numericValue === 'number' || typeof numericValue === 'string') {
-            const formatted = formatNumber(numericValue);
-            setDisplayValues(prev => ({
-                ...prev,
-                [fieldName]: formatted
-            }));
-        }
+    // A typed money field; the first value typed picks the entry mode until it is locked.
+    const handleMoneyInputChange = (field: MoneyField, value: string) => {
+        dispatch({ type: 'money', field, value: digitsOnly(value), detectMode: true });
     };
 
     // Handle focus - select all text only when value is "0"
@@ -514,98 +205,28 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
 
     // Toggle: fill the amount field with the exact remaining balance (zeroes the balance)
     const handlePayFullBalanceToggle = (checked: boolean) => {
-        // Lock to amount mode so the value isn't recomputed from cash
-        setModeLocked(true);
-        if (entryMode !== 'amount') setEntryMode('amount');
-
-        if (checked && calculations.remainingBalance > 0) {
-            setFormData(prev => ({ ...prev, amountToRegister: calculations.remainingBalance }));
-        } else {
-            setFormData(prev => ({ ...prev, amountToRegister: '' }));
-        }
+        dispatch({ type: 'payFullBalance', checked, remainingBalance });
     };
 
     const handleChangeOverride = (value: string) => {
-        const numericValue = digitsOnly(value) || 0;
-        setFormData(prev => ({
-            ...prev,
-            change: numericValue,
-            changeManualOverride: true
-        }));
-        setDisplayValues(prev => ({
-            ...prev,
-            change: formatNumber(numericValue)
-        }));
+        dispatch({ type: 'changeOverride', value: digitsOnly(value) || 0 });
     };
 
     // Toggle cash override mode (for USD bill override in IQD account + Amount mode)
-    const handleCashOverrideToggle = () => {
-        setFormData(prev => ({
-            ...prev,
-            cashOverrideEnabled: !prev.cashOverrideEnabled
-        }));
-    };
+    const handleCashOverrideToggle = () => dispatch({ type: 'toggleCashOverride' });
 
-    // Handle USD input when in override mode - recalculates IQD change
+    // The USD bill typed in override mode — the change is recomputed from it.
     const handleOverrideUSDChange = (value: string) => {
-        const usd = digitsOnly(value);
-
-        setFormData(prev => ({ ...prev, actualUSD: usd }));
-        setDisplayValues(prev => ({ ...prev, actualUSD: formatNumber(usd) }));
-
-        // Change will be auto-calculated by the total/change render block
+        dispatch({ type: 'money', field: 'actualUSD', value: digitsOnly(value), detectMode: false });
     };
 
     // Handle entry mode toggle change (always locks mode after manual toggle)
-    const handleEntryModeChange = (newMode: EntryMode) => {
-        if (newMode === entryMode) return;
-
-        // Lock mode after manual toggle
-        setModeLocked(true);
-
-        if (newMode === 'cash') {
-            // Switching to cash mode
-            // Clear amount (auto-calculated in cash mode), keep cash values
-            // the reverse-mode render block will recalculate amount from cash
-            setFormData(prev => ({
-                ...prev,
-                amountToRegister: '',
-                change: 0,
-                changeManualOverride: false,
-                cashOverrideEnabled: false // Reset override when switching modes
-            }));
-            setDisplayValues(prev => ({
-                ...prev,
-                amountToRegister: '',
-                change: ''
-            }));
-            setEntryMode(newMode);
-        } else {
-            // Switching to amount mode
-            // Clear cash (auto-calculated in amount mode), keep amount value
-            // the suggested-cash render block will recalculate cash from amount
-            setFormData(prev => ({
-                ...prev,
-                actualUSD: '',
-                actualIQD: '',
-                change: 0,
-                changeManualOverride: false,
-                cashOverrideEnabled: false // Reset override when switching modes
-            }));
-            setDisplayValues(prev => ({
-                ...prev,
-                actualUSD: '',
-                actualIQD: '',
-                change: ''
-            }));
-            setEntryMode(newMode);
-        }
-    };
+    const handleEntryModeChange = (newMode: EntryMode) => dispatch({ type: 'entryMode', mode: newMode });
 
     // Detect same-currency payment for change tracking (only IQD-to-IQD)
     // USD-to-USD tracks change as IQD because clinic uses $50/$100 bills
     const isSameCurrencyPayment =
-        calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD';
+        accountCurrency === 'IQD' && form.paymentCurrency === 'IQD';
 
     // THE single source of truth for whether change is tracked on this payment —
     // read by the Change field, the summary strip AND handleSubmit. Change is not
@@ -621,30 +242,30 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     const isChangeDisabled =
         entryMode === 'cash' ||
         isSameCurrencyPayment ||
-        (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'IQD');
+        (accountCurrency === 'USD' && form.paymentCurrency === 'IQD');
 
     // Whether this payment genuinely needs an exchange rate. Only two things convert:
     // cash taken in a currency other than the work's, and change (always handed back in
     // IQD) owed on a USD-denominated overpayment. Saving was previously gated on the
     // rate unconditionally, so an IQD work being paid in IQD — nothing to convert —
     // could not be registered at all until someone entered the day's rate.
-    const usdCash = parseFloat(String(formData.actualUSD)) || 0;
-    const iqdCash = parseFloat(String(formData.actualIQD)) || 0;
+    const usdCash = parseFloat(String(form.actualUSD)) || 0;
+    const iqdCash = parseFloat(String(form.actualIQD)) || 0;
     const foreignCashEntered =
-        calculations.accountCurrency === 'USD' ? iqdCash > 0 : usdCash > 0;
+        accountCurrency === 'USD' ? iqdCash > 0 : usdCash > 0;
     const rateRequired =
-        (formData.paymentCurrency === 'MIXED'
+        (form.paymentCurrency === 'MIXED'
             // MIXED only converts once foreign cash is actually entered.
             ? foreignCashEntered
-            : formData.paymentCurrency !== calculations.accountCurrency) ||
-        (calculations.accountCurrency === 'USD' && !isChangeDisabled && calculations.isOver);
+            : form.paymentCurrency !== accountCurrency) ||
+        (accountCurrency === 'USD' && !isChangeDisabled && isOver);
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        const actualUSD = parseInt(String(formData.actualUSD), 10) || 0;
-        const actualIQD = parseInt(String(formData.actualIQD), 10) || 0;
-        const amountPaid = parseInt(String(formData.amountToRegister), 10) || 0;
+        const actualUSD = parseInt(String(form.actualUSD), 10) || 0;
+        const actualIQD = parseInt(String(form.actualIQD), 10) || 0;
+        const amountPaid = parseInt(String(form.amountToRegister), 10) || 0;
 
         // Validation based on entry mode
         if (entryMode === 'amount') {
@@ -672,31 +293,31 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
         }
 
         if (rateRequired && !exchangeRate) {
-            toast.warning(t('validation.rateRequired', { date: formData.paymentDate }));
+            toast.warning(t('validation.rateRequired', { date: form.paymentDate }));
             return;
         }
 
-        if (calculations.remainingBalance > 0 && amountPaid > calculations.remainingBalance) {
-            toast.error(t('validation.exceedsBalance', { balance: formatCurrency(calculations.remainingBalance, calculations.accountCurrency) }));
+        if (remainingBalance > 0 && amountPaid > remainingBalance) {
+            toast.error(t('validation.exceedsBalance', { balance: formatCurrency(remainingBalance, accountCurrency) }));
             return;
         }
 
-        if (calculations.isShort) {
+        if (isShort) {
             if (!await confirm(t('confirm.underpaymentMessage'), { title: t('confirm.underpaymentTitle'), confirmText: t('confirm.underpaymentConfirm') })) return;
         }
 
         // A slipped year digit saves silently otherwise, outside every daily total (FE-F8-9).
-        const unusualDate = unusualEntryDate(formData.paymentDate, formatISODate());
+        const unusualDate = unusualEntryDate(form.paymentDate, formatISODate());
         if (unusualDate) {
             const message = unusualDate === 'future'
-                ? t('confirm.futureDateMessage', { date: formData.paymentDate })
-                : t('confirm.oldDateMessage', { date: formData.paymentDate });
+                ? t('confirm.futureDateMessage', { date: form.paymentDate })
+                : t('confirm.oldDateMessage', { date: form.paymentDate });
             if (!await confirm(message, { title: t('confirm.unusualDateTitle'), confirmText: t('confirm.unusualDateConfirm') })) return;
         }
 
         // Change is saved exactly when the form tracked it (see isChangeDisabled above):
         // NULL for the untracked scenarios, the entered/auto-calculated value otherwise.
-        const changeToSubmit = isChangeDisabled ? null : (parseInt(String(formData.change), 10) || 0);
+        const changeToSubmit = isChangeDisabled ? null : (parseInt(String(form.change), 10) || 0);
 
         // Validate cross-currency change doesn't exceed received amounts
         if (changeToSubmit !== null && changeToSubmit > 0) {
@@ -713,7 +334,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             const invoiceData = {
                 workid: workData!.work_id,
                 amountPaid: amountPaid,
-                paymentDate: formData.paymentDate,
+                paymentDate: form.paymentDate,
                 usdReceived: actualUSD,
                 iqdReceived: actualIQD,
                 change: changeToSubmit  // NULL for same-currency, number for cross-currency
@@ -729,7 +350,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
             // The success view shows what was registered, in the work's currency. (The
             // printed receipt is rendered server-side from the saved invoice.)
             setPaymentSuccess(true);
-            setPaidToday({ amount: amountPaid, currency: calculations.accountCurrency });
+            setPaidToday({ amount: amountPaid, currency: accountCurrency });
 
             // Flat { success, messageId } / { success:false, message } at HTTP 200 → passthrough.
             postJSON<{ success: boolean; message?: string }>('/api/wa/send-receipt', { workId: workData!.work_id })
@@ -796,14 +417,14 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
     // Whether the amount field currently equals the full remaining balance
     // (drives the "Pay full balance" checkbox; auto-unticks when the user edits the amount)
     const amountEqualsBalance =
-        calculations.remainingBalance > 0 &&
-        (parseFloat(String(formData.amountToRegister)) || 0) === Math.round(calculations.remainingBalance);
+        remainingBalance > 0 &&
+        (parseFloat(String(form.amountToRegister)) || 0) === Math.round(remainingBalance);
 
     // Detect same-currency selection (for entry mode locking)
     // Cash mode doesn't make sense for same-currency - can't derive "amount owed" from "cash received"
     const isSameCurrencySelection =
-        (calculations.accountCurrency === 'USD' && formData.paymentCurrency === 'USD') ||
-        (calculations.accountCurrency === 'IQD' && formData.paymentCurrency === 'IQD');
+        (accountCurrency === 'USD' && form.paymentCurrency === 'USD') ||
+        (accountCurrency === 'IQD' && form.paymentCurrency === 'IQD');
 
     // "Set Rate" link → inline rate input. Shared by the no-rate banner and the
     // carried-forward one (both let staff record this day's actual rate).
@@ -855,10 +476,10 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             actions={
                                 <div className={styles.paymentBalanceBadge}>
                                     <span className={styles.balanceLabel}>{t('balance.label')}</span>
-                                    <span className={styles.balanceAmount}>{formatCurrency(calculations.remainingBalance, calculations.accountCurrency)}</span>
+                                    <span className={styles.balanceAmount}>{formatCurrency(remainingBalance, accountCurrency)}</span>
                                     {Number(workData.discount ?? 0) > 0 && (
                                         <span className={`${styles.balanceLabel} ${styles.discountNote}`}>
-                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), calculations.accountCurrency)} {t('balance.discountApplied')}
+                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), accountCurrency)} {t('balance.discountApplied')}
                                         </span>
                                     )}
                                 </div>
@@ -871,7 +492,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         {!exchangeRate ? (
                             <div className={styles.exchangeRateErrorCompact}>
                                 <i className="fas fa-exclamation-triangle"></i>
-                                <span>{t('exchangeRate.noRate', { date: formData.paymentDate })}</span>
+                                <span>{t('exchangeRate.noRate', { date: form.paymentDate })}</span>
                                 {rateEditor}
                             </div>
                         ) : (
@@ -886,7 +507,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         {rateEditor}
                                     </>
                                 ) : (
-                                    <span className={styles.rateDate}>({formData.paymentDate})</span>
+                                    <span className={styles.rateDate}>({form.paymentDate})</span>
                                 )}
                             </div>
                         )}
@@ -899,7 +520,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     <select
                                         id="payment-currency"
                                         name="paymentCurrency"
-                                        value={formData.paymentCurrency}
+                                        value={form.paymentCurrency}
                                         onChange={handleInputChange}
                                         className={styles.selectCompact}
                                     >
@@ -933,7 +554,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         type="date"
                                         name="paymentDate"
                                         min={ENTRY_DATE_MIN}
-                                        value={formData.paymentDate}
+                                        value={form.paymentDate}
                                         onChange={handleInputChange}
                                         className={styles.inputCompact}
                                     />
@@ -945,60 +566,58 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 {/* Amount to Register */}
                                 <div className={`${styles.paymentField} ${styles.paymentFieldLg}`}>
                                     <label>
-                                        {t('form.amountLabel', { currency: calculations.accountCurrency })}
+                                        {t('form.amountLabel', { currency: accountCurrency })}
                                         {entryMode === 'amount' && <span className={styles.required}>*</span>}
                                         {entryMode === 'cash' && <span className={styles.autoBadge}>{t('form.auto')}</span>}
                                     </label>
                                     <input
                                         type="text"
                                         inputMode="numeric"
-                                        value={displayValues.amountToRegister}
+                                        value={display.amountToRegister}
                                         onChange={(e) => handleMoneyInputChange('amountToRegister', e.target.value)}
-                                        onBlur={() => handleMoneyInputBlur('amountToRegister')}
                                         onFocus={handleMoneyInputFocus}
                                         readOnly={entryMode === 'cash'}
                                         placeholder={entryMode === 'cash' ? t('form.auto') : t('form.enterAmount')}
                                         className={`${styles.inputLg} ${entryMode === 'cash' ? styles.inputReadonly : ''}`}
                                     />
-                                    {entryMode === 'amount' && calculations.remainingBalance > 0 && (
+                                    {entryMode === 'amount' && remainingBalance > 0 && (
                                         <label className={styles.payFullBalanceCheck}>
                                             <input
                                                 type="checkbox"
                                                 checked={amountEqualsBalance}
                                                 onChange={(e) => handlePayFullBalanceToggle(e.target.checked)}
                                             />
-                                            <span>{t('form.payFullBalance', { amount: formatCurrency(calculations.remainingBalance, calculations.accountCurrency) })}</span>
+                                            <span>{t('form.payFullBalance', { amount: formatCurrency(remainingBalance, accountCurrency) })}</span>
                                         </label>
                                     )}
                                 </div>
 
                                 {/* Cash Received - Dynamic based on currency */}
-                                {formData.paymentCurrency !== 'MIXED' ? (
+                                {form.paymentCurrency !== 'MIXED' ? (
                                     <div className={`${styles.paymentField} ${styles.paymentFieldLg}`}>
                                         <label>
-                                            {t('form.received', { currency: formData.paymentCurrency })}
+                                            {t('form.received', { currency: form.paymentCurrency })}
                                             {entryMode === 'cash' && <span className={styles.required}>*</span>}
-                                            {entryMode === 'amount' && !formData.cashOverrideEnabled && <span className={styles.autoBadge}>{t('form.auto')}</span>}
-                                            {entryMode === 'amount' && formData.cashOverrideEnabled && <span className={styles.overrideBadge}>{t('form.override')}</span>}
+                                            {entryMode === 'amount' && !form.cashOverrideEnabled && <span className={styles.autoBadge}>{t('form.auto')}</span>}
+                                            {entryMode === 'amount' && form.cashOverrideEnabled && <span className={styles.overrideBadge}>{t('form.override')}</span>}
                                         </label>
-                                        {formData.paymentCurrency === 'USD' ? (
+                                        {form.paymentCurrency === 'USD' ? (
                                             /* USD field - check if cross-currency override is available */
                                             (() => {
                                                 // Show lock icon only for: IQD account + USD payment + Amount mode
-                                                const canOverride = calculations.accountCurrency === 'IQD' && entryMode === 'amount';
-                                                const isLocked = canOverride && !formData.cashOverrideEnabled;
-                                                const isOverriding = canOverride && formData.cashOverrideEnabled;
+                                                const canOverride = accountCurrency === 'IQD' && entryMode === 'amount';
+                                                const isLocked = canOverride && !form.cashOverrideEnabled;
+                                                const isOverriding = canOverride && form.cashOverrideEnabled;
 
                                                 return (
                                                     <div className={styles.inputWithLock}>
                                                         <input
                                                             type="text"
                                                             inputMode="numeric"
-                                                            value={displayValues.actualUSD}
+                                                            value={display.actualUSD}
                                                             onChange={(e) => isOverriding
                                                                 ? handleOverrideUSDChange(e.target.value)
                                                                 : handleMoneyInputChange('actualUSD', e.target.value)}
-                                                            onBlur={() => handleMoneyInputBlur('actualUSD')}
                                                             onFocus={handleMoneyInputFocus}
                                                             readOnly={isLocked}
                                                             placeholder={entryMode === 'cash' ? t('form.enterUsd') : (isOverriding ? t('form.enterBill') : t('form.auto'))}
@@ -1021,17 +640,16 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             /* IQD field - check if cross-currency override is available */
                                             (() => {
                                                 // Show lock icon only for: USD account + IQD payment + Amount mode
-                                                const canOverrideIQD = calculations.accountCurrency === 'USD' && entryMode === 'amount';
-                                                const isLockedIQD = canOverrideIQD && !formData.cashOverrideEnabled;
+                                                const canOverrideIQD = accountCurrency === 'USD' && entryMode === 'amount';
+                                                const isLockedIQD = canOverrideIQD && !form.cashOverrideEnabled;
 
                                                 return (
                                                     <div className={styles.inputWithLock}>
                                                         <input
                                                             type="text"
                                                             inputMode="numeric"
-                                                            value={displayValues.actualIQD}
+                                                            value={display.actualIQD}
                                                             onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
-                                                            onBlur={() => handleMoneyInputBlur('actualIQD')}
                                                             onFocus={handleMoneyInputFocus}
                                                             readOnly={isLockedIQD}
                                                             placeholder={entryMode === 'cash' ? t('form.enterIqd') : t('form.auto')}
@@ -1040,11 +658,11 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                         {canOverrideIQD && (
                                                             <button
                                                                 type="button"
-                                                                className={`${styles.lockToggleBtn} ${formData.cashOverrideEnabled ? styles.unlocked : styles.locked}`}
+                                                                className={`${styles.lockToggleBtn} ${form.cashOverrideEnabled ? styles.unlocked : styles.locked}`}
                                                                 onClick={handleCashOverrideToggle}
-                                                                title={formData.cashOverrideEnabled ? t('form.lockAuto') : t('form.unlockReceived')}
+                                                                title={form.cashOverrideEnabled ? t('form.lockAuto') : t('form.unlockReceived')}
                                                             >
-                                                                <i className={`fas fa-${formData.cashOverrideEnabled ? 'lock-open' : 'lock'}`}></i>
+                                                                <i className={`fas fa-${form.cashOverrideEnabled ? 'lock-open' : 'lock'}`}></i>
                                                             </button>
                                                         )}
                                                     </div>
@@ -1052,14 +670,14 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                             })()
                                         )}
                                         {/* Suggestion hint */}
-                                        {entryMode === 'amount' && calculations.suggestedUSD > 0 && formData.paymentCurrency === 'USD' && !formData.cashOverrideEnabled && (
-                                            <small className={styles.fieldHint}>{t('form.collectHint', { amount: formatNumber(calculations.suggestedUSD) })}</small>
+                                        {entryMode === 'amount' && suggested.suggestedUSD > 0 && form.paymentCurrency === 'USD' && !form.cashOverrideEnabled && (
+                                            <small className={styles.fieldHint}>{t('form.collectHint', { amount: formatNumber(suggested.suggestedUSD) })}</small>
                                         )}
-                                        {entryMode === 'amount' && formData.paymentCurrency === 'USD' && formData.cashOverrideEnabled && (
+                                        {entryMode === 'amount' && form.paymentCurrency === 'USD' && form.cashOverrideEnabled && (
                                             <small className={`${styles.fieldHint} ${styles.overrideHint}`}>{t('form.overrideHint')}</small>
                                         )}
-                                        {entryMode === 'amount' && calculations.suggestedIQD > 0 && formData.paymentCurrency === 'IQD' && (
-                                            <small className={styles.fieldHint}>{t('form.collectHint', { amount: formatNumber(calculations.suggestedIQD) })}</small>
+                                        {entryMode === 'amount' && suggested.suggestedIQD > 0 && form.paymentCurrency === 'IQD' && (
+                                            <small className={styles.fieldHint}>{t('form.collectHint', { amount: formatNumber(suggested.suggestedIQD) })}</small>
                                         )}
                                     </div>
                                 ) : (
@@ -1071,9 +689,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 id="payment-usd-received"
                                                 type="text"
                                                 inputMode="numeric"
-                                                value={displayValues.actualUSD}
-                                                onChange={(e) => handleMixedCashChange('actualUSD', e.target.value)}
-                                                onBlur={() => handleMoneyInputBlur('actualUSD')}
+                                                value={display.actualUSD}
+                                                onChange={(e) => handleMoneyInputChange('actualUSD', e.target.value)}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder="USD"
                                                 className={styles.inputMd}
@@ -1085,9 +702,8 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                 id="payment-iqd-received"
                                                 type="text"
                                                 inputMode="numeric"
-                                                value={displayValues.actualIQD}
-                                                onChange={(e) => handleMixedCashChange('actualIQD', e.target.value)}
-                                                onBlur={() => handleMoneyInputBlur('actualIQD')}
+                                                value={display.actualIQD}
+                                                onChange={(e) => handleMoneyInputChange('actualIQD', e.target.value)}
                                                 onFocus={handleMoneyInputFocus}
                                                 placeholder="IQD"
                                                 className={styles.inputMd}
@@ -1113,45 +729,44 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                         <input
                                             type="text"
                                             inputMode="numeric"
-                                            value={displayValues.change}
+                                            value={display.change}
                                             onChange={(e) => handleChangeOverride(e.target.value)}
-                                            onBlur={() => handleMoneyInputBlur('change')}
                                             onFocus={handleMoneyInputFocus}
                                             placeholder="0"
                                             className={styles.inputCompact}
                                         />
                                     )}
-                                    {!isChangeDisabled && calculations.calculatedChange > 0 && !formData.changeManualOverride && (
+                                    {!isChangeDisabled && (totals?.calculatedChange ?? 0) > 0 && !form.changeManualOverride && (
                                         <small className={`${styles.fieldHint} ${styles.fieldHintSuccess}`}>{t('form.autoCalculated')}</small>
                                     )}
                                 </div>
                             </div>
 
                             {/* Summary Strip - Only show when there's data */}
-                            {(formData.actualUSD || formData.actualIQD) && (
-                                <div className={`${styles.paymentSummaryStrip} ${calculations.isShort ? styles.summaryWarning : styles.summarySuccess}`}>
+                            {(form.actualUSD || form.actualIQD) && (
+                                <div className={`${styles.paymentSummaryStrip} ${isShort ? styles.summaryWarning : styles.summarySuccess}`}>
                                     <div className={styles.summaryItem}>
                                         <span className={styles.summaryLabel}>{t('summary.cashIn')}</span>
                                         <span className={styles.summaryValue}>
-                                            {formData.actualUSD ? `$${formatNumber(formData.actualUSD)}` : ''}
-                                            {formData.actualUSD && formData.actualIQD ? ' + ' : ''}
-                                            {formData.actualIQD ? `${formatNumber(formData.actualIQD)} IQD` : ''}
+                                            {form.actualUSD ? `$${formatNumber(form.actualUSD)}` : ''}
+                                            {form.actualUSD && form.actualIQD ? ' + ' : ''}
+                                            {form.actualIQD ? `${formatNumber(form.actualIQD)} IQD` : ''}
                                         </span>
                                     </div>
-                                    {!isChangeDisabled && formData.change > 0 && (
+                                    {!isChangeDisabled && form.change > 0 && (
                                         <div className={styles.summaryItem}>
                                             <span className={styles.summaryLabel}>{t('summary.changeOut')}</span>
-                                            <span className={styles.summaryValue}>{formatNumber(formData.change)} IQD</span>
+                                            <span className={styles.summaryValue}>{formatNumber(form.change)} IQD</span>
                                         </div>
                                     )}
                                     <div className={`${styles.summaryItem} ${styles.summaryTotal}`}>
                                         <span className={styles.summaryLabel}>{t('summary.register')}</span>
-                                        <span className={styles.summaryValue}>{formatCurrency(Number(formData.amountToRegister) || 0, calculations.accountCurrency)}</span>
+                                        <span className={styles.summaryValue}>{formatCurrency(Number(form.amountToRegister) || 0, accountCurrency)}</span>
                                     </div>
-                                    {calculations.isShort && (
+                                    {isShort && (
                                         <div className={styles.summaryWarningText}>
                                             <i className="fas fa-exclamation-triangle"></i>
-                                            {t('summary.shortBy', { amount: formatCurrency((parseFloat(String(formData.amountToRegister)) || 0) - calculations.totalReceived, calculations.accountCurrency) })}
+                                            {t('summary.shortBy', { amount: formatCurrency((parseFloat(String(form.amountToRegister)) || 0) - (totals?.totalReceived ?? 0), accountCurrency) })}
                                         </div>
                                     )}
                                 </div>
@@ -1188,7 +803,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             <i className="fas fa-check-circle"></i>
                         </div>
                         <p className={styles.successAmount}>
-                            {formatCurrency(paidToday?.amount ?? 0, paidToday?.currency ?? calculations.accountCurrency)}
+                            {formatCurrency(paidToday?.amount ?? 0, paidToday?.currency ?? accountCurrency)}
                         </p>
                         <div className={styles.successActions}>
                             <button onClick={handlePrint} className="btn btn-primary">

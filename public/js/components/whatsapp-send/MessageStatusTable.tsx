@@ -8,6 +8,7 @@ import { MESSAGE_STATUS, type MessageStatusValue } from '../../utils/whatsapp-se
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
 import { formatISODate } from '../../core/utils';
+import { formatLocaleTime } from '../../utils/formatters';
 
 /**
  * WhatsApp-style delivery indicator for the Status column (Font Awesome):
@@ -138,14 +139,8 @@ export default function MessageStatusTable({
   };
 
   const getTimeSent = (msg: MessageItem): string => {
-    if (msg.timeSent) {
-      return new Date(msg.timeSent).toLocaleTimeString();
-    } else if (msg.sentAt) {
-      return new Date(msg.sentAt).toLocaleTimeString();
-    } else if (msg.timestamp) {
-      return new Date(msg.timestamp).toLocaleTimeString();
-    }
-    return 'Not sent';
+    const sent = msg.timeSent || msg.sentAt || msg.timestamp;
+    return sent ? formatLocaleTime(sent) : 'Not sent';
   };
 
   return (

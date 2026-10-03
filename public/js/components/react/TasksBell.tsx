@@ -1,43 +1,74 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
-import { tasksQuery } from '@/query/queries';
+import { tasksQuery, HEADER_BELL_POLL } from '@/query/queries';
 import {
     setTaskStatus,
     snoozeTask,
-    notifyTasksChanged,
+    invalidateTasks,
     dateFromTodayYmd,
-    TASKS_CHANGED_EVENT,
     type TaskRow,
 } from '@/services/tasks';
+import HeaderPopover, { RelativeAge } from './HeaderPopover';
 import TaskFormModal from './TaskFormModal';
 import styles from './TasksBell.module.css';
 
-const REFRESH_MS = 5 * 60 * 1000;
-const POPOVER_WIDTH = 360;
-
 const SEV_CLASS: Record<number, string> = { 1: styles.sev1, 2: styles.sev2, 3: styles.sev3 };
 
-function relAge(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    if (Number.isNaN(diff)) return '';
-    const day = 86_400_000;
-    if (diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))}m`;
-    if (diff < day) return `${Math.floor(diff / 3_600_000)}h`;
-    return `${Math.floor(diff / day)}d`;
-}
+/** Assignee-filter sentinels (any other value is a `String(assigned_to)`). */
+const FILTER_ALL = 'all';
+const FILTER_UNASSIGNED = 'unassigned';
+
+/**
+ * The custom-snooze date. It commits on *Set* or Enter, never on change: a date
+ * input fires `change` for every complete-looking value while the year is typed,
+ * so committing on change sent `0002-10-15` after the first year digit — a past
+ * date, and the task never left the bell (audit FE-F5-4).
+ */
+const SnoozeDate = ({ onSnooze }: { onSnooze: (ymd: string) => void }) => {
+    const { t } = useTranslation('tasks');
+    const toast = useToast();
+    const [value, setValue] = useState('');
+    const min = dateFromTodayYmd(1);
+    const commit = () => {
+        if (!value || value < min) {
+            toast.error(t('bell.snoozeDateInvalid'));
+            return;
+        }
+        onSnooze(value);
+    };
+    return (
+        <>
+            <input
+                type="date"
+                aria-label={t('bell.snoozeUntil')}
+                min={min}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commit();
+                    }
+                }}
+            />
+            <button type="button" onClick={commit} disabled={!value}>{t('bell.snoozeApply')}</button>
+        </>
+    );
+};
 
 /**
  * TasksBell — the app-wide task surface in the universal header. A quiet bell
  * (badge only when there are tasks; red pulse if any are severe) opens a popover
  * listing active push tasks + escalated context alerts, each with done / snooze /
- * edit / dismiss actions. Freshness: mount + 5-min poll + visibility refetch + the
- * `tasks:changed` window event (fired by every task/alert mutation app-wide).
+ * edit / dismiss actions. Freshness: `HEADER_BELL_POLL` + `invalidateTasks()`,
+ * which every task/alert write calls.
  */
 const TasksBell = () => {
+    const { t } = useTranslation('tasks');
     const navigate = useNavigate();
     const toast = useToast();
 
@@ -45,240 +76,195 @@ const TasksBell = () => {
     const [formOpen, setFormOpen] = useState(false);
     const [editTask, setEditTask] = useState<TaskRow | null>(null);
     const [snoozeFor, setSnoozeFor] = useState<number | null>(null);
-    // Assignee filter (feature #4): 'all' | 'unassigned' | a String(assigned_to).
-    const [filter, setFilter] = useState<string>('all');
-    // The popover is portaled to <body> (the fixed, overflow:hidden header would
-    // otherwise clip it), so it's positioned with viewport-fixed coords off the bell.
-    const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+    // Assignee filter (feature #4): FILTER_ALL | FILTER_UNASSIGNED | a String(assigned_to).
+    const [filter, setFilter] = useState<string>(FILTER_ALL);
 
-    const wrapRef = useRef<HTMLDivElement | null>(null);
-    const bellRef = useRef<HTMLButtonElement | null>(null);
-    const popRef = useRef<HTMLDivElement | null>(null);
+    const { data: tasks = [] } = useQuery({ ...tasksQuery(), ...HEADER_BELL_POLL });
 
-    const placePopover = useCallback(() => {
-        const r = bellRef.current?.getBoundingClientRect();
-        if (!r) return;
-        const left = Math.min(Math.max(8, r.right - POPOVER_WIDTH), window.innerWidth - POPOVER_WIDTH - 8);
-        setCoords({ top: r.bottom + 8, left: Math.max(8, left) });
-    }, []);
-
-    // Task list on React Query: the staleTime + 5-min `refetchInterval` cover the
-    // mount + poll; a stale read keeps the last good list. The visibility refetch
-    // and the app-wide `tasks:changed` event (fired by every task/alert mutation)
-    // are bridged to refetch below.
-    const { data: tasksData, refetch } = useQuery({ ...tasksQuery(), refetchInterval: REFRESH_MS });
-    const tasks = (tasksData ?? []) as TaskRow[];
-
-    useEffect(() => {
-        const onVisible = () => { if (document.visibilityState === 'visible') void refetch(); };
-        const onChanged = () => void refetch();
-        document.addEventListener('visibilitychange', onVisible);
-        window.addEventListener(TASKS_CHANGED_EVENT, onChanged);
-        return () => {
-            document.removeEventListener('visibilitychange', onVisible);
-            window.removeEventListener(TASKS_CHANGED_EVENT, onChanged);
-        };
-    }, [refetch]);
-
-    // Close the popover on outside click / Escape; keep it anchored on resize.
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e: MouseEvent) => {
-            const t = e.target as Node;
-            if (wrapRef.current?.contains(t) || popRef.current?.contains(t)) return;
-            setOpen(false); setSnoozeFor(null);
-        };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); setSnoozeFor(null); } };
-        document.addEventListener('mousedown', onDown);
-        document.addEventListener('keydown', onKey);
-        window.addEventListener('resize', placePopover);
-        return () => {
-            document.removeEventListener('mousedown', onDown);
-            document.removeEventListener('keydown', onKey);
-            window.removeEventListener('resize', placePopover);
-        };
-    }, [open, placePopover]);
+    const setOpenAndReset = (next: boolean) => {
+        setOpen(next);
+        if (!next) setSnoozeFor(null);
+    };
 
     const count = tasks.length;
-    const hasSevere = tasks.some((t) => t.alert_severity >= 3);
+    const hasSevere = tasks.some((task) => task.alert_severity >= 3);
 
     // Distinct assignees present in the current list, for the filter dropdown.
     const assignees = Array.from(
         new Map(
             tasks
-                .filter((t) => t.assigned_to != null)
-                .map((t) => [t.assigned_to as number, t.assignee_name ?? `#${t.assigned_to}`])
+                .filter((task) => task.assigned_to != null)
+                .map((task) => [task.assigned_to as number, task.assignee_name ?? `#${task.assigned_to}`])
         ).entries()
     ).map(([id, name]) => ({ id, name }));
-    const hasUnassigned = tasks.some((t) => t.assigned_to == null);
+    const hasUnassigned = tasks.some((task) => task.assigned_to == null);
     // Guard a stale selection (the picked assignee may have no tasks left).
     const effectiveFilter =
-        filter === 'all' ||
-        (filter === 'unassigned' && hasUnassigned) ||
+        filter === FILTER_ALL ||
+        (filter === FILTER_UNASSIGNED && hasUnassigned) ||
         assignees.some((a) => String(a.id) === filter)
             ? filter
-            : 'all';
+            : FILTER_ALL;
     const visibleTasks =
-        effectiveFilter === 'all'
+        effectiveFilter === FILTER_ALL
             ? tasks
-            : effectiveFilter === 'unassigned'
-                ? tasks.filter((t) => t.assigned_to == null)
-                : tasks.filter((t) => String(t.assigned_to) === effectiveFilter);
+            : effectiveFilter === FILTER_UNASSIGNED
+                ? tasks.filter((task) => task.assigned_to == null)
+                : tasks.filter((task) => String(task.assigned_to) === effectiveFilter);
     const showFilter = assignees.length > 0;
 
-    const runAction = async (fn: () => Promise<unknown>, failMsg: string) => {
+    const runAction = async (task: TaskRow, fn: () => Promise<unknown>, failMsg: string) => {
         try {
             await fn();
-            notifyTasksChanged();
+            await invalidateTasks(task.person_id);
         } catch (error) {
             toast.error(httpErrorMessage(error, failMsg));
         }
     };
 
-    const handleDone = (t: TaskRow) => runAction(() => setTaskStatus(t.alert_id, 'done'), 'Failed to complete task');
-    const handleDismiss = (t: TaskRow) => runAction(() => setTaskStatus(t.alert_id, 'dismissed'), 'Failed to dismiss task');
-    const handleSnooze = (t: TaskRow, ymd: string) => {
+    const handleDone = (task: TaskRow) =>
+        runAction(task, () => setTaskStatus(task.alert_id, 'done'), t('bell.completeFailed'));
+    const handleDismiss = (task: TaskRow) =>
+        runAction(task, () => setTaskStatus(task.alert_id, 'dismissed'), t('bell.dismissFailed'));
+    const handleSnooze = (task: TaskRow, ymd: string) => {
         setSnoozeFor(null);
-        return runAction(() => snoozeTask(t.alert_id, ymd), 'Failed to snooze task');
+        return runAction(task, () => snoozeTask(task.alert_id, ymd), t('bell.snoozeFailed'));
     };
 
     const openPatient = (personId: number) => {
-        setOpen(false);
+        setOpenAndReset(false);
         navigate(`/patient/${personId}/works`);
     };
 
-    const openEdit = (t: TaskRow) => { setEditTask(t); setFormOpen(true); setOpen(false); };
-    const openNew = () => { setEditTask(null); setFormOpen(true); setOpen(false); };
-    const openHistory = () => { setOpen(false); navigate('/tasks/history'); };
-
-    const toggleOpen = () => {
-        if (!open) placePopover();
-        setOpen((o) => !o);
-    };
+    const openEdit = (task: TaskRow) => { setEditTask(task); setFormOpen(true); setOpenAndReset(false); };
+    const openNew = () => { setEditTask(null); setFormOpen(true); setOpenAndReset(false); };
+    const openHistory = () => { setOpenAndReset(false); navigate('/tasks/history'); };
 
     return (
-        <div className={styles.wrap} ref={wrapRef}>
-            <button
-                type="button"
-                ref={bellRef}
-                className={styles.bellBtn}
-                onClick={toggleOpen}
-                aria-label={`Tasks${count ? ` (${count})` : ''}`}
-                aria-expanded={open}
-                title="Tasks"
-            >
-                <i className="fas fa-bell" aria-hidden="true" />
-                {count > 0 && (
+        <>
+            <HeaderPopover
+                open={open}
+                onOpenChange={setOpenAndReset}
+                bellLabel={count ? t('bell.titleCount', { n: count }) : t('bell.title')}
+                title={t('bell.title')}
+                icon="fa-bell"
+                width={360}
+                badge={count > 0 && (
                     <span className={`${styles.badge} ${hasSevere ? styles.badgeSevere : ''}`}>{count}</span>
                 )}
-            </button>
-
-            {open && coords && createPortal(
-                <div
-                    className={styles.popover}
-                    role="dialog"
-                    aria-label="Tasks"
-                    ref={popRef}
-                    style={{ position: 'fixed', top: coords.top, left: coords.left }}
-                >
-                    <div className={styles.popHeader}>
-                        <span>Tasks {count > 0 && <span className={styles.popCount}>{count}</span>}</span>
-                        <div className={styles.popHeaderActions}>
-                            <button
-                                type="button"
-                                className={styles.headerIconBtn}
-                                onClick={openHistory}
-                                title="All tasks"
-                                aria-label="All tasks"
-                            >
-                                <i className="fas fa-list-check" />
-                            </button>
-                            <button type="button" className={styles.newBtn} onClick={openNew}>
-                                <i className="fas fa-plus" /> New
-                            </button>
-                        </div>
+            >
+                <div className={styles.popHeader}>
+                    <span>{t('bell.title')} {count > 0 && <span className={styles.popCount}>{count}</span>}</span>
+                    <div className={styles.popHeaderActions}>
+                        <button
+                            type="button"
+                            className={styles.headerIconBtn}
+                            onClick={openHistory}
+                            title={t('bell.allTasks')}
+                            aria-label={t('bell.allTasks')}
+                        >
+                            <i className="fas fa-list-check" aria-hidden="true" />
+                        </button>
+                        <button type="button" className={styles.newBtn} onClick={openNew}>
+                            <i className="fas fa-plus" aria-hidden="true" /> {t('bell.new')}
+                        </button>
                     </div>
+                </div>
 
-                    {showFilter && (
-                        <div className={styles.filterRow}>
-                            <i className="fas fa-filter" aria-hidden="true" />
-                            <select
-                                className={styles.filterSelect}
-                                value={effectiveFilter}
-                                onChange={(e) => setFilter(e.target.value)}
-                                aria-label="Filter tasks by assignee"
-                            >
-                                <option value="all">Everyone</option>
-                                {hasUnassigned && <option value="unassigned">Unassigned</option>}
-                                {assignees.map((a) => (
-                                    <option key={a.id} value={String(a.id)}>{a.name}</option>
-                                ))}
-                            </select>
+                {showFilter && (
+                    <div className={styles.filterRow}>
+                        <i className="fas fa-filter" aria-hidden="true" />
+                        <select
+                            className={styles.filterSelect}
+                            value={effectiveFilter}
+                            onChange={(e) => setFilter(e.target.value)}
+                            aria-label={t('bell.filterLabel')}
+                        >
+                            <option value={FILTER_ALL}>{t('bell.everyone')}</option>
+                            {hasUnassigned && <option value={FILTER_UNASSIGNED}>{t('bell.unassigned')}</option>}
+                            {assignees.map((a) => (
+                                <option key={a.id} value={String(a.id)}>{a.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                <div className={styles.list}>
+                    {visibleTasks.length === 0 ? (
+                        <div className={styles.empty}>
+                            <i className="fas fa-check-circle" aria-hidden="true" />
+                            <span>{count === 0 ? t('bell.emptyAll') : t('bell.emptyFilter')}</span>
                         </div>
-                    )}
-
-                    <div className={styles.list}>
-                        {visibleTasks.length === 0 ? (
-                            <div className={styles.empty}>
-                                <i className="fas fa-check-circle" />
-                                <span>{count === 0 ? 'Nothing waiting on you' : 'No tasks for this filter'}</span>
-                            </div>
-                        ) : (
-                            visibleTasks.map((t) => (
-                                <div key={t.alert_id} className={styles.item}>
-                                    <span className={`${styles.sevBar} ${SEV_CLASS[t.alert_severity] ?? styles.sev2}`} />
-                                    <div className={styles.itemBody}>
-                                        <div className={styles.itemText}>{t.alert_details}</div>
-                                        <div className={styles.itemMeta}>
-                                            {t.person_id != null && (
-                                                <button type="button" className={styles.patientChip} onClick={() => { if (t.person_id != null) openPatient(t.person_id); }}>
-                                                    <i className="fas fa-user" /> {t.patient_name ?? `#${t.person_id}`}
-                                                </button>
-                                            )}
-                                            {t.AlertTypeName && <span className={styles.typeTag}>{t.AlertTypeName}</span>}
-                                            {t.assignee_name && (
-                                                <span className={styles.assigneeTag} title={`Assigned to ${t.assignee_name}`}>
-                                                    <i className="fas fa-user-tag" /> {t.assignee_name}
-                                                </span>
-                                            )}
-                                            {t.surface_mode === 'context' && <span className={styles.escTag} title="Escalated patient alert">escalated</span>}
-                                            <span className={styles.age}>{relAge(t.creation_date)}</span>
-                                        </div>
-
-                                        {snoozeFor === t.alert_id && (
-                                            <div className={styles.snoozeRow}>
-                                                <button type="button" onClick={() => handleSnooze(t, dateFromTodayYmd(1))}>Tomorrow</button>
-                                                <button type="button" onClick={() => handleSnooze(t, dateFromTodayYmd(7))}>Next week</button>
-                                                <input
-                                                    type="date"
-                                                    aria-label="Snooze until"
-                                                    onChange={(e) => e.target.value && handleSnooze(t, e.target.value)}
-                                                />
-                                            </div>
+                    ) : (
+                        visibleTasks.map((task) => (
+                            <div key={task.alert_id} className={styles.item}>
+                                <span className={`${styles.sevBar} ${SEV_CLASS[task.alert_severity] ?? styles.sev2}`} />
+                                <div className={styles.itemBody}>
+                                    <div className={styles.itemText}>{task.alert_details}</div>
+                                    <div className={styles.itemMeta}>
+                                        {task.person_id != null && (
+                                            <button
+                                                type="button"
+                                                className={styles.patientChip}
+                                                onClick={() => { if (task.person_id != null) openPatient(task.person_id); }}
+                                                title={t('bell.openPatient', { name: task.patient_name ?? `#${task.person_id}` })}
+                                            >
+                                                <i className="fas fa-user" aria-hidden="true" /> {task.patient_name ?? `#${task.person_id}`}
+                                            </button>
                                         )}
+                                        {task.AlertTypeName && <span className={styles.typeTag}>{task.AlertTypeName}</span>}
+                                        {task.assignee_name && (
+                                            <span className={styles.assigneeTag} title={t('bell.assignedTo', { name: task.assignee_name })}>
+                                                <i className="fas fa-user-tag" aria-hidden="true" /> {task.assignee_name}
+                                            </span>
+                                        )}
+                                        {task.surface_mode === 'context' && (
+                                            <span className={styles.escTag} title={t('bell.escalatedTitle')}>{t('bell.escalated')}</span>
+                                        )}
+                                        <RelativeAge iso={task.creation_date} className={styles.age} />
                                     </div>
 
-                                    <div className={styles.actions}>
-                                        <button type="button" title="Mark done" onClick={() => handleDone(t)}><i className="fas fa-check" /></button>
-                                        <button type="button" title="Snooze" onClick={() => setSnoozeFor((s) => (s === t.alert_id ? null : t.alert_id))}><i className="fas fa-clock" /></button>
-                                        <button type="button" title="Edit" onClick={() => openEdit(t)}><i className="fas fa-pen" /></button>
-                                        <button type="button" title="Dismiss" onClick={() => handleDismiss(t)}><i className="fas fa-times" /></button>
-                                    </div>
+                                    {snoozeFor === task.alert_id && (
+                                        <div className={styles.snoozeRow}>
+                                            <button type="button" onClick={() => handleSnooze(task, dateFromTodayYmd(1))}>{t('bell.snoozeTomorrow')}</button>
+                                            <button type="button" onClick={() => handleSnooze(task, dateFromTodayYmd(7))}>{t('bell.snoozeNextWeek')}</button>
+                                            <SnoozeDate onSnooze={(ymd) => handleSnooze(task, ymd)} />
+                                        </div>
+                                    )}
                                 </div>
-                            ))
-                        )}
-                    </div>
-                </div>,
-                document.body
-            )}
+
+                                <div className={styles.actions}>
+                                    <button type="button" title={t('bell.markDone')} aria-label={t('bell.markDone')} onClick={() => handleDone(task)}>
+                                        <i className="fas fa-check" aria-hidden="true" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        title={t('bell.snooze')}
+                                        aria-label={t('bell.snooze')}
+                                        aria-expanded={snoozeFor === task.alert_id}
+                                        onClick={() => setSnoozeFor((s) => (s === task.alert_id ? null : task.alert_id))}
+                                    >
+                                        <i className="fas fa-clock" aria-hidden="true" />
+                                    </button>
+                                    <button type="button" title={t('bell.edit')} aria-label={t('bell.edit')} onClick={() => openEdit(task)}>
+                                        <i className="fas fa-pen" aria-hidden="true" />
+                                    </button>
+                                    <button type="button" title={t('bell.dismiss')} aria-label={t('bell.dismiss')} onClick={() => handleDismiss(task)}>
+                                        <i className="fas fa-times" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </HeaderPopover>
 
             <TaskFormModal
                 isOpen={formOpen}
                 onClose={() => setFormOpen(false)}
-                onSaved={() => refetch()}
                 editTask={editTask}
             />
-        </div>
+        </>
     );
 };
 

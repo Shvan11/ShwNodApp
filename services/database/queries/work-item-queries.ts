@@ -11,6 +11,7 @@
  */
 import { sql, type Kysely } from 'kysely';
 import { getKysely, withPgTransaction, type Database } from '../kysely.js';
+import type { WorkItemRow } from '../../../shared/contracts/work.contract.js';
 
 /**
  * Normalize a form-supplied numeric value for a nullable numeric column.
@@ -24,34 +25,8 @@ function numericOrNull(value: number | string | null | undefined): number | null
 }
 
 
-// Row types that feed a `sendData(res, <looseObject>.response, …)` call are
-// `type` aliases, NOT `interface`s — a `z.looseObject` response infers a string
-// index signature, and an `interface` isn't assignable to an index-signatured
-// type (TS2345), whereas a `type` alias gets an implicit one. See the ⚠️ CRITICAL
-// looseObject-index-signature Finding in docs/shared-contract-progress.md.
-type WorkItem = {
-  id: number;
-  work_id: number;
-  filling_type: string | null;
-  filling_depth: string | null;
-  canals_no: number | null;
-  working_length: string | null;
-  implant_length: number | null;
-  implant_diameter: number | null;
-  implant_manufacturer_id: number | null;
-  ImplantManufacturerName: string | null;
-  material: string | null;
-  lab_id: number | null;
-  lab_name: string | null;
-  shade_system: string | null;
-  shade: string | null;
-  item_cost: number | null;
-  start_date: string | null;
-  completed_date: string | null;
-  note: string | null;
-  Teeth: string | null;
-  TeethIds: number[];
-};
+// One row of GET /api/getworkdetailslist, as the contract enumerates it (the SSoT).
+type WorkItem = WorkItemRow;
 
 interface WorkItemData {
   work_id: number;

@@ -6,7 +6,8 @@ import { useTranslation } from 'react-i18next';
 import type { Expense } from '../../hooks/useExpenses';
 import { useLocalizedName } from '../../hooks/useLocalizedName';
 import styles from '../../routes/Expenses.module.css';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, formatLocaleDate } from '../../utils/formatters';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Re-export the Expense type for convenience
 export type { Expense } from '../../hooks/useExpenses';
@@ -23,11 +24,10 @@ interface ExpenseTableProps {
 export default function ExpenseTable({ expenses, loading, onEdit, onDelete, writeFinance = true }: ExpenseTableProps) {
     const { t } = useTranslation('expenses');
     const localizedName = useLocalizedName();
+    const { language } = useLanguage();
 
-    const formatDate = (dateString: string | undefined): string => {
-        if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString();
-    };
+    const formatDate = (dateString: string | undefined): string =>
+        formatLocaleDate(dateString, undefined, language) || '-';
 
     if (loading) {
         return (

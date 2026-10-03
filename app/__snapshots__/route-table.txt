@@ -71,7 +71,6 @@ GET     /api/settings/patients-folder
 GET     /api/patients/phones
 GET     /api/patients/search  [validate(query)]
 GET     /api/patients/tag-options
-GET     /api/patients/type-options
 GET     /api/patients/:personId
 POST    /api/patients/transliterate-name  [authorize(admin|front_desk|clinical) -> validate(body)]
 POST    /api/patients  [authorize(admin|front_desk|clinical) -> validate(body)]

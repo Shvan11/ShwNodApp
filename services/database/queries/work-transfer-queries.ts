@@ -5,15 +5,16 @@
  * Split out of work-queries.ts: this is one self-contained feature whose only tie
  * to the core module is the `getWorkById` read it starts from.
  */
-import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { recomputePatientType } from './patient-type-classifier.js';
 import { getWorkById } from './work-queries.js';
 
 /**
- * Related record counts for work transfer preview
+ * Related record counts for work transfer preview — the records that move with the
+ * work. Wires are not among them: a visit's wire is a lookup reference, not a record
+ * of the patient's, and counting it inflated "Related Records" (audit FE-F7-11).
  */
-// `type` (not interface) — feeds a looseObject `sendData` response (transfer-preview);
+// `type` (not interface) — feeds a `sendData` response (transfer-preview);
 // imported only as a type by WorkService + re-exported, so the flip is safe.
 export type WorkRelatedCounts = {
   visits: number;
@@ -22,7 +23,6 @@ export type WorkRelatedCounts = {
   workItems: number;
   alignerSets: number;
   alignerBatches: number;
-  wires: number;
   implants: number;
   screws: number;
 };
@@ -78,13 +78,6 @@ export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedC
         .select(eb.fn.countAll<number>().as('c'))
         .where('s.work_id', '=', workId)
         .as('alignerBatches'),
-      // Distinct upper + lower wire ids referenced by this work's visits.
-      sql<number>`(
-        SELECT COUNT(DISTINCT "upper_wire_id") + COUNT(DISTINCT "lower_wire_id")
-        FROM "visits"
-        WHERE "work_id" = ${workId}
-          AND ("upper_wire_id" IS NOT NULL OR "lower_wire_id" IS NOT NULL)
-      )`.as('wires'),
       eb
         .selectFrom('implants')
         .select(eb.fn.countAll<number>().as('c'))
@@ -105,7 +98,6 @@ export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedC
     workItems: Number(row.workItems),
     alignerSets: Number(row.alignerSets),
     alignerBatches: Number(row.alignerBatches),
-    wires: Number(row.wires),
     implants: Number(row.implants),
     screws: Number(row.screws),
   };
@@ -113,7 +105,7 @@ export async function getWorkRelatedCounts(workId: number): Promise<WorkRelatedC
 
 /**
  * Transfer a work to a new patient
- * All related records (visits, invoices, wires, etc.) automatically follow
+ * All related records (visits, invoices, items, etc.) automatically follow
  * because they link via work_id, not person_id
  */
 export async function transferWork(

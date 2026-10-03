@@ -19,7 +19,6 @@ export const portalPatientSchema = z.object({
   lastName: z.string().nullable(),
   language: z.number().nullable(),
 });
-export type PortalPatientData = z.infer<typeof portalPatientSchema>;
 
 export const portalMeResponseSchema = z.object({
   success: z.boolean(),

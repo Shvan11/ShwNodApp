@@ -8,6 +8,7 @@ import ConfirmDialog from '../../components/react/ConfirmDialog';
 import { putJSON, patchJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { archformPatientsQuery, archformMatchesQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
+import { formatDate } from '@/core/utils';
 import type { ArchformPatient, AlignerSetForMatch } from './aligner.types';
 import styles from './ArchformMatcher.module.css';
 
@@ -150,15 +151,6 @@ const ArchformMatcher: React.FC = () => {
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [alignerSets]);
-
-    const formatDate = (dateString: string | null): string => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
 
     const handleSelectionChange = (archformId: number, option: SingleValue<SetOption>): void => {
         setSelections((prev) => ({

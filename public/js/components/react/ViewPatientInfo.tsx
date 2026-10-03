@@ -1,5 +1,6 @@
-import { useState, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { z } from 'zod';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import PhotoSessionDialog from './PhotoSessionDialog';
@@ -7,13 +8,18 @@ import AlertModal from './AlertModal';
 import WebCephModal from './WebCephModal';
 import PortalAccessCard from './PortalAccessCard';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { LANGUAGES } from '../../core/language';
+import { parseLocalDate } from '../../utils/calendarDate';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import { putJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { patientLanguageKey } from '@shared/patient-language';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
-import { notifyTasksChanged } from '@/services/tasks';
+import type * as patientContract from '@shared/contracts/patient.contract';
+import { invalidateTasks } from '@/services/tasks';
 import { patientInfoQuery, patientAlertsQuery, costPresetsQuery, alertTypesQuery } from '@/query/queries';
 import styles from './ViewPatientInfo.module.css';
 
@@ -21,41 +27,10 @@ interface Props {
     personId?: number | null;  // Validated PersonID from loader (null if invalid)
 }
 
-interface Alert {
-    alert_id: number;
-    alert_details: string;
-    alert_type_id?: number;
-    alert_severity?: number;
-    creation_date?: string;
-    surface_mode?: string;
-    expires_at?: string | null;
-    escalate_at?: string | null;
-}
-
-interface PatientInfo {
-    person_id: number;
-    patient_name?: string;
-    first_name?: string;
-    last_name?: string;
-    phone?: string;
-    phone2?: string;
-    email?: string;
-    DateOfBirth?: string;
-    gender?: string;
-    gender_display?: string;
-    address_name?: string;
-    referral_source?: string;
-    patient_type_name?: string;
-    tag_name?: string;
-    notes?: string;
-    date_added?: string;
-    country_code?: string;
-    DolphinId?: number | null;
-    estimated_cost?: string | number;
-    currency?: string;
-    language?: number;
-    AlertCount?: number;
-}
+// The parsed contract rows, read as they arrive (two hand-written interfaces used
+// to re-type them by assertion, with every nullable turned optional: FE-F6-10).
+type PatientInfo = z.infer<typeof patientContract.patientInfo.response>;
+type Alert = z.infer<typeof patientContract.alerts.response>[number];
 
 interface EditingCostState {
     value: string;
@@ -81,29 +56,37 @@ const ViewPatientInfo = ({ personId }: Props) => {
     const navigate = useNavigate();
     const location = useLocation();
     // Patient edit + estimated cost are FINANCE_ROLES on the server (FE-F6-6).
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     const caps = roleCaps(user?.role as UserRole | undefined);
     const toast = useToast();
+    const confirm = useConfirm();
+    const { language } = useLanguage();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
-    // Patient demographics now read from React Query (shared cache key with
-    // PatientShell/XraysComponent — one fetch, deduped, live-invalidated). The
-    // patientInfo response is a loose contract object; cast to the local
-    // PatientInfo shape the JSX/helpers expect, mirroring the original
-    // fetchJSON<PatientInfo> typing.
+    // Patient demographics read from React Query (shared cache key with
+    // PatientShell/XraysComponent — one fetch, deduped, live-invalidated).
     const { data: patientInfoData, isLoading: loading, error: queryError, refetch: refetchPatientInfo } = useQuery({
         ...patientInfoQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const patientInfo = (patientInfoData ?? null) as PatientInfo | null;
+    const patientInfo: PatientInfo | null = patientInfoData ?? null;
     const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
-    // Alerts, cost presets, and alert types now read from React Query (shared,
-    // deduped, live-invalidated). Casts mirror the original fetchJSON typings.
+    // A failed BACKGROUND refetch keeps the record on screen (React Query keeps
+    // `data` and sets `error`); it used to swap a good record for the error card
+    // (FE-F6-11a). Say so in a toast instead — once per failure.
+    useEffect(() => {
+        if (queryError && patientInfoData) {
+            toast.error(t('view.toast.refreshFailed', { error: httpErrorMessage(queryError, '') }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [queryError]);
+    // Alerts, cost presets, and alert types read from React Query (shared,
+    // deduped, live-invalidated).
     const { data: alertsData, isLoading: alertsLoading } = useQuery({
         ...patientAlertsQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const alerts = (alertsData ?? []) as Alert[];
+    const alerts: Alert[] = alertsData ?? [];
     const { data: alertTypesData } = useQuery(alertTypesQuery());
     const alertTypes: AlertType[] = alertTypesData ?? [];
     const { data: costPresetsData, isLoading: presetsLoading } = useQuery(costPresetsQuery());
@@ -116,9 +99,6 @@ const ViewPatientInfo = ({ personId }: Props) => {
     // Cost editing state
     const [editingCost, setEditingCost] = useState<EditingCostState | null>(null);
     const [savingCost, setSavingCost] = useState(false);
-
-    const reloadAlerts = () =>
-        queryClient.invalidateQueries({ queryKey: qk.patient.alerts(personId ?? '') });
 
     // Use validated PersonID from loader, fallback to patientInfo.person_id
     const validPersonId = personId ?? patientInfo?.person_id ?? null;
@@ -137,18 +117,20 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return next;
     });
 
-    const formatPhoneDisplay = (countryCode: string | undefined, phone: string | undefined): string => {
+    const formatPhoneDisplay = (countryCode: string | null, phone: string | null): string => {
         if (!phone) return '-';
         const formatted = formatPhoneForDisplay(phone);
         if (!countryCode) return formatted;
         return `+${countryCode.replace('+', '')} ${formatted}`;
     };
 
-    const formatDateDisplay = (dateStr: string | undefined): string => {
+    // In the app's language with Western digits (the browser's locale used to pick
+    // the digits: FE-F3-3), and date-only strings on their calendar day.
+    const formatDateDisplay = (dateStr: string | null): string => {
         if (!dateStr) return '-';
         try {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString(undefined, {
+            const date = parseLocalDate(dateStr);
+            return date.toLocaleDateString(LANGUAGES[language].locale, {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
@@ -161,16 +143,16 @@ const ViewPatientInfo = ({ personId }: Props) => {
     // Short-month date for the alert list (defined outside JSX so the format
     // option literals aren't flagged by the i18n ratchet; digits stay Western).
     const formatAlertDate = (dateStr: string): string =>
-        new Date(dateStr).toLocaleDateString(undefined, {
+        new Date(dateStr).toLocaleDateString(LANGUAGES[language].locale, {
             year: 'numeric',
             month: 'short',
             day: 'numeric'
         });
 
-    const calculateAge = (dateOfBirth: string | undefined): string => {
+    const calculateAge = (dateOfBirth: string | null): string => {
         if (!dateOfBirth) return '-';
         try {
-            const dob = new Date(dateOfBirth);
+            const dob = parseLocalDate(dateOfBirth);
             const today = new Date();
             let age = today.getFullYear() - dob.getFullYear();
             const monthDiff = today.getMonth() - dob.getMonth();
@@ -191,12 +173,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
     };
 
     // Format cost for display
-    const formatCostDisplay = (cost: string | number | undefined, currency: string | undefined): string => {
+    const formatCostDisplay = (cost: number | null, currency: string | null): string => {
         if (!cost) return '-';
-        const numericCost = typeof cost === 'string' ? parseFloat(cost) : cost;
-        if (isNaN(numericCost)) return '-';
-
-        const formattedNumber = numericCost.toLocaleString('en-US');
+        const formattedNumber = cost.toLocaleString('en-US');
         return `${formattedNumber} ${currency || 'IQD'}`;
     };
 
@@ -212,19 +191,22 @@ const ViewPatientInfo = ({ personId }: Props) => {
         return value.replace(/[^0-9]/g, '');
     };
 
-    // Handle alert modal save - refresh alerts list
-    const handleAlertSaved = async () => {
-        await reloadAlerts();
-    };
-
+    // Archiving a context alert is final from the UI (the task log lists header
+    // tasks only), so it asks first (FE-F6-11b).
     const handleDeleteAlert = async (alertId: number) => {
+        const ok = await confirm(t('view.alerts.archiveConfirm'), {
+            title: t('view.alerts.archiveConfirmTitle'),
+            confirmText: t('view.alerts.archiveConfirmButton'),
+            danger: true,
+        });
+        if (!ok) return;
         try {
             setDeletingAlertId(alertId);
             await putJSON(`/api/alerts/${alertId}/status`, { status: 'dismissed' });
 
-            reloadAlerts(); // Reload alerts
-            notifyTasksChanged();
-            toast.success(t('view.toast.alertDeleted'));
+            // The list here, and the bell when this alert was also in the header.
+            void invalidateTasks(personId);
+            toast.success(t('view.toast.alertArchived'));
         } catch (err) {
             console.error('Error deleting alert:', err);
             toast.error(httpErrorMessage(err, t('view.toast.alertDeleteFailed')));
@@ -297,7 +279,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
         );
     }
 
-    if (error) {
+    if (error && !patientInfo) {
         return (
             <div className={styles.patientInfoError}>
                 <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`}></i>
@@ -409,14 +391,16 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                         }}
                                         className={styles.patientAlertEdit}
                                         title={t('view.alerts.editTitle')}
+                                        aria-label={t('view.alerts.editTitle')}
                                     >
-                                        <i className="fas fa-pencil-alt"></i>
+                                        <i className="fas fa-pencil-alt" aria-hidden="true"></i>
                                     </button>
                                     <button
                                         onClick={() => handleDeleteAlert(alert.alert_id)}
                                         disabled={deletingAlertId === alert.alert_id}
                                         className={styles.patientAlertDelete}
                                         title={t('view.alerts.archiveTitle')}
+                                        aria-label={t('view.alerts.archiveTitle')}
                                     >
                                         {deletingAlertId === alert.alert_id ? (
                                             <i className="fas fa-spinner fa-spin"></i>
@@ -491,7 +475,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         <div className={styles.patientInfoRow}>
                             <span className={styles.patientInfoLabel}>{t('view.labels.gender')}</span>
                             <span className={styles.patientInfoValue}>
-                                {patientInfo.gender_display || patientInfo.gender || '-'}
+                                {patientInfo.gender_display || '-'}
                             </span>
                         </div>
                         <div className={styles.patientInfoRow}>
@@ -593,22 +577,28 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                 )}
                                 <div className={styles.patientCostEditActions}>
                                     <button
+                                        type="button"
                                         onClick={handleSaveCost}
                                         disabled={savingCost}
                                         className="btn btn-primary btn-sm"
+                                        aria-label={t('view.saveCost')}
+                                        title={t('view.saveCost')}
                                     >
                                         {savingCost ? (
-                                            <i className="fas fa-spinner fa-spin"></i>
+                                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                         ) : (
-                                            <i className="fas fa-check"></i>
+                                            <i className="fas fa-check" aria-hidden="true"></i>
                                         )}
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={handleCancelEditingCost}
                                         disabled={savingCost}
                                         className="btn btn-secondary btn-sm"
+                                        aria-label={t('view.cancelCost')}
+                                        title={t('view.cancelCost')}
                                     >
-                                        <i className="fas fa-times"></i>
+                                        <i className="fas fa-times" aria-hidden="true"></i>
                                     </button>
                                 </div>
                             </div>
@@ -668,7 +658,6 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         setShowAlertModal(false);
                         setEditingAlert(null);
                     }}
-                    onSave={handleAlertSaved}
                     personId={validPersonId}
                     alertTypes={alertTypes}
                     editAlert={editingAlert}

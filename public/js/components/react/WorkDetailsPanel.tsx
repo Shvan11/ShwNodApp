@@ -2,43 +2,18 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getWorkTypeConfig } from '../../config/workTypeConfig';
 import { workDetailsListQuery, teethQuery, implantManufacturersQuery, shadesQuery, labsQuery } from '@/query/queries';
-import WorkDetailItem, { type ImplantManufacturer, type ShadeSystemOption, type LabOption } from './WorkDetailItem';
-import { type ToothOption } from './TeethSelector';
+import type { WorkItemRow } from '@shared/contracts/work.contract';
+import WorkDetailItem from './WorkDetailItem';
 import styles from './WorkDetailsPanel.module.css';
 
-/** A single treatment-item (procedure) row under a work. */
-export interface WorkDetail {
-    id: number;
-    work_id: number;
-    TeethIds?: number[];
-    Teeth?: string;
-    ImplantManufacturerName?: string;
-    filling_type?: string;
-    filling_depth?: string;
-    canals_no?: number;
-    working_length?: string;
-    implant_length?: number;
-    implant_diameter?: number;
-    implant_manufacturer_id?: number;
-    material?: string;
-    lab_id?: number;
-    lab_name?: string;
-    shade_system?: string;
-    shade?: string;
-    item_cost?: number;
-    start_date?: string;
-    completed_date?: string;
-    note?: string;
-    /** Set once "Start Lab Flow" has been used on this item (Crown/Bridge, Veneers). */
-    lab_case_id?: number | null;
-    lab_status?: string | null;
-    // Allow dynamic access for work type display fields
-    [key: string]: string | number | number[] | null | undefined;
-}
+/** A single treatment-item (procedure) row under a work — the contract's row (FE-F7-17). */
+export type WorkDetail = WorkItemRow;
 
 interface WorkDetailsPanelProps {
     workId: number;
     typeOfWork: number;
+    /** An item editor gained or lost unsaved input (keyed per item) — the card asks before a collapse discards it. */
+    onItemDirtyChange?: (key: string, dirty: boolean) => void;
 }
 
 /**
@@ -48,22 +23,22 @@ interface WorkDetailsPanelProps {
  * with read + in-place edit modes. "Add Item" appends a blank card in edit mode;
  * all writes invalidate the shared detailsList key to refresh here.
  */
-const WorkDetailsPanel = ({ workId, typeOfWork }: WorkDetailsPanelProps) => {
+const WorkDetailsPanel = ({ workId, typeOfWork, onItemDirtyChange }: WorkDetailsPanelProps) => {
     const config = getWorkTypeConfig(typeOfWork);
     const { data, isLoading, isError } = useQuery(workDetailsListQuery(workId));
-    const details = (data ?? []) as WorkDetail[];
+    const details = data ?? [];
 
     const { data: teethData } = useQuery(teethQuery());
-    const teethOptions = (teethData?.teeth ?? []) as ToothOption[];
+    const teethOptions = teethData?.teeth ?? [];
 
     const { data: manufacturersData } = useQuery(implantManufacturersQuery());
-    const implantManufacturers = (manufacturersData ?? []) as ImplantManufacturer[];
+    const implantManufacturers = manufacturersData ?? [];
 
     const { data: shadesData } = useQuery(shadesQuery());
-    const shadeSystems = (shadesData?.systems ?? []) as ShadeSystemOption[];
+    const shadeSystems = shadesData?.systems ?? [];
 
     const { data: labsData } = useQuery(labsQuery());
-    const labs = (labsData ?? []) as LabOption[];
+    const labs = labsData ?? [];
 
     const [isAdding, setIsAdding] = useState(false);
 
@@ -96,6 +71,7 @@ const WorkDetailsPanel = ({ workId, typeOfWork }: WorkDetailsPanelProps) => {
                                 implantManufacturers={implantManufacturers}
                                 shadeSystems={shadeSystems}
                                 labs={labs}
+                                onDirtyChange={onItemDirtyChange}
                             />
                         ))}
                         {isAdding && (
@@ -109,6 +85,7 @@ const WorkDetailsPanel = ({ workId, typeOfWork }: WorkDetailsPanelProps) => {
                                 labs={labs}
                                 startInEdit
                                 onCloseNew={() => setIsAdding(false)}
+                                onDirtyChange={onItemDirtyChange}
                             />
                         )}
                         {details.length === 0 && !isAdding && (

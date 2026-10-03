@@ -5,15 +5,16 @@
  */
 
 import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useUnsavedRouteGuard } from '../../hooks/useUnsavedRouteGuard';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatNumber, parseFormattedNumber } from '../../utils/formatters';
+import { formatNumber, parseFormattedNumber, formatLocaleDate } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
-import { useGlobalState } from '../../contexts/GlobalStateContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { useToast } from '../../contexts/ToastContext';
 import { qk } from '@/query/keys';
-import { notifyApprovalsChanged } from '@/services/approvals';
+import { invalidateApprovals } from '@/services/approvals';
 import * as workContract from '@shared/contracts/work.contract';
 import { WORK_CURRENCIES, DEFAULT_WORK_CURRENCY_OPTION, parseWorkCurrency } from '@shared/work-currency';
 import {
@@ -84,40 +85,49 @@ interface WorkFormData {
     createAsFinished: boolean;
 }
 
-interface WorkResponse {
-    work_id: number;
-    person_id: number;
-    type_of_work?: number;
-    total_required?: number;
-    currency?: string;
-    notes?: string;
-    status?: number;
-    start_date?: string;
-    debond_date?: string;
-    f_photo_date?: string;
-    i_photo_date?: string;
-    estimated_duration?: number;
-    dr_id?: number;
-    notes_date?: string;
-    keyword_id_1?: number;
-    keyword_id_2?: number;
-    keyword_id_3?: number;
-    keyword_id_4?: number;
-    keyword_id_5?: number;
-    discount?: number | null;
-    discount_date?: string | null;
-    discount_reason?: string | null;
-    TotalPaid?: number;
-}
-
 interface NewWorkComponentProps {
     personId?: number | null;
     workId?: number | null;
-    onSave?: (result: WorkResponse) => void;
+    /** The save went through (or was held for approval); the caller navigates away. */
+    onSave?: () => void;
     onCancel?: () => void;
 }
 
 type TabType = 'basic' | 'dates' | 'keywords';
+
+/** The tabs, in order — ids for the tablist/tabpanel wiring. */
+const TABS: readonly { id: TabType; icon: string; label: string }[] = [
+    { id: 'basic', icon: 'fa-info-circle', label: 'Basic Info' },
+    { id: 'dates', icon: 'fa-calendar', label: 'Dates' },
+    { id: 'keywords', icon: 'fa-tags', label: 'Keywords' },
+];
+
+const EMPTY_FORM: WorkFormData = {
+    person_id: '',
+    total_required: 0, // Default to 0 instead of empty string (matches DB default)
+    // Seeded below from the clinic default (new work) or the work's own currency (edit).
+    // Never a literal: this used to be 'USD' in a clinic whose works are 79 % IQD.
+    currency: '',
+    type_of_work: '',
+    notes: '',
+    status: 1, // 1=Active, 2=Finished, 3=Discontinued
+    start_date: '',
+    debond_date: '',
+    f_photo_date: '',
+    i_photo_date: '',
+    estimated_duration: '',
+    dr_id: '',
+    notes_date: '',
+    keyword_id_1: '',
+    keyword_id_2: '',
+    keyword_id_3: '',
+    keyword_id_4: '',
+    keyword_id_5: '',
+    discount: 0,
+    discount_date: '',
+    discount_reason: '',
+    createAsFinished: false
+};
 
 const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWorkComponentProps) => {
     const queryClient = useQueryClient();
@@ -162,33 +172,15 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     const [pendingFormData, setPendingFormData] = useState<WorkFormData | null>(null);
     const [showFinishedWorkConfirm, setShowFinishedWorkConfirm] = useState(false);
 
-    // Form state
-    const [formData, setFormData] = useState<WorkFormData>({
-        person_id: personId ? String(personId) : '',
-        total_required: 0, // Default to 0 instead of empty string (matches DB default)
-        // Seeded below from the clinic default (new work) or the work's own currency (edit).
-        // Never a literal: this used to be 'USD' in a clinic whose works are 79 % IQD.
-        currency: '',
-        type_of_work: '',
-        notes: '',
-        status: 1, // 1=Active, 2=Finished, 3=Discontinued
-        start_date: '',
-        debond_date: '',
-        f_photo_date: '',
-        i_photo_date: '',
-        estimated_duration: '',
-        dr_id: '',
-        notes_date: '',
-        keyword_id_1: '',
-        keyword_id_2: '',
-        keyword_id_3: '',
-        keyword_id_4: '',
-        keyword_id_5: '',
-        discount: 0,
-        discount_date: '',
-        discount_reason: '',
-        createAsFinished: false
-    });
+    // Form state. `baseline` is what the form opened with (after seeding), so "dirty"
+    // means the user changed something — the unsaved-work guard below reads it.
+    const initialForm: WorkFormData = { ...EMPTY_FORM, person_id: personId ? String(personId) : '' };
+    const [formData, setFormData] = useState<WorkFormData>(initialForm);
+    const [baseline, setBaseline] = useState<WorkFormData>(initialForm);
+    // Every field write goes through the functional updater: a spread of the render's
+    // `formData` loses a concurrent write (FE-F6-4's shape, FE-F7-15).
+    const setField = <K extends keyof WorkFormData>(key: K, value: WorkFormData[K]) =>
+        setFormData(prev => ({ ...prev, [key]: value }));
 
     // Display state for formatted values
     const [displayValues, setDisplayValues] = useState({
@@ -196,13 +188,19 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         discount: ''
     });
 
-    // Existing work financial snapshot (for discount validation)
-    const [existingTotalPaid, setExistingTotalPaid] = useState<number>(0);
+    // The work being edited, live from the works read. Its payments total and its doctor
+    // are read from it on every render (a colleague's payment on another PC moves them),
+    // while the FORM is seeded from it once — below.
+    const existingWork = workId ? worksData?.find(w => w.work_id === workId) : undefined;
+    // Existing work financial facts (discount validation, the currency lock)
+    const existingTotalPaid = Number(existingWork?.TotalPaid ?? 0);
     // The work's CURRENT doctor (edit mode), kept so the Doctor select can always show
     // it — a quit doctor, or anyone else outside the work-doctor list (FE-F7-1).
-    const [currentDoctor, setCurrentDoctor] = useState<Doctor | null>(null);
+    const currentDoctor: Doctor | null = existingWork?.dr_id != null
+        ? { id: existingWork.dr_id, employee_name: `${existingWork.doctor_name ?? `#${existingWork.dr_id}`} (current)` }
+        : null;
 
-    const { user } = useGlobalState();
+    const user = useAuthUser();
     // Clinical staff (doctors/assistants) add works without a cost — the cost/
     // currency inputs and the "mark as finished" (paid) shortcut are finance-only.
     // Editing a work (and finishing one) is `editRecords`; a direct discount is `adminWrites`.
@@ -210,11 +208,13 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
 
     // A NEW work's currency starts at the clinic default once it has loaded — never over
     // a currency the user already picked, and never in edit mode (the work's own wins).
+    // The baseline takes it too: a default is not a change the user made.
     const [defaultCurrencyApplied, setDefaultCurrencyApplied] = useState(false);
     if (!workId && !defaultCurrencyApplied && defaultCurrency) {
         setDefaultCurrencyApplied(true);
         if (!formData.currency) {
             setFormData(prev => ({ ...prev, currency: defaultCurrency }));
+            setBaseline(prev => ({ ...prev, currency: defaultCurrency }));
         }
     }
 
@@ -246,20 +246,18 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         }));
     }
 
-    // Populate the form when the works list arrives (edit mode), picking out the row
-    // for this workId — keyed on (worksData, workId) so it re-seeds on refetch.
-    // Mirrors the old loadWorkData population exactly — same nullish-coalescing
-    // (preserve 0) and String(...) coercion.
-    const [seededWork, setSeededWork] = useState<{ data: unknown; id: number | null }>({ data: null, id: null });
-    if (seededWork.data !== worksData || seededWork.id !== workId) {
-        setSeededWork({ data: worksData, id: workId });
-        // worksData is the contracted WorkRow[]; the field reads below are all
-        // null-safe (?? / || / ?:), so it's used directly — no cast.
-        const work = worksData?.find(w => w.work_id === workId);
-        if (work) {
+    // Populate the form ONCE per work, when its row first arrives (edit mode). It used to
+    // re-seed on every refetch that changed data, so a colleague's payment on another PC
+    // wiped the edits in progress here (FE-F7-15). Same nullish-coalescing (preserve 0)
+    // and String(...) coercion as the old loadWorkData.
+    const [seededWorkId, setSeededWorkId] = useState<number | null>(null);
+    if (existingWork && seededWorkId !== workId) {
+        setSeededWorkId(workId);
+        {
+            const work = existingWork;
             const discountDateISO = work.discount_date ? formatISODate(work.discount_date) : '';
             const discountValue = Number(work.discount ?? 0);
-            setFormData({
+            const seeded: WorkFormData = {
                 person_id: String(work.person_id),
                 total_required: work.total_required ?? 0, // Use nullish coalescing to preserve 0
                 currency: work.currency ?? '',
@@ -282,15 +280,20 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 discount_date: discountDateISO,
                 discount_reason: work.discount_reason || '',
                 createAsFinished: false
-            });
-            setExistingTotalPaid(Number(work.TotalPaid ?? 0));
-            setCurrentDoctor(
-                work.dr_id != null
-                    ? { id: work.dr_id, employee_name: `${work.doctor_name ?? `#${work.dr_id}`} (current)` }
-                    : null
-            );
+            };
+            setFormData(seeded);
+            setBaseline(seeded);
         }
     }
+
+    // Unsaved-work guard for this full-page form (FE-F7-15): leaving with changes asks
+    // first, through the same dialog the modal forms use.
+    const dirty = JSON.stringify(formData) !== JSON.stringify(baseline);
+    const { allowNextNavigation } = useUnsavedRouteGuard(dirty);
+    const finishSave = () => {
+        allowNextNavigation();
+        onSave?.();
+    };
 
     // Surface a work-record load failure in the existing error banner (the old
     // loadWorkData did setError(...) on its catch), once per error transition.
@@ -329,8 +332,6 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         try {
             setLoading(true);
 
-            // Both endpoints return the raw WorkResponse (no envelope) → fetchData passthrough.
-            let result: WorkResponse;
             if (workId) {
                 // Update existing work
                 // Send all fields - backend middleware handles authorization
@@ -352,13 +353,12 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     toast.success('Submitted for admin approval');
                     // A request was created but no row changed — tell the approval bells
                     // (they only hear about a RESOLVED request otherwise, and poll every 5 min).
-                    notifyApprovalsChanged();
-                    if (onSave) onSave({} as WorkResponse);
+                    void invalidateApprovals();
+                    finishSave();
                     return;
                 }
                 queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
                 queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
-                result = {} as WorkResponse;
             } else {
                 // Add new work - use special endpoint if createAsFinished is true
                 // Strip discount fields from creation payload (not supported at creation)
@@ -369,7 +369,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 const schema = formData.createAsFinished
                     ? workContract.addWorkWithInvoice.response
                     : workContract.addWork.response;
-                result = await postJSON<WorkResponse>(endpoint, creationData, { schema });
+                await postJSON(endpoint, creationData, { schema });
                 // Refresh the patient's works list (+ info/timepoints) so the new
                 // work shows immediately on navigating back — without this the
                 // still-fresh cache (30s staleTime) serves the stale list until a
@@ -377,9 +377,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
             }
 
-            if (onSave) {
-                onSave(result);
-            }
+            finishSave();
         } catch (err) {
             // Conflict context travels on the thrown HttpError's parsed body. The standard
             // envelope nests code/existingWork under `details`; the top-level keys are kept
@@ -445,16 +443,14 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                       return rest;
                   })()
                 : pendingFormData;
-            const result = await postJSON<WorkResponse>('/api/addwork', pendingCreation, { schema: workContract.addWork.response })
+            await postJSON('/api/addwork', pendingCreation, { schema: workContract.addWork.response })
                 .catch((addErr) => {
                     throw new Error(httpErrorMessage(addErr, 'Failed to add new work'));
                 });
             // Refresh again after the new work lands so the works list reflects it
             // immediately on navigating back (the earlier invalidate ran before this add).
             queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
-            if (onSave) {
-                onSave(result);
-            }
+            finishSave();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
@@ -523,6 +519,22 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         );
     }
 
+    // A stale or deleted workId used to render a BLANK edit form (FE-F7-15).
+    if (workId && worksData && !existingWork) {
+        return (
+            <div className={styles.newWorkComponent}>
+                <div className={styles.newWorkError} role="alert">
+                    <i className="fas fa-exclamation-circle"></i> This work no longer exists — it may have been deleted or moved to another patient.
+                    {onCancel && (
+                        <button type="button" onClick={onCancel} className="btn btn-secondary">
+                            <i className="fas fa-arrow-left"></i> Back
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={styles.newWorkComponent}>
             {/* Header */}
@@ -570,7 +582,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     <strong>Total Required:</strong> {existingWorkData.totalRequired} {existingWorkData.currency}
                                 </div>
                                 <div className={styles.detailRow}>
-                                    <strong>Added:</strong> {existingWorkData.additionDate ? new Date(existingWorkData.additionDate).toLocaleDateString() : 'N/A'}
+                                    <strong>Added:</strong> {formatLocaleDate(existingWorkData.additionDate) || 'N/A'}
                                 </div>
                             </div>
                             <p className={styles.confirmationQuestion}>
@@ -643,7 +655,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         <strong>Amount:</strong> {formData.total_required} {formData.currency}
                                     </div>
                                     <div className={styles.detailRow}>
-                                        <strong>Date:</strong> Today ({new Date().toLocaleDateString()})
+                                        <strong>Date:</strong> Today ({formatLocaleDate(new Date())})
                                     </div>
                                 </div>
                             </div>
@@ -685,39 +697,38 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 </div>
 
                 {/* Tabs */}
-                <div className={styles.workTabs}>
-                    <button
-                        type="button"
-                        className={`${styles.workTab} ${activeTab === 'basic' ? styles.workTabActive : ''}`}
-                        onClick={() => setActiveTab('basic')}
-                    >
-                        <i className="fas fa-info-circle"></i> Basic Info
-                    </button>
-                    <button
-                        type="button"
-                        className={`${styles.workTab} ${activeTab === 'dates' ? styles.workTabActive : ''}`}
-                        onClick={() => setActiveTab('dates')}
-                    >
-                        <i className="fas fa-calendar"></i> Dates
-                    </button>
-                    <button
-                        type="button"
-                        className={`${styles.workTab} ${activeTab === 'keywords' ? styles.workTabActive : ''}`}
-                        onClick={() => setActiveTab('keywords')}
-                    >
-                        <i className="fas fa-tags"></i> Keywords
-                    </button>
+                <div className={styles.workTabs} role="tablist" aria-label="Work form sections">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            role="tab"
+                            id={`work-tab-${tab.id}`}
+                            aria-selected={activeTab === tab.id}
+                            aria-controls={`work-tabpanel-${tab.id}`}
+                            className={`${styles.workTab} ${activeTab === tab.id ? styles.workTabActive : ''}`}
+                            onClick={() => setActiveTab(tab.id)}
+                        >
+                            <i className={`fas ${tab.icon}`} aria-hidden="true"></i> {tab.label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Tab 1: Basic Information */}
-                <div data-tab="basic" className={`${styles.tabContent} ${activeTab === 'basic' ? styles.tabContentActive : ''}`}>
+                <div
+                    data-tab="basic"
+                    role="tabpanel"
+                    id="work-tabpanel-basic"
+                    aria-labelledby="work-tab-basic"
+                    className={`${styles.tabContent} ${activeTab === 'basic' ? styles.tabContentActive : ''}`}
+                >
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
                             <label htmlFor="work-type">Work Type <span className={styles.required}>*</span></label>
                             <select
                                 id="work-type"
                                 value={formData.type_of_work}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type_of_work: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('type_of_work', e.target.value)}
                                 required
                             >
                                 <option value="">Select Type</option>
@@ -735,7 +746,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-doctor"
                                 name="dr_id"
                                 value={formData.dr_id}
-                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, dr_id: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('dr_id', e.target.value)}
                                 required
                             >
                                 <option value="">Select Doctor</option>
@@ -755,7 +766,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <select
                                     id="work-status"
                                     value={formData.status}
-                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setFormData({...formData, status: parseInt(e.target.value, 10)})}
+                                    onChange={(e: ChangeEvent<HTMLSelectElement>) => setField('status', parseInt(e.target.value, 10))}
                                     required
                                 >
                                     <option value={1}>Active</option>
@@ -835,7 +846,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     <input
                                         type="checkbox"
                                         checked={formData.createAsFinished}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, createAsFinished: e.target.checked})}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setField('createAsFinished', e.target.checked)}
                                         disabled={!formData.total_required || formData.total_required <= 0}
                                     />
                                     <span>
@@ -867,7 +878,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         value={displayValues.discount}
                                         onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                             const numericValue = parseFormattedNumber(e.target.value) || 0;
-                                            setFormData({ ...formData, discount: numericValue });
+                                            setField('discount', numericValue);
                                             setDisplayValues(prev => ({ ...prev, discount: e.target.value }));
                                         }}
                                         onBlur={() => {
@@ -892,7 +903,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         type="date"
                                         value={formData.discount_date}
                                         disabled={formData.discount <= 0}
-                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, discount_date: e.target.value })}
+                                        onChange={(e: ChangeEvent<HTMLInputElement>) => setField('discount_date', e.target.value)}
                                     />
                                     {formData.discount > 0 && !formData.discount_date && (
                                         <small className={styles.formHint}>
@@ -907,7 +918,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 <textarea
                                     id="work-discount-reason"
                                     value={formData.discount_reason}
-                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, discount_reason: e.target.value })}
+                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setField('discount_reason', e.target.value)}
                                     rows={2}
                                     maxLength={500}
                                     placeholder="Why was the discount granted? (visible on work card, not on receipt)"
@@ -923,7 +934,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-start-date"
                                 type="date"
                                 value={formData.start_date}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, start_date: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setField('start_date', e.target.value)}
                             />
                         </div>
 
@@ -933,7 +944,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-estimated-duration"
                                 type="number"
                                 value={formData.estimated_duration}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, estimated_duration: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setField('estimated_duration', e.target.value)}
                                 min="1"
                                 max="255"
                             />
@@ -945,7 +956,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <textarea
                             id="work-notes"
                             value={formData.notes}
-                            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setFormData({...formData, notes: e.target.value})}
+                            onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setField('notes', e.target.value)}
                             rows={3}
                             placeholder="Additional notes about this work..."
                         />
@@ -953,7 +964,13 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 </div>
 
                 {/* Tab 2: Dates */}
-                <div data-tab="dates" className={`${styles.tabContent} ${activeTab === 'dates' ? styles.tabContentActive : ''}`}>
+                <div
+                    data-tab="dates"
+                    role="tabpanel"
+                    id="work-tabpanel-dates"
+                    aria-labelledby="work-tab-dates"
+                    className={`${styles.tabContent} ${activeTab === 'dates' ? styles.tabContentActive : ''}`}
+                >
                     <div className={styles.formRow}>
                         <div className={styles.formGroup}>
                             <label htmlFor="work-i-photo-date">Initial Photo Date</label>
@@ -961,7 +978,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-i-photo-date"
                                 type="date"
                                 value={formData.i_photo_date}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, i_photo_date: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setField('i_photo_date', e.target.value)}
                             />
                         </div>
 
@@ -971,7 +988,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-f-photo-date"
                                 type="date"
                                 value={formData.f_photo_date}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, f_photo_date: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setField('f_photo_date', e.target.value)}
                             />
                         </div>
                     </div>
@@ -983,7 +1000,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-debond-date"
                                 type="date"
                                 value={formData.debond_date}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, debond_date: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setField('debond_date', e.target.value)}
                             />
                         </div>
 
@@ -993,14 +1010,20 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 id="work-notes-date"
                                 type="date"
                                 value={formData.notes_date}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({...formData, notes_date: e.target.value})}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) => setField('notes_date', e.target.value)}
                             />
                         </div>
                     </div>
                 </div>
 
                 {/* Tab 3: Keywords */}
-                <div data-tab="keywords" className={`${styles.tabContent} ${activeTab === 'keywords' ? styles.tabContentActive : ''}`}>
+                <div
+                    data-tab="keywords"
+                    role="tabpanel"
+                    id="work-tabpanel-keywords"
+                    aria-labelledby="work-tab-keywords"
+                    className={`${styles.tabContent} ${activeTab === 'keywords' ? styles.tabContentActive : ''}`}
+                >
                     <div className={styles.keywordsSection}>
                         <p className={styles.sectionHint}>
                             <i className="fas fa-info-circle"></i> Select up to 5 keywords to categorize this work
@@ -1008,17 +1031,13 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <div className={styles.keywordsGrid}>
                             {([1, 2, 3, 4, 5] as const).map(num => {
                                 // Get the keyword field value with proper type handling
-                                const keywordField = `keyword_id_${num}` as keyof WorkFormData;
-                                const keywordValue = String(formData[keywordField] || '');
+                                const keywordValue = formData[`keyword_id_${num}`];
                                 return (
                                 <div key={num} className={styles.formGroup}>
                                     <label>Keyword {num}</label>
                                     <select
                                         value={keywordValue}
-                                        onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-                                            const field = `keyword_id_${num}`;
-                                            setFormData({...formData, [field]: e.target.value});
-                                        }}
+                                        onChange={(e: ChangeEvent<HTMLSelectElement>) => setField(`keyword_id_${num}`, e.target.value)}
                                     >
                                         <option value="">Select Keyword</option>
                                         {keywords.map(kw => (
