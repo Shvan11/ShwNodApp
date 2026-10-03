@@ -16,11 +16,14 @@ import EditTimepointModal from './EditTimepointModal';
 import DeleteTimepointModal from './DeleteTimepointModal';
 import PhotoSessionDialog from './PhotoSessionDialog';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
+import SessionListMenu from './SessionListMenu';
 import ShareSheet from './share/ShareSheet';
 import type { ShareSource } from './localsend/LocalSendShareModal';
 import { encodeRelPath, buildWorkingContentUrl } from './files/fileHelpers';
 import type { PhotoViewCode } from '@shared/photo-views';
 import sseAppointments from '../../services/sse-appointments';
+import { useDragScroll } from '../../hooks/useDragScroll';
+import { rememberPhotoTab } from '../../hooks/useLastPhotoTab';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import type { PhotoSwipe as PhotoSwipeInstance } from 'photoswipe/lightbox';
 import 'photoswipe/style.css';
@@ -818,9 +821,77 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // photos" means at least one view actually resolved to a rendered image.
     const hasRealPhotos = !!gallery && Object.values(gallery).some(Boolean);
     // Whether the current tpCode is actually one of this patient's sessions. The
-    // sidebar Photos button always points at tp0, which often doesn't exist.
+    // sidebar Photos button points at tp0 until a session has been viewed, and tp0
+    // often doesn't exist.
     const selectedTpExists = timepoints.some((tp) => tp.tp_code === tpCode);
     const noSessions = !loadingTimepoints && timepoints.length === 0;
+
+    // The sidebar's Photos button reopens whichever real session was last on screen.
+    useEffect(() => {
+        if (personId && selectedTpExists) rememberPhotoTab(personId, tpCode);
+    }, [personId, tpCode, selectedTpExists]);
+
+    // A long session strip scrolls by mouse drag as well as by its scrollbar.
+    const tabStripRef = useRef<HTMLDivElement>(null);
+    const tabStripDrag = useDragScroll(tabStripRef);
+    // The "All sessions" list is offered only while the strip overflows. Observing
+    // the tabs too (not just the strip) catches a width change the strip's own size
+    // doesn't show: a rename, or the webfont arriving after first layout. Showing the
+    // button only narrows the strip, so it can never flip itself back off.
+    const [stripOverflows, setStripOverflows] = useState(false);
+    useEffect(() => {
+        const strip = tabStripRef.current;
+        if (!strip) return;
+        const ro = new ResizeObserver(() => setStripOverflows(strip.scrollWidth > strip.clientWidth + 1));
+        ro.observe(strip);
+        for (const child of strip.children) ro.observe(child);
+        return () => ro.disconnect();
+    }, [timepointsData]);
+
+    // Bring the active tab into view when it is off-screen — on arrival (a remembered
+    // session can sit far down the strip), after a click on a half-hidden tab, and
+    // once the "All sessions" button appears and narrows the strip under it.
+    useEffect(() => {
+        const strip = tabStripRef.current;
+        const active = strip?.querySelector<HTMLElement>('[aria-current="true"]')?.parentElement;
+        if (!strip || !active) return;
+        const s = strip.getBoundingClientRect();
+        const a = active.getBoundingClientRect();
+        if (a.left >= s.left && a.right <= s.right) return;
+        strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2;
+    }, [tpCode, timepointsData, stripOverflows]);
+
+    const [sessionList, setSessionList] = useState<{ x: number; y: number } | null>(null);
+
+    // ← / → step to the previous / next session, in strip order (mirrored if the
+    // page is ever RTL). Stays out of the way of anything else that owns the arrows:
+    // typing, a menu or dialog (the session list, the kebab menu, a modal), the
+    // lightbox (its own prev/next photo), a held modifier (Alt+← is browser Back),
+    // and key-repeat — one session per press, not a burst of gallery loads.
+    useEffect(() => {
+        if (!personId || !timepointsData?.length) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            if (e.defaultPrevented || e.repeat || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (document.querySelector('.pswp--open') || document.getElementById('modal-root')?.childElementCount) return;
+            const focused = document.activeElement;
+            if (
+                focused instanceof HTMLElement &&
+                (focused.isContentEditable ||
+                    focused.closest('input, textarea, select, [role="menu"], [role="dialog"], [role="listbox"], [role="slider"]'))
+            ) {
+                return;
+            }
+            const forward = (e.key === 'ArrowRight') !== (document.documentElement.dir === 'rtl');
+            const i = timepointsData.findIndex((tp) => tp.tp_code === tpCode);
+            const next = i === -1 ? 0 : i + (forward ? 1 : -1);
+            if (next < 0 || next >= timepointsData.length) return;
+            e.preventDefault();
+            navigate(`/patient/${personId}/photos/tp${timepointsData[next].tp_code}`);
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [personId, tpCode, timepointsData, navigate]);
 
     return (
         <div
@@ -829,45 +900,74 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         >
             {/* Timepoints Selector */}
             {!loadingTimepoints && timepoints.length > 0 && (
-                <div className={tpStyles.selector}>
-                    {timepoints.map((timepoint, index) => (
-                        <div
-                            key={`tp-${timepoint.tp_code}-${index}`}
-                            className={`${tpStyles.tab} ${tpCode === timepoint.tp_code ? tpStyles.tabActive : ''}`}
+                <div className={tpStyles.bar}>
+                    {stripOverflows && (
+                        <button
+                            type="button"
+                            className={tpStyles.allSessions}
+                            aria-label="All sessions"
+                            aria-haspopup="menu"
+                            aria-expanded={!!sessionList}
+                            title={`All sessions (${timepoints.length})`}
+                            // While open, the press that would close it via the menu's
+                            // outside-mousedown is kept from it, so the click below can
+                            // toggle it shut instead of closing and instantly reopening it.
+                            onMouseDown={(e) => {
+                                if (sessionList) e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                                if (sessionList) {
+                                    setSessionList(null);
+                                    return;
+                                }
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setSessionList({ x: rect.left, y: rect.bottom + 4 });
+                            }}
                         >
-                            <button
-                                type="button"
-                                className={tpStyles.tabNav}
-                                onClick={() => handleTimepointClick(timepoint.tp_code)}
+                            <i className="fas fa-bars" aria-hidden="true"></i>
+                        </button>
+                    )}
+                    <div ref={tabStripRef} className={tpStyles.selector} {...tabStripDrag}>
+                        {timepoints.map((timepoint, index) => (
+                            <div
+                                key={`tp-${timepoint.tp_code}-${index}`}
+                                className={`${tpStyles.tab} ${tpCode === timepoint.tp_code ? tpStyles.tabActive : ''}`}
                             >
-                                <div className={tpStyles.tabIcon}>
-                                    <i className="fas fa-camera"></i>
-                                </div>
-                                <div className={tpStyles.tabContent}>
-                                    <div className={tpStyles.tabDesc}>{timepoint.tp_description}</div>
-                                    <div className={tpStyles.tabDate}>{formatDate(timepoint.tp_date_time)}</div>
-                                </div>
-                            </button>
-                            <button
-                                type="button"
-                                className={tpStyles.kebab}
-                                aria-label="Photo session actions"
-                                aria-haspopup="menu"
-                                aria-expanded={menuFor?.tp.tp_code === timepoint.tp_code}
-                                onClick={(e) => openTimepointMenu(e, timepoint)}
-                            >
-                                <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
-                            </button>
-                        </div>
-                    ))}
-                    <button
-                        type="button"
-                        className={tpStyles.addTab}
-                        onClick={() => setShowNewSession(true)}
-                    >
-                        <i className="fas fa-plus" aria-hidden="true"></i>
-                        <span>New session</span>
-                    </button>
+                                <button
+                                    type="button"
+                                    className={tpStyles.tabNav}
+                                    aria-current={tpCode === timepoint.tp_code ? 'true' : undefined}
+                                    onClick={() => handleTimepointClick(timepoint.tp_code)}
+                                >
+                                    <div className={tpStyles.tabIcon}>
+                                        <i className="fas fa-camera"></i>
+                                    </div>
+                                    <div className={tpStyles.tabContent}>
+                                        <div className={tpStyles.tabDesc}>{timepoint.tp_description}</div>
+                                        <div className={tpStyles.tabDate}>{formatDate(timepoint.tp_date_time)}</div>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={tpStyles.kebab}
+                                    aria-label="Photo session actions"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuFor?.tp.tp_code === timepoint.tp_code}
+                                    onClick={(e) => openTimepointMenu(e, timepoint)}
+                                >
+                                    <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            className={tpStyles.addTab}
+                            onClick={() => setShowNewSession(true)}
+                        >
+                            <i className="fas fa-plus" aria-hidden="true"></i>
+                            <span>New session</span>
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -1052,6 +1152,23 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             </div>
             )}
 
+            {sessionList && (
+                <SessionListMenu
+                    x={sessionList.x}
+                    y={sessionList.y}
+                    sessions={timepoints.map((tp) => ({
+                        code: tp.tp_code,
+                        description: tp.tp_description,
+                        date: formatDate(tp.tp_date_time),
+                    }))}
+                    currentCode={tpCode}
+                    onSelect={(code) => {
+                        setSessionList(null);
+                        handleTimepointClick(code);
+                    }}
+                    onClose={() => setSessionList(null)}
+                />
+            )}
             {menuFor && (
                 <TimepointActionsMenu
                     x={menuFor.x}

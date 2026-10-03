@@ -10,6 +10,7 @@ import type { patientInfo as patientInfoContract } from '@shared/contracts/patie
 import PhotoSessionDialog from './PhotoSessionDialog';
 import type { z } from 'zod';
 import { patientInfoQuery, patientsFolderQuery, timepointsQuery } from '@/query/queries';
+import { useLastPhotoTab } from '@/hooks/useLastPhotoTab';
 
 /** The parsed row, straight from the contract. The local interface this replaces
  *  declared eight optional name fields plus an index signature and was reached
@@ -69,6 +70,11 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
     const photosLabel = tpData
         ? `${tpData.length} ${t(tpData.length === 1 ? 'photos.session' : 'photos.sessions')}`
         : t('photos.labelFallback');
+    // Reopen the session last viewed for this patient (tp0 until one has been) —
+    // unless it has since been deleted, which would land on an empty grid.
+    const lastPhotoTab = useLastPhotoTab(hasPatient ? personId : null);
+    const photosTp =
+        lastPhotoTab && (!tpData || tpData.some((tp) => tp.tp_code === lastPhotoTab)) ? lastPhotoTab : '0';
 
     // Patients-folder UNC (client-side `explorer:` target — must stay UNC, see
     // CLAUDE.md). Ordinary server state, read from the shared cache.
@@ -293,7 +299,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             </div>
                         ) : (
                             <Link
-                                to={`/patient/${personId}/photos/tp0`}
+                                to={`/patient/${personId}/photos/tp${photosTp}`}
                                 className={`sidebar-nav-item photos-main-btn ${isPhotosPageActive ? 'active' : ''}`}
                                 title={t('photos.tooltip')}
                             >
