@@ -91,7 +91,7 @@ const SlotActions = ({ editor, activeView, onRemoveSaved }: Props) => {
               aria-label="Restore original to re-edit"
               onClick={() => {
                 if (activeView && slot?.reEditRelPath) {
-                  editor.place(activeView, slot.reEditRelPath, slot.reEditName ?? slot.reEditRelPath);
+                  editor.place(activeView, slot.reEditRelPath, slot.reEditName ?? slot.reEditRelPath, slot.reEditVersion);
                 }
               }}
             >

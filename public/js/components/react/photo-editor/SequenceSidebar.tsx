@@ -12,7 +12,8 @@
  *     from the card after the upload succeeds. It asks once before the first move.
  *   - "Upload (copy)": a plain file input; the originals stay where they are.
  * A photo can be dragged onto a slot, or clicked (Enter) and then a slot clicked — the
- * keyboard path (FE-F14-13a).
+ * keyboard path (FE-F14-13a). Each thumbnail shows when it was taken (EXIF), flagged
+ * when that is not the session's day — a card often still holds another day's photos.
  * (Step 2 — framing + Save → working/ — happens in the slot grid.)
  */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
@@ -21,12 +22,14 @@ import styles from './SequenceSidebar.module.css';
 import { useToast } from '../../../contexts/ToastContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { postFormData, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { patientFilesQuery } from '@/query/queries';
+import { patientFilesQuery, takenDatesQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import type { FileEntry } from '@/types/api.types';
 import type { TimepointRow } from '@shared/contracts/patient.contract';
 import { ensurePermission, showFilePicker } from '@/core/fileSystemAccess';
 import { useImportFolder } from '@/hooks/useImportFolder';
+import { formatLocaleDate, formatLocaleTime, formatPhotoTakenAt } from '@/utils/formatters';
+import { buildContentUrl } from '../files/fileHelpers';
 import RenameFolderModal from './RenameFolderModal';
 
 /** Extensions offered in the "Move from card" picker (mirrors the Upload accept list). */
@@ -38,6 +41,8 @@ const IMAGE_ACCEPT: Record<string, string[]> = {
 export interface ArmedPhoto {
   relPath: string;
   name: string;
+  /** The listing's mtime — versions the slot's image URL (see SlotCanvas). */
+  modified?: string;
 }
 
 /** Set once the user has confirmed that "Move from card" deletes from the card. */
@@ -48,6 +53,8 @@ interface Props {
   /** The patient's photo sessions — RenameFolderModal tells their folders apart. */
   sessions: TimepointRow[];
   defaultFolder: string;
+  /** The session's date ('YYYY-MM-DD') — a photo taken on another day is flagged. */
+  sessionDate: string;
   /** relPaths already dropped into a slot — hidden from the list while in use. */
   usedRelPaths: Set<string>;
   /** Bumped by the parent to force a re-list (e.g. after a view's original is untagged). */
@@ -60,6 +67,7 @@ const SequenceSidebar = ({
   personId,
   sessions,
   defaultFolder,
+  sessionDate,
   usedRelPaths,
   refreshSignal = 0,
   armed,
@@ -93,6 +101,12 @@ const SequenceSidebar = ({
     [filesQ.data]
   );
   const loading = filesQ.isFetching;
+  // When each photo was taken, keyed by file name — a header-only read, after the list.
+  const takenQ = useQuery({
+    ...takenDatesQuery(personId, folder, 'all'),
+    enabled: !!folder && files.length > 0,
+  });
+  const takenDates = takenQ.data?.dates ?? {};
   // 404 = folder doesn't exist yet; any other status (or success) counts as "exists".
   const folderStatus = (filesQ.error as HttpError | null)?.status;
   const folderExists = folderStatus !== 404;
@@ -106,6 +120,7 @@ const SequenceSidebar = ({
   useEffect(() => {
     if (refreshSignal) {
       void queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, folder) });
+      void queryClient.invalidateQueries({ queryKey: qk.patient.takenDates(personId, folder, 'all') });
     }
     // folder intentionally omitted: a refreshSignal bump targets the folder shown
     // at bump time, and a folder change already refetches via its own query key.
@@ -116,7 +131,10 @@ const SequenceSidebar = ({
   const reloadFolders = () =>
     queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, '') });
   const reloadFiles = () =>
-    queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, folder) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, folder) }),
+      queryClient.invalidateQueries({ queryKey: qk.patient.takenDates(personId, folder, 'all') }),
+    ]);
 
   /** Create the folder on the share; a 409 (already there) is treated as success. */
   const ensureFolder = async (name: string): Promise<void> => {
@@ -268,8 +286,12 @@ const SequenceSidebar = ({
   };
 
   const onDragStart = (e: DragEvent<HTMLElement>, f: FileEntry): void => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ relPath: f.relPath, name: f.name }));
+    e.dataTransfer.setData('text/plain', JSON.stringify({ relPath: f.relPath, name: f.name, modified: f.modified }));
     e.dataTransfer.effectAllowed = 'copy';
+    // A drag supersedes a click-pick. Left armed, the pick outlived the drop — its
+    // highlight gone once its own photo was placed — and swapped itself into the
+    // next slot clicked, often the one just dropped into, mid-crop.
+    if (armed) onArm(null);
   };
 
   // Hide photos already placed in a slot; they return here when the slot is cleared.
@@ -343,6 +365,8 @@ const SequenceSidebar = ({
         <div className={styles.list}>
           {visibleFiles.map((f) => {
             const isArmed = armed?.relPath === f.relPath;
+            const takenAt = takenDates[f.name] ?? null;
+            const otherDay = !!takenAt && !!sessionDate && takenAt.slice(0, 10) !== sessionDate.slice(0, 10);
             return (
               <figure key={f.relPath} className={`${styles.thumb} ${isArmed ? styles.thumbArmed : ''}`}>
                 <button
@@ -350,20 +374,39 @@ const SequenceSidebar = ({
                   className={styles.thumbButton}
                   draggable
                   onDragStart={(e) => onDragStart(e, f)}
-                  onClick={() => onArm(isArmed ? null : { relPath: f.relPath, name: f.name })}
+                  onClick={() => onArm(isArmed ? null : { relPath: f.relPath, name: f.name, modified: f.modified })}
                   aria-pressed={isArmed}
                   aria-label={`${f.name} — pick, then choose a slot`}
                 >
                   <img
-                    src={`/api/patients/${personId}/files/content?path=${encodeURIComponent(f.relPath)}&thumb=240`}
+                    // Versioned by mtime: a different photo later uploaded under this
+                    // name gets a new URL instead of the deleted one's cached thumbnail.
+                    src={buildContentUrl(personId, f.relPath, { thumb: 240, v: f.modified })}
                     alt=""
                     draggable={false}
                     loading="lazy"
                     className={styles.thumbImg}
                   />
                 </button>
-                <figcaption className={styles.thumbName} title={f.name}>
-                  {f.name}
+                <figcaption className={styles.thumbCaption}>
+                  <span className={styles.thumbName} title={f.name}>
+                    {f.name}
+                  </span>
+                  {/* Day and time on their own lines — a thumbnail is too narrow for
+                      both, and a cut-off time is what orders a session's shots. */}
+                  {takenAt && (
+                    <span
+                      className={`${styles.thumbTaken} ${otherDay ? styles.thumbTakenOtherDay : ''}`}
+                      title={`${otherDay ? 'Taken on a different day than this session' : 'Taken'}: ${formatPhotoTakenAt(takenAt)}`}
+                    >
+                      <span>{formatLocaleDate(takenAt, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                      {/* The flag rides the shorter time line, so it never pushes the day out. */}
+                      <span className={styles.thumbTakenTime}>
+                        {otherDay && <i className="fas fa-exclamation-triangle" aria-hidden="true" />}
+                        {formatLocaleTime(takenAt, { hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    </span>
+                  )}
                 </figcaption>
               </figure>
             );

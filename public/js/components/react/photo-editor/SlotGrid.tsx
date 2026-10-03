@@ -96,10 +96,25 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, armed, onPlaced, on
     setMenu({ view, x, y });
   };
 
-  // Activate a cell; with a photo picked in the sidebar, place it there first.
-  const activate = (view: PhotoViewCode): void => {
-    if (armed) {
-      editor.place(view, armed.relPath, armed.name);
+  // Where the last press inside a cell started (see isPlacementClick).
+  const pressAt = useRef<{ x: number; y: number } | null>(null);
+
+  // Did this click mean "put the picked photo here"? Panning the live cropper and
+  // using the rotation strip both bubble a `click` to the cell too, and used to
+  // place the pick over the photo being framed. A pan is a press that moved; the
+  // strip is all of SlotToolbar — its gaps and readout too, so a near-miss on the
+  // slider can't swap the photo either.
+  const isPlacementClick = (e: ReactMouseEvent<HTMLDivElement>): boolean => {
+    const from = pressAt.current;
+    if (from && Math.hypot(e.clientX - from.x, e.clientY - from.y) > 4) return false;
+    return !(e.target as HTMLElement).closest('[data-slot-toolbar], button, input');
+  };
+
+  // Activate a cell; with a photo picked in the sidebar, place it there first. No
+  // event = the keyboard path (Enter/Space on the cell), always a deliberate pick.
+  const activate = (view: PhotoViewCode, e?: ReactMouseEvent<HTMLDivElement>): void => {
+    if (armed && (!e || isPlacementClick(e))) {
+      editor.place(view, armed.relPath, armed.name, armed.modified ?? null);
       onPlaced();
     }
     onActivate(view);
@@ -111,9 +126,9 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, armed, onPlaced, on
     const raw = e.dataTransfer.getData('text/plain');
     if (!raw) return;
     try {
-      const data = JSON.parse(raw) as { relPath?: string; name?: string };
+      const data = JSON.parse(raw) as { relPath?: string; name?: string; modified?: string };
       if (data.relPath) {
-        editor.place(view, data.relPath, data.name || data.relPath);
+        editor.place(view, data.relPath, data.name || data.relPath, data.modified ?? null);
         onActivate(view);
       }
     } catch {
@@ -148,7 +163,10 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, armed, onPlaced, on
             tabIndex={0}
             aria-label={armed ? `Place ${armed.name} in ${labelForView(view)}` : labelForView(view)}
             className={`${styles.cell} ${isActive ? styles.cellActive : ''} ${dragOver === view || (armed && !slot.sourceRelPath) ? styles.cellDragOver : ''}`}
-            onClick={() => activate(view)}
+            onPointerDown={(e) => {
+              pressAt.current = { x: e.clientX, y: e.clientY };
+            }}
+            onClick={(e) => activate(view, e)}
             onKeyDown={(e) => {
               // Only the cell itself: keys inside the cropper/toolbar are theirs.
               if (e.target !== e.currentTarget) return;
@@ -193,12 +211,13 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, armed, onPlaced, on
           if (!slot.sourceRelPath && slot.canReEdit && slot.reEditRelPath) {
             const relPath = slot.reEditRelPath;
             const name = slot.reEditName ?? relPath;
+            const version = slot.reEditVersion;
             items.push({
               key: 'restore',
               label: 'Restore original to re-edit',
               icon: 'fa-rotate-left',
               onClick: () => {
-                editor.place(menu.view, relPath, name);
+                editor.place(menu.view, relPath, name, version);
                 onActivate(menu.view);
               },
             });

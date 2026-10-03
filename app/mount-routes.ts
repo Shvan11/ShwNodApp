@@ -36,6 +36,7 @@ import publicVideoRoutes from '../routes/public/video.routes.js';
 import tvDisplayRoutes from '../routes/public/tv-display.routes.js';
 import portalRoutes from '../routes/portal.js';
 import { workingDir } from '../services/files/clinic-paths.js';
+import { imageCacheControl } from '../utils/image-cache-control.js';
 import { log } from '../utils/logger.js';
 
 /**
@@ -151,15 +152,19 @@ export async function mountRoutes(app: Express, wsEmitter: EventEmitter): Promis
   // ===== MOUNT ROUTES (AFTER AUTHENTICATION) =====
   // PHI imaging static mounts — require auth (patient X-rays / clinic photos)
   app.use('/DolImgs', express.static(workingDir(), {
-      setHeaders: (res, filePath) => {
+      setHeaders: (res, filePath, stat: { mtimeMs: number }) => {
           if (/\.i\d+$/i.test(filePath)) {
               res.setHeader('Content-Type', 'image/jpeg');
-              // The gallery always requests these with a `?v={mtime}` token, so a
-              // given URL is immutable (a re-render changes the mtime → a new URL).
-              // Cache hard to kill the per-image revalidation round-trip on every
-              // revisit. `private` keeps this PHI out of shared/CDN caches (the
-              // off-LAN cloudflared edge) — auth lives at our origin.
-              res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+              // The gallery requests these with a `?v={mtime}` token, and a re-render
+              // changes the mtime → a new URL, so a URL whose `v` names THIS mtime is
+              // immutable: cache it hard and skip the revalidation round-trip. One
+              // without (the old `/DolImgs/{id}00.i13` guesses) revalidates instead of
+              // pinning a stale render for a year. `private` keeps this PHI out of
+              // shared/CDN caches (the off-LAN cloudflared edge).
+              res.setHeader(
+                  'Cache-Control',
+                  imageCacheControl(res.req.query.v, stat.mtimeMs, { maxAgeSeconds: 31536000, immutable: true }),
+              );
           }
       }
   }));

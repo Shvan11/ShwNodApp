@@ -6,7 +6,7 @@ import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/co
 import { invalidatePatientPhotos } from '@/query/photos';
 import { reportClientError, describeHttpError } from '@/core/error-reporter';
 import { qk } from '@/query/keys';
-import { timepointsQuery, galleryQuery, photoVisibilityQuery, brandingQuery } from '@/query/queries';
+import { timepointsQuery, galleryQuery, photoVisibilityQuery, brandingQuery, takenDatesQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
@@ -20,7 +20,9 @@ import SessionListMenu from './SessionListMenu';
 import ShareSheet from './share/ShareSheet';
 import type { ShareSource } from './localsend/LocalSendShareModal';
 import { encodeRelPath, buildWorkingContentUrl } from './files/fileHelpers';
-import type { PhotoViewCode } from '@shared/photo-views';
+import { parseViewTag, type PhotoViewCode } from '@shared/photo-views';
+import { sessionFolderName } from '@shared/photo-session-folder';
+import { formatPhotoTakenAt } from '@/utils/formatters';
 import sseAppointments from '../../services/sse-appointments';
 import { useDragScroll } from '../../hooks/useDragScroll';
 import { rememberPhotoTab } from '../../hooks/useLastPhotoTab';
@@ -489,6 +491,27 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 }
             });
 
+            // Caption: the view and when it was taken. The text is read from the slide's
+            // grid anchor on every change (its `data-taken` is filled once the dates
+            // load), so the lightbox needs no copy of the dates. It is also the one place
+            // a touch device — no hover — sees the date.
+            pswpUi.registerElement({
+                name: 'photo-caption',
+                order: 9,
+                isButton: false,
+                appendTo: 'root',
+                html: '',
+                onInit: (el: HTMLElement, pswp: PhotoSwipeInstance) => {
+                    pswp.on('change', () => {
+                        const anchor = pswp.currSlide?.data?.element;
+                        const label = anchor?.querySelector('img')?.alt ?? '';
+                        const taken = anchor?.dataset.taken;
+                        el.textContent = taken ? `${label} · Taken ${taken}` : label;
+                        el.hidden = !el.textContent;
+                    });
+                }
+            });
+
             // Native share button (touch-first devices only — see isTouchFirst).
             if (canNativeShare() && isTouchFirst()) {
                 pswpUi.registerElement({
@@ -826,6 +849,24 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const selectedTpExists = timepoints.some((tp) => tp.tp_code === tpCode);
     const noSessions = !loadingTimepoints && timepoints.length === 0;
 
+    // When each view's photo was TAKEN, shown in its hover caption + the lightbox. The
+    // renders above carry no EXIF; the date is the camera clock of the original the
+    // editor view-tagged (`i13-IMG_….JPG`) in the session folder. Fetched only once THIS
+    // session's photos are on screen (never ahead of them, never for a placeholder), and
+    // the server reads just those ≤ 8 tagged originals' headers. No folder, tag or EXIF
+    // (a Dolphin-era session) = no date, never a guessed one.
+    const currentTp = timepoints.find((tp) => tp.tp_code === tpCode);
+    const sessionFolder = currentTp ? sessionFolderName(currentTp.tp_description, currentTp.tp_date_time) : null;
+    const takenQ = useQuery({
+        ...takenDatesQuery(personId ?? '', sessionFolder ?? '', 'views'),
+        enabled: !!personId && !!sessionFolder && hasRealPhotos && !switching,
+    });
+    const takenByView: Partial<Record<PhotoViewCode, string>> = {};
+    for (const [name, takenAt] of Object.entries(takenQ.data?.dates ?? {})) {
+        const tag = parseViewTag(name);
+        if (tag && takenAt) takenByView[tag.view] = formatPhotoTakenAt(takenAt);
+    }
+
     // The sidebar's Photos button reopens whichever real session was last on screen.
     useEffect(() => {
         if (personId && selectedTpExists) rememberPhotoTab(personId, tpCode);
@@ -1098,6 +1139,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                     // img's object-fit: contain — so the rect lands on the photo itself,
                     // letterboxing included, with zero layout measurement.
                     const showAnonBar = anonymize && !!cell.view && EXTRA_ORAL_VIEWS.has(cell.view);
+                    const takenAt = cell.view ? takenByView[cell.view] : undefined;
 
                     return (
                         <a
@@ -1106,6 +1148,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             href={fullResUrl(image)}
                             data-pswp-width={image.width ?? 800}
                             data-pswp-height={image.height ?? 600}
+                            data-taken={takenAt}
                             target="_blank"
                             rel="noreferrer"
                             className={styles.galleryCell}
@@ -1135,6 +1178,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             )}
                             <span className={styles.typeLabel} aria-hidden="true">
                                 {cell.alt}
+                                {takenAt && <span className={styles.takenAt}>{takenAt}</span>}
                             </span>
                             {isHidden && (
                                 <span

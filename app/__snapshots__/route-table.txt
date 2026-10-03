@@ -300,6 +300,7 @@ POST    /api/photo-editor/:personId/prepare  [authorize(admin|front_desk|clinica
 POST    /api/photo-editor/:personId/render  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 DELETE  /api/photo-editor/:personId/view  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 GET     /api/photo-editor/:personId/photo-dates  [validate(params)]
+GET     /api/photo-editor/:personId/taken-dates  [validate(params,query)]
 MOUNT   /api/videos
 GET     /api/videos
 GET     /api/videos/categories

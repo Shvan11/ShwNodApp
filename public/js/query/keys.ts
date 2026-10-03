@@ -57,6 +57,11 @@ export const qk = {
     /** GET /api/patients/:id/files?path=&flat= — file-explorer listing for a folder. */
     files: (id: Id, path = '', flat = false) =>
       ['patient', normId(id), 'files', path, flat ? 'flat' : 'nested'] as const,
+    /** GET /api/photo-editor/:id/taken-dates?folder=&scope= — originals' EXIF capture
+     *  times. Under `filesAll`, so every photo write's `invalidatePatientPhotos` (renders
+     *  re-tag originals, renames move the folder) refreshes it with the listings. */
+    takenDates: (id: Id, folder: string, scope: 'views' | 'all') =>
+      ['patient', normId(id), 'files', folder, 'taken-dates', scope] as const,
     /** GET /api/patients/:id/working-files — working-files listing. */
     workingFiles: (id: Id) => ['patient', normId(id), 'working-files'] as const,
     /** GET /api/patients/:id/photos/visibility — per-photo private-flag list. */

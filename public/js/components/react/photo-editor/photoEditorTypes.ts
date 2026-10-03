@@ -137,6 +137,12 @@ export interface SlotState {
   view: PhotoViewCode;
   sourceRelPath: string | null;
   sourceName: string | null;
+  /**
+   * The source's mtime from the folder listing — the `v` on the image URL. Without
+   * it, a different photo later uploaded under the same name was framed from the
+   * browser's cached copy of the old one, while Save rendered the new one.
+   */
+  sourceVersion: string | null;
   crop: { x: number; y: number };
   zoom: number;
   rotation: number;
@@ -154,9 +160,10 @@ export interface SlotState {
   savedImageUrl: string | null;
   /** True when a tagged source original still exists to reload for re-editing. */
   canReEdit: boolean;
-  /** The tagged original to reload on "Restore original" (patient-root-relative path + clean name). */
+  /** The tagged original to reload on "Restore original" (patient-root-relative path + clean name + mtime). */
   reEditRelPath: string | null;
   reEditName: string | null;
+  reEditVersion: string | null;
 }
 
 export type SlotMap = Record<PhotoViewCode, SlotState>;
@@ -167,6 +174,7 @@ export interface SlotHydration {
   canReEdit: boolean;
   reEditRelPath: string | null;
   reEditName: string | null;
+  reEditVersion: string | null;
 }
 
 export function makeInitialSlot(view: PhotoViewCode): SlotState {
@@ -174,6 +182,7 @@ export function makeInitialSlot(view: PhotoViewCode): SlotState {
     view,
     sourceRelPath: null,
     sourceName: null,
+    sourceVersion: null,
     crop: { x: 0, y: 0 },
     zoom: 1,
     rotation: 0,
@@ -185,6 +194,7 @@ export function makeInitialSlot(view: PhotoViewCode): SlotState {
     canReEdit: false,
     reEditRelPath: null,
     reEditName: null,
+    reEditVersion: null,
   };
 }
 

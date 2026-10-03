@@ -67,6 +67,26 @@ export const photoDates = {
   }),
 } as const;
 
+// GET /api/photo-editor/:personId/taken-dates?folder=&scope= → { dates }. Each
+// original's EXIF capture time ('YYYY-MM-DDTHH:MM:SS', zone-less local wall clock —
+// see services/imaging/exif-taken-at.ts), keyed by file name; null = the file carries
+// none. `scope=views` reads only the view-tagged originals (the photo grid's caption),
+// `all` every image (the editor's Sequence Files list). A missing folder is `{}`.
+export const takenDatesScope = z.enum(['views', 'all']);
+export const takenDates = {
+  params: personIdParams,
+  query: z.object({
+    folder: z.string().min(1, 'folder is required').max(260),
+    scope: takenDatesScope.default('all'),
+  }),
+  response: z.object({
+    dates: z.record(z.string(), z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/).nullable()),
+  }),
+} as const;
+export type TakenDatesScope = z.infer<typeof takenDatesScope>;
+export type TakenDatesQuery = z.infer<typeof takenDates.query>;
+export type TakenDatesResponse = z.infer<typeof takenDates.response>;
+
 // SSE `photos_rendered` (appointments stream) — a background render finished. Not an
 // HTTP response: the frame the broadcaster forwards from POST /render's job. `jobId`
 // is the id the client sent with the render (absent for a legacy caller); `problems`

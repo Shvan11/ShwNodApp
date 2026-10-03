@@ -901,6 +901,25 @@ export const patientFilesQuery = (id: Id, path = '', flat = false) =>
       ),
   });
 
+/**
+ * GET /api/photo-editor/:id/taken-dates?folder=&scope= — when each original in a
+ * patient folder was taken (EXIF), keyed by file name. `views` (the photo grid) holds
+ * for 30 min: a session's tagged originals change only through the editor, whose
+ * writes invalidate it. `all` (the editor's Sequence Files) keeps the default, like
+ * the folder listing it sits beside, so a photo dropped into the folder from outside
+ * the app gets its date on the next look.
+ */
+export const takenDatesQuery = (id: Id, folder: string, scope: photoEditorContract.TakenDatesScope) =>
+  queryOptions({
+    queryKey: qk.patient.takenDates(id, folder, scope),
+    queryFn: ({ signal }) =>
+      fetchJSON<photoEditorContract.TakenDatesResponse>(
+        `/api/photo-editor/${id}/taken-dates?${new URLSearchParams({ folder, scope })}`,
+        { signal, schema: photoEditorContract.takenDates.response }
+      ),
+    ...(scope === 'views' ? { staleTime: 30 * 60_000, gcTime: 30 * 60_000 } : {}),
+  });
+
 /** GET /api/slideshow-configs?personId= — saved per-patient sequences + generic templates. */
 export const slideshowConfigsQuery = (personId: Id) =>
   queryOptions({

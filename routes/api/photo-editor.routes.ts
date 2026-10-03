@@ -18,7 +18,7 @@ import { authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { InternalEmitterEvents } from '../../services/messaging/websocket-events.js';
-import { sendData, ErrorResponses } from '../../utils/error-response.js';
+import { sendData, sendError, ErrorResponses } from '../../utils/error-response.js';
 import * as photoEditor from '../../shared/contracts/photo-editor.contract.js';
 import {
   getPatientForPhotoSession,
@@ -36,6 +36,7 @@ import {
 import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/photo-render.service.js';
 import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
+import { listTakenDates } from '../../services/imaging/photo-taken-date.service.js';
 import { FileExplorerError } from '../../services/files/file-explorer.service.js';
 import { toDateOnly, parseLocalDate } from '../../utils/date.js';
 import { log } from '../../utils/logger.js';
@@ -485,5 +486,34 @@ router.get('/:personId/photo-dates', validate({ params: photoEditor.photoDates.p
     ErrorResponses.internalError(res, 'Failed to fetch photo dates', err as Error);
   }
 });
+
+/**
+ * GET /:personId/taken-dates?folder=&scope=
+ * When each original in a patient folder was taken (EXIF), for the photo grid's
+ * caption (`scope=views`, the session's view-tagged originals) and the editor's
+ * Sequence Files list (`scope=all`). Read-only — rides the global auth gate.
+ */
+router.get(
+  '/:personId/taken-dates',
+  validate({ params: photoEditor.takenDates.params, query: photoEditor.takenDates.query }),
+  async (
+    req: Request<{ personId: string }, unknown, unknown, photoEditor.TakenDatesQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const { folder, scope } = req.query;
+      const dates = await listTakenDates(personId, folder, scope);
+      sendData(res, photoEditor.takenDates.response, { dates });
+    } catch (err) {
+      if (err instanceof FileExplorerError) {
+        sendError(res, err.status, err.message);
+        return;
+      }
+      log.error('[PhotoEditor] taken-dates failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Failed to read photo dates', err as Error);
+    }
+  }
+);
 
 export default router;

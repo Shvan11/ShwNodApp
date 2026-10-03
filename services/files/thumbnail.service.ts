@@ -89,20 +89,21 @@ async function renderThumb(
 
 /**
  * Return the absolute path to a cached WebP thumbnail of an image, generating
- * it on first request. Validates + symlink-guards the source via the
- * file-explorer service. Images only — throws for other categories.
+ * it on first request, plus the SOURCE's mtime (the route's cache header only
+ * lets a `?v=` that names it be cached). Validates + symlink-guards the source
+ * via the file-explorer service. Images only — throws for other categories.
  */
 export async function getThumbnail(
   personId: string | number,
   relPath: string,
   width = 240
-): Promise<string> {
+): Promise<{ path: string; mtimeMs: number }> {
   // Validates id/path, guards symlink escape, rejects dirs/missing files.
   const { abs, mtimeMs } = await resolveFileForServe(personId, relPath);
   if (getFileCategory(relPath) !== 'image') {
     throw new FileExplorerError('Thumbnails are only generated for images', 415);
   }
-  return renderThumb(abs, mtimeMs, [String(personId)], relPath, width);
+  return { path: await renderThumb(abs, mtimeMs, [String(personId)], relPath, width), mtimeMs };
 }
 
 /**

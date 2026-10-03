@@ -181,6 +181,7 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
         canReEdit: false,
         reEditRelPath: null,
         reEditName: null,
+        reEditVersion: null,
       };
     }
     // Tagged originals → enable "Restore original" for their view.
@@ -194,10 +195,12 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
           canReEdit: false,
           reEditRelPath: null,
           reEditName: null,
+          reEditVersion: null,
         }),
         canReEdit: true,
         reEditRelPath: e.relPath,
         reEditName: tag.original,
+        reEditVersion: e.modified ?? null,
       };
     }
     editor.hydrate(views);
@@ -515,6 +518,7 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
           personId={personId}
           sessions={sessionsQ.data ?? []}
           defaultFolder={sessionFolder}
+          sessionDate={tpDate}
           usedRelPaths={usedRelPaths}
           refreshSignal={sidebarRefresh}
           armed={armed}

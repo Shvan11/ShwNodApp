@@ -239,6 +239,15 @@
   opacity: 1;
 }
 
+/* When the photo was taken (EXIF), a quieter second line under the view name. */
+.takenAt {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  opacity: 0.9;
+}
+
 /* "Hidden from patient" indicator — rendered only on photos hidden from the portal
    (visible photos stay unmarked, so a clean grid means everything is visible). It's a
    read-only marker; visibility is toggled from the lightbox. Red chip + white icon
@@ -278,6 +287,34 @@
 
 :global(.pswp__button--visibility-private i) {
   color: var(--error-red-light);
+}
+
+/* Lightbox caption — the view and when it was taken, over the bottom of the photo.
+   Appended to the pswp root (outside this component's DOM), so matched via :global;
+   PhotoSwipe's own pswp__hide-on-close class fades it with the rest of the UI. Always
+   on the lightbox's dark backdrop, so the colours are literal, like the toolbar's. */
+:global(.pswp__photo-caption) {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--pswp-icon-color, #fff);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* Out-specifies pswp's `.pswp--ui-visible .pswp__hide-on-close { pointer-events: auto }`
+   so a swipe or tap that starts on the caption still reaches the slide. */
+:global(.pswp--ui-visible .pswp__photo-caption.pswp__hide-on-close) {
+  pointer-events: none;
+}
+
+:global(.pswp__photo-caption[hidden]) {
+  display: none;
 }
 
 /* Gallery Image Styling */

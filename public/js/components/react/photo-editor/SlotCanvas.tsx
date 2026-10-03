@@ -12,6 +12,7 @@ import type { Area, MediaSize, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
 import type { CropArea, PhotoViewCode, SlotState } from './photoEditorTypes';
 import { aspectForView, gridLinesForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
+import { buildContentUrl } from '../files/fileHelpers';
 
 /** Inert crop handler for inactive slots (react-easy-crop requires onCropChange). */
 const noop = (): void => {};
@@ -49,10 +50,14 @@ interface Props {
   onMediaLoaded: (size: { width: number; height: number }) => void;
 }
 
-function contentUrl(personId: number, relPath: string, proxy: boolean): string {
-  const base = `/api/patients/${personId}/files/content?path=${encodeURIComponent(relPath)}`;
-  // 2048 must stay in the thumbnail service's ALLOWED_WIDTHS.
-  return proxy ? `${base}&thumb=2048` : base;
+/**
+ * The 2048 px proxy or the original, versioned by the listing's mtime: unversioned,
+ * a different photo later uploaded under this name was framed from the browser's
+ * cached copy of the old one while Save rendered the new one. 2048 must stay in the
+ * thumbnail service's ALLOWED_WIDTHS.
+ */
+function contentUrl(personId: number, relPath: string, proxy: boolean, version: string | null): string {
+  return buildContentUrl(personId, relPath, { thumb: proxy ? 2048 : undefined, v: version ?? undefined });
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -102,7 +107,7 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
   // body (react-hooks/set-state-in-effect), and blob revocation stays centralised.
   useEffect(() => {
     let cancelled = false;
-    const base = slot.sourceRelPath ? contentUrl(personId, slot.sourceRelPath, proxyMode) : null;
+    const base = slot.sourceRelPath ? contentUrl(personId, slot.sourceRelPath, proxyMode, slot.sourceVersion) : null;
     const load: Promise<string | null> =
       !base ? Promise.resolve(null)
       : (!slot.flipH && !slot.flipV) ? Promise.resolve(base)
@@ -125,7 +130,7 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
     return () => {
       cancelled = true;
     };
-  }, [personId, slot.sourceRelPath, slot.flipH, slot.flipV, proxyMode]);
+  }, [personId, slot.sourceRelPath, slot.sourceVersion, slot.flipH, slot.flipV, proxyMode]);
 
   // Revoke any outstanding blob on unmount.
   useEffect(() => () => revoke(), []);

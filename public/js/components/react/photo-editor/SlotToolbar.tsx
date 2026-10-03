@@ -3,6 +3,11 @@
  * mirror, reset framing, remove — moved to the topbar SlotActions to save vertical
  * space; only the slider stays under each slot because fine rotation has no mouse
  * equivalent. Crop + zoom are inherent to the cropper (drag to pan, wheel/pinch).
+ *
+ * The row is a group, NOT a <label>: a label's click goes to its first labelable
+ * descendant, which here was the −1° button — so a click on the icon, the degree
+ * readout or any gap between the controls (37% of the strip) turned the photo 1°.
+ * `data-slot-toolbar` tells SlotGrid that clicks here never place a picked photo.
  */
 import styles from './SlotToolbar.module.css';
 
@@ -20,8 +25,8 @@ const SlotToolbar = ({ hasImage, rotation, onSetRotation }: Props) => {
   const signedDeg = deg > 180 ? deg - 360 : deg;
   // Nudge buttons step ±1°; the reducer re-normalises so wrap-around is safe.
   return (
-    <div className={styles.toolbar}>
-      <label className={styles.rotateRow}>
+    <div className={styles.toolbar} data-slot-toolbar="">
+      <div className={styles.rotateRow} role="group" aria-label="Fine rotation">
         <i className="fas fa-rotate" aria-hidden="true" title="Fine rotation" />
         <button
           type="button"
@@ -55,7 +60,7 @@ const SlotToolbar = ({ hasImage, rotation, onSetRotation }: Props) => {
           +1°
         </button>
         <span className={styles.deg}>{signedDeg}°</span>
-      </label>
+      </div>
     </div>
   );
 };

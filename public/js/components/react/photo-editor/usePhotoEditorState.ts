@@ -7,7 +7,7 @@ import type { CropArea, PhotoViewCode, SlotHydration, SlotMap } from './photoEdi
 import { makeInitialSlot, makeInitialSlots, VIEW_CODES } from './photoEditorTypes';
 
 type Action =
-  | { type: 'PLACE'; view: PhotoViewCode; sourceRelPath: string; sourceName: string }
+  | { type: 'PLACE'; view: PhotoViewCode; sourceRelPath: string; sourceName: string; sourceVersion: string | null }
   | { type: 'CLEAR'; view: PhotoViewCode }
   | { type: 'RESET'; view: PhotoViewCode }
   | { type: 'SET_CROP'; view: PhotoViewCode; crop: { x: number; y: number } }
@@ -39,6 +39,7 @@ function reducer(state: SlotMap, action: Action): SlotMap {
             canReEdit: h.canReEdit,
             reEditRelPath: h.reEditRelPath,
             reEditName: h.reEditName,
+            reEditVersion: h.reEditVersion,
           }
         : makeInitialSlot(v);
     }
@@ -53,6 +54,7 @@ function reducer(state: SlotMap, action: Action): SlotMap {
           ...makeInitialSlot(action.view),
           sourceRelPath: action.sourceRelPath,
           sourceName: action.sourceName,
+          sourceVersion: action.sourceVersion,
         },
       };
     case 'CLEAR':
@@ -64,6 +66,7 @@ function reducer(state: SlotMap, action: Action): SlotMap {
           ...makeInitialSlot(action.view),
           sourceRelPath: slot.sourceRelPath,
           sourceName: slot.sourceName,
+          sourceVersion: slot.sourceVersion,
         },
       };
     case 'SET_CROP':
@@ -90,7 +93,8 @@ function reducer(state: SlotMap, action: Action): SlotMap {
 
 export interface PhotoEditorState {
   slots: SlotMap;
-  place: (view: PhotoViewCode, sourceRelPath: string, sourceName: string) => void;
+  /** `sourceVersion`: the listing's mtime for the source (null when unknown). */
+  place: (view: PhotoViewCode, sourceRelPath: string, sourceName: string, sourceVersion: string | null) => void;
   clear: (view: PhotoViewCode) => void;
   reset: (view: PhotoViewCode) => void;
   setCrop: (view: PhotoViewCode, crop: { x: number; y: number }) => void;
@@ -107,7 +111,8 @@ export function usePhotoEditorState(): PhotoEditorState {
   const [slots, dispatch] = useReducer(reducer, undefined, makeInitialSlots);
   return {
     slots,
-    place: (view, sourceRelPath, sourceName) => dispatch({ type: 'PLACE', view, sourceRelPath, sourceName }),
+    place: (view, sourceRelPath, sourceName, sourceVersion) =>
+      dispatch({ type: 'PLACE', view, sourceRelPath, sourceName, sourceVersion }),
     clear: (view) => dispatch({ type: 'CLEAR', view }),
     reset: (view) => dispatch({ type: 'RESET', view }),
     setCrop: (view, crop) => dispatch({ type: 'SET_CROP', view, crop }),

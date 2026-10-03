@@ -8,9 +8,10 @@ export interface ContentUrlOptions {
   download?: boolean;
   thumb?: number;
   /**
-   * Cache-busting version token (typically the file's mtime). Appended as `v=…`
-   * so a re-rendered file gets a fresh URL — without it, the thumbnail endpoint's
-   * 7-day `max-age` makes the browser keep serving a stale cached thumbnail.
+   * The file's version — its mtime: a listing's `modified` or the gallery's
+   * `mtime`. Appended as `v=…`. A thumbnail URL whose `v` names the file on disk is
+   * cached for a week, and a changed file gets a new URL; without `v` (or with a
+   * stale one) the server makes the browser revalidate it on every view.
    */
   v?: string | number;
 }

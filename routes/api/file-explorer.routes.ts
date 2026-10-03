@@ -23,6 +23,7 @@ import { validate } from '../../middleware/validate.js';
 import { timeouts } from '../../middleware/timeout.js';
 import * as fileExplorer from '../../shared/contracts/file-explorer.contract.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
+import { imageCacheControl, REVALIDATE } from '../../utils/image-cache-control.js';
 import { folderOwner } from '../../shared/photo-session-folder.js';
 import { getTimePoints } from '../../services/database/queries/timepoint-queries.js';
 import {
@@ -47,6 +48,9 @@ import {
 import { getTimePointCodes } from '../../services/database/queries/timepoint-queries.js';
 
 const router = Router();
+
+/** Browser lifetime of a thumbnail whose URL names its version (see imageCacheControl). */
+const THUMB_MAX_AGE_S = 7 * 24 * 60 * 60;
 
 const MAX_UPLOAD_BYTES =
   parseInt(process.env.FILE_EXPLORER_MAX_UPLOAD_MB || '200', 10) * 1024 * 1024;
@@ -100,6 +104,9 @@ async function streamFileFallback(
   res.setHeader('Content-type', mime);
   res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Last-Modified', st.mtime.toUTCString());
+  // Explicit, like the `sendFile` path: with Last-Modified and no Cache-Control a
+  // browser may guess a lifetime of ~10% of the file's age — weeks for an old photo.
+  res.setHeader('Cache-Control', REVALIDATE);
   if (download) {
     res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/["\r\n]/g, '')}"`);
   } else {
@@ -168,14 +175,18 @@ router.get(
       // ── Thumbnail branch ──
       if (thumbRaw && thumbRaw !== '0') {
         const width = parseInt(thumbRaw, 10);
-        const thumbPath = await getThumbnail(personId, relPath, isNaN(width) ? 240 : width);
+        const { path: thumbPath, mtimeMs } = await getThumbnail(personId, relPath, isNaN(width) ? 240 : width);
         log.info('[Files] thumb', { userId: req.session?.userId, personId, relPath, width });
         res.setHeader('Content-type', 'image/webp');
+        // A week, privately, only when `?v=` names this file's mtime; otherwise every
+        // view revalidates. A flat `public, max-age` here kept a deleted photo's
+        // thumbnail on screen after a different one was uploaded under its name.
+        res.setHeader('Cache-Control', imageCacheControl(req.query.v, mtimeMs, { maxAgeSeconds: THUMB_MAX_AGE_S }));
         res.sendFile(
           thumbPath,
           // `dotfiles: 'allow'` is required — the cache lives under a dot dir
           // (`.cache/thumbs/…`), which `send` would otherwise refuse to serve.
-          { dotfiles: 'allow', cacheControl: true, lastModified: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+          { dotfiles: 'allow', cacheControl: false, lastModified: true },
           (err) => {
             if (err && !res.headersSent) {
               ErrorResponses.serverError(res, 'Failed to serve thumbnail');
@@ -191,10 +202,12 @@ router.get(
       const filename = path.basename(relPath.replace(/\\/g, '/'));
       log.info('[Files] content', { userId: req.session?.userId, personId, relPath, download });
 
+      // Always revalidated (a 304 when unchanged), and never `public` — PHI.
+      res.setHeader('Cache-Control', REVALIDATE);
       const sendOpts = {
         dotfiles: 'allow' as const,
         acceptRanges: true,
-        cacheControl: true,
+        cacheControl: false,
         lastModified: true,
       };
 
@@ -285,10 +298,10 @@ router.get(
           isNaN(width) ? 240 : width
         );
         res.setHeader('Content-Type', 'image/webp');
-        // PHI thumbnail → `private` so the off-LAN cloudflared edge / any shared
-        // cache never stores it (auth lives at our origin). Callers bust on
-        // re-render via `?v=mtime`, so a 7-day browser cache is safe + self-heals.
-        res.setHeader('Cache-Control', 'private, max-age=604800');
+        // A re-render keeps the file's name, so the 7-day browser cache is only for
+        // a `?v=` that names this mtime (every caller passes one); anything else
+        // revalidates. `private` keeps PHI off the cloudflared edge.
+        res.setHeader('Cache-Control', imageCacheControl(req.query.v, mtimeMs, { maxAgeSeconds: THUMB_MAX_AGE_S }));
         res.sendFile(
           thumbPath,
           { dotfiles: 'allow', cacheControl: false, lastModified: true },
@@ -301,10 +314,11 @@ router.get(
 
       // ── Full file branch (working `.iNN` images are JPEG bytes) ──
       log.info('[Files] working-content', { userId: req.session?.userId, personId, name, download });
+      res.setHeader('Cache-Control', REVALIDATE);
       const sendOpts = {
         dotfiles: 'allow' as const,
         acceptRanges: true,
-        cacheControl: true,
+        cacheControl: false,
         lastModified: true,
       };
       const onDone = (err: Error | undefined): void => {

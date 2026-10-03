@@ -9,6 +9,7 @@ import {
 } from '@/query/queries';
 import type { AlignerPatient } from '@shared/contracts/aligner.contract';
 import styles from './PatientsList.module.css';
+import { buildWorkingContentUrl } from '../../components/react/files/fileHelpers';
 
 interface Doctor {
     dr_id: number | string;
@@ -169,8 +170,13 @@ const PatientsList: React.FC = () => {
                             )}
                             <div className={styles.patientCardHeader}>
                                 <div className={styles.patientCardPhoto}>
+                                    {/* The first session's Smile as a small thumbnail. It was
+                                        `/DolImgs/{id}00.i13`: the full render for a 60px avatar,
+                                        unversioned behind a year-long immutable cache, so a
+                                        re-crop never showed here (WorkComponent's FE-F13-1 fix). */}
                                     <img
-                                        src={`/DolImgs/${patient.person_id}00.i13`}
+                                        src={buildWorkingContentUrl(patient.person_id, `${patient.person_id}00.i13`, { thumb: 240 })}
+                                        loading="lazy"
                                         alt={`${formatPatientName(patient)} - Smile`}
                                         onError={handleImageError}
                                     />

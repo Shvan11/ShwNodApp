@@ -181,7 +181,7 @@ async function exists(p: string): Promise<boolean> {
 }
 
 /** Bounded-concurrency map — keeps us from firing thousands of parallel stats. */
-async function mapLimit<T, R>(
+export async function mapLimit<T, R>(
   items: T[],
   limit: number,
   fn: (item: T) => Promise<R>
@@ -336,6 +336,15 @@ export async function walkFlat(
 // ===========================================
 // CONTENT (path resolution for the route's res.sendFile)
 // ===========================================
+
+/**
+ * Resolve + guard a folder for reading its entries yourself (path math + the
+ * symlink-escape check). Returns the real absolute path; 404 when it is missing.
+ */
+export async function resolveDirForRead(personId: string | number, relPath: string): Promise<string> {
+  const { root, abs } = resolveSafe(personId, relPath);
+  return realpathGuard(abs, root);
+}
 
 /**
  * Resolve + guard a file for serving. Returns the real absolute path and the

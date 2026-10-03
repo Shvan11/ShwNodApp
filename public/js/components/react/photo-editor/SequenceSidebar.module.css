@@ -125,12 +125,41 @@
   box-shadow: var(--shadow-focus);
 }
 
+.thumbCaption {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .thumbName {
   font-size: 0.68rem;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* When the photo was taken (EXIF) — day over time. */
+.thumbTaken {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.thumbTakenTime {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Taken on another day than the session — likely a leftover on the card. */
+.thumbTakenOtherDay {
+  color: var(--warning-700);
+  font-weight: var(--font-weight-medium);
 }
 
 .note {

@@ -285,6 +285,18 @@ export const formatLocaleDateTime = (
   lang: Language = 'en'
 ): string => toValidDate(value)?.toLocaleString(LANGUAGES[lang].locale, options) ?? '';
 
+/**
+ * When a photo was taken — its EXIF capture time ('YYYY-MM-DDTHH:MM:SS', zone-less,
+ * read as local) → "Jun 17, 2026, 4:59 PM". Shared by the photo grid caption and the
+ * photo editor's Sequence Files list.
+ */
+export const formatPhotoTakenAt = (takenAt: string, lang: Language = 'en'): string =>
+  formatLocaleDateTime(
+    takenAt,
+    { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' },
+    lang
+  );
+
 /** A wall-clock time in an app locale — `toLocaleTimeString` with the locale pinned. */
 export const formatLocaleTime = (
   value: DateInput,
