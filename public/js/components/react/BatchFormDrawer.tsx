@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
 import { formatISODate } from '../../core/utils';
+import { describeRemainingAligners, lastFlagPrompt } from '../../utils/batchLastFlag';
 import { postJSON, putJSON, patchJSON, httpErrorMessage, type HttpError } from '@/core/http';
 
 interface BatchFormData {
@@ -243,11 +244,25 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         const newRemainingUpper = (set?.remaining_upper_aligners ?? 0) + oldUpperConsumed - newUpperConsumed;
         const newRemainingLower = (set?.remaining_lower_aligners ?? 0) + oldLowerConsumed - newLowerConsumed;
 
-        let markAsLast = false;
-        if (newRemainingUpper === 0 && newRemainingLower === 0 && !formData.is_last) {
-            markAsLast = await confirm(
+        let isLast = formData.is_last;
+        const prompt = lastFlagPrompt({
+            isLast,
+            wasLast: batch?.is_last ?? false,
+            currentRemainingUpper: set?.remaining_upper_aligners ?? 0,
+            currentRemainingLower: set?.remaining_lower_aligners ?? 0,
+            nextRemainingUpper: newRemainingUpper,
+            nextRemainingLower: newRemainingLower,
+        });
+        if (prompt === 'offer') {
+            isLast = await confirm(
                 'Both remaining upper and lower aligners will be 0. Do you want to mark this as the last batch?',
                 { title: 'Mark as Last Batch', confirmText: 'Mark as Last', cancelText: 'No' }
+            );
+        } else if (prompt === 'confirm') {
+            // "No" (or dismissing) saves the batch WITHOUT the flag — the rest of the edit still stands.
+            isLast = await confirm(
+                `This set still has ${describeRemainingAligners(newRemainingUpper, newRemainingLower)} that are not in any batch. Are you sure this is the last batch?`,
+                { title: 'Aligners Remaining', confirmText: 'Yes, Last Batch', cancelText: 'No, Not Last' }
             );
         }
 
@@ -260,7 +275,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             const { batch_sequence: _batchSequence, ...editableFields } = formData;
             const dataToSend = {
                 ...editableFields,
-                ...(markAsLast && { is_last: true }),
+                is_last: isLast,
                 aligner_set_id: set?.aligner_set_id,
                 has_upper_template: canChangeTemplateOption ? hasUpperTemplate : undefined,
                 has_lower_template: canChangeTemplateOption ? hasLowerTemplate : undefined

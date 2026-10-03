@@ -217,6 +217,10 @@ export async function createBatch(batchData: BatchData): Promise<number | null> 
     if (isActive) {
       await trx.updateTable('aligner_batches').set({ is_active: false }).where('aligner_set_id', '=', aligner_set_id).where('is_active', '=', true).execute();
     }
+    // The new batch is the newest in its set, so no earlier batch can still be the last one —
+    // whether or not this one is. Without this, a batch marked last stayed last after a later
+    // batch was added, and a set could carry two "last" batches (sets 232/307/315, 2026-10).
+    await trx.updateTable('aligner_batches').set({ is_last: false }).where('aligner_set_id', '=', aligner_set_id).where('is_last', '=', true).execute();
 
     const upperBase = hasU ? -1 : 0;
     const lowerBase = hasL ? -1 : 0;
