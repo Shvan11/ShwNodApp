@@ -2,16 +2,19 @@
  * Telegram share modal — pick a contact (or type a phone), then push the given
  * file(s) to it over Telegram.
  *
- * Mirrors the Send Message screen's recipient picker (Patients' Phones / Dr.
- * Shwan / Clinic sources + a searchable dropdown + free-text phone), but is
- * driven off a `ShareSource[]` like the LocalSend modal so single + batch share
- * are one code path.
+ * Mirrors the Send Message screen's recipient picker (patients' phones, staff, the
+ * Google contact accounts from `shared/google-contacts-accounts.ts` + a searchable
+ * dropdown + free-text phone), but is driven off a `ShareSource[]` like the
+ * LocalSend modal so single + batch share are one code path.
  *
  * Big files upload for minutes, so the send is a BACKGROUND JOB: we POST to
  * start it (returns instantly with a job id, dodging the 30s request timeout),
  * then poll `/api/telegram/send/:jobId` to drive a per-file progress bar until
- * the job reports `done`. All I/O goes through the core/http funnel (reads carry
- * `{ schema }`); the poll is React-Query-managed, not local `useState`.
+ * the job reports `done`. The poll keeps running in a hidden tab, and a 404 is
+ * final (the server has forgotten the job); closing mid-upload hands the job to
+ * `services/share-watch.ts`, which reports how it ends (FE-F14-6). All I/O goes
+ * through the core/http funnel (reads carry `{ schema }`); the poll is
+ * React-Query-managed, not local `useState`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Select, { type SingleValue, type StylesConfig } from 'react-select';
@@ -19,7 +22,9 @@ import { useQuery } from '@tanstack/react-query';
 import Modal from '../Modal';
 import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
-import { postJSON, httpErrorMessage } from '@/core/http';
+import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { GOOGLE_CONTACT_ACCOUNTS } from '@shared/google-contacts-accounts';
+import { lostTrackMessage, watchTelegramJob } from '@/services/share-watch';
 import {
   patientPhonesQuery,
   googleContactsQuery,
@@ -51,14 +56,15 @@ interface ContactOption {
   phone: string;
 }
 
-type Source = 'pat' | 'emp' | 'shw' | 'cli';
+/** 'pat' | 'emp', or a Google contact account id from the registry. */
+type Source = string;
 
-const SOURCE_LABELS: Record<Source, string> = {
-  pat: "Patients' Phones",
-  emp: 'Employee Phones',
-  shw: 'Dr. Shwan Phone',
-  cli: 'Clinic Phone',
-};
+// The account labels come from the registry, not a copy here (FE-F14-11).
+const SOURCES: ReadonlyArray<{ id: Source; label: string }> = [
+  { id: 'pat', label: "Patients' Phones" },
+  { id: 'emp', label: 'Employee Phones' },
+  ...GOOGLE_CONTACT_ACCOUNTS.map((a) => ({ id: a.id, label: a.label })),
+];
 
 const selectStyles: StylesConfig<ContactOption, false> = {
   menu: (provided) => ({ ...provided, zIndex: 9999 }),
@@ -82,14 +88,23 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
   const statusResult = useQuery({ ...telegramStatusQuery(), enabled: open });
   const enabled = statusResult.data?.enabled ?? true;
 
-  // Poll the running job for per-file progress; stop once it reports `done`.
+  // Poll the running job for per-file progress; stop once it reports `done`, or once
+  // the server answers 404 (it has forgotten the job — final, not transient). The
+  // poll keeps going in a hidden tab: React Query pauses it otherwise, and the server
+  // dropped a finished job before the user came back (FE-F14-6a).
   const progressResult = useQuery({
     ...telegramSendProgressQuery(jobId ?? ''),
     enabled: !!jobId,
-    refetchInterval: (query) => (query.state.data?.status === 'done' ? false : 800),
+    retry: (count, err) => (err as HttpError)?.status !== 404 && count < 2,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'done' || (query.state.error as HttpError | null)?.status === 404
+        ? false
+        : 800,
+    refetchIntervalInBackground: true,
   });
   const progress = jobId ? progressResult.data : undefined;
   const done = progress?.status === 'done';
+  const lost = !!jobId && (progressResult.error as HttpError | null)?.status === 404;
 
   // Contacts come from the patients' phone book (`pat`), the staff roster (`emp`),
   // or a Google contact group (`shw`/`cli`); only the active source fetches while
@@ -161,19 +176,12 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
     setPhone('');
   };
 
-  // Prefill the phone input from a picked contact (same shaping as Send Message).
+  // Prefill the phone input with the contact's number AS STORED: the server's
+  // formatter normalises every form (07…, 7…, +964…, 00964…). Prefixing '964' here
+  // turned a stored `07…` into `9640750…`, which the server then kept (FE-F14-11).
   const handleSelect = (opt: SingleValue<ContactOption>): void => {
     setSelected(opt);
-    if (!opt?.phone) {
-      setPhone('');
-      return;
-    }
-    if (source === 'pat') {
-      setPhone('964' + opt.phone);
-      return;
-    }
-    const match = opt.phone.match(/(?:(?:(?:00)|\+)(?:964)|0)[ ]?(\d{3})[ ]?(\d{3})[ ]?(\d{4})/);
-    setPhone(match ? '964' + match[1] + match[2] + match[3] : opt.phone);
+    setPhone(opt?.phone ?? '');
   };
 
   const handleSend = useCallback(async (): Promise<void> => {
@@ -199,10 +207,17 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
     setStarting(false);
   };
 
+  // Closing mid-upload does not stop it: the job is handed to the background watcher,
+  // which toasts how it ends.
+  const handleClose = (): void => {
+    if (jobId && !done && !lost) watchTelegramJob(jobId, phone.trim() || 'the recipient');
+    onClose();
+  };
+
   if (!open) return null;
 
-  const phase: 'form' | 'uploading' | 'result' =
-    done && progress ? 'result' : jobId || starting ? 'uploading' : 'form';
+  const phase: 'form' | 'uploading' | 'result' | 'lost' =
+    lost ? 'lost' : done && progress ? 'result' : jobId || starting ? 'uploading' : 'form';
   const pct = Math.round((progress?.fileProgress ?? 0) * 100);
   const index = Math.min(progress?.index || 1, progress?.total || sources.length);
   const total = progress?.total ?? sources.length;
@@ -210,7 +225,7 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
   return (
     <Modal
       isOpen
-      onClose={onClose}
+      onClose={handleClose}
       ariaLabelledBy="telegram-share-title"
       contentClassName={styles.modal}
       overlayClassName={styles.overlay}
@@ -220,7 +235,7 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
         titleId="telegram-share-title"
         icon={<i className="fab fa-telegram" aria-hidden="true" />}
         title="Share via Telegram"
-        onClose={onClose}
+        onClose={handleClose}
       />
 
       <div className={styles.body}>
@@ -241,12 +256,13 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
             <select
               className={styles.sourceSelect}
               value={source}
-              onChange={(e) => handleSourceChange(e.target.value as Source)}
+              onChange={(e) => handleSourceChange(e.target.value)}
               disabled={!enabled}
+              aria-label="Contacts from"
             >
-              {(Object.keys(SOURCE_LABELS) as Source[]).map((s) => (
-                <option key={s} value={s}>
-                  {SOURCE_LABELS[s]}
+              {SOURCES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -260,6 +276,7 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
               isClearable
               isDisabled={!enabled}
               placeholder="Search and select a contact…"
+              aria-label="Contact"
               noOptionsMessage={() => 'No contacts found'}
               classNamePrefix="react-select"
               styles={selectStyles}
@@ -270,7 +287,8 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
               className={styles.phoneInput}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone number (e.g. 9647XXXXXXXX)"
+              placeholder="Phone number (e.g. 07XX XXX XXXX)"
+              aria-label="Phone number"
               inputMode="tel"
               disabled={!enabled}
             />
@@ -303,7 +321,14 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
               <div className={styles.progressName} title={progress?.name}>
                 {progress?.name || 'Preparing…'}
               </div>
-              <div className={styles.progressTrack}>
+              <div
+                className={styles.progressTrack}
+                role="progressbar"
+                aria-label={progress?.name || 'Sending'}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={pct}
+              >
                 <div className={styles.progressBar} style={{ width: `${pct}%` }} />
               </div>
               {(progress?.errors.length ?? 0) > 0 && (
@@ -311,10 +336,13 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
                   {progress?.errors.length} failed so far
                 </span>
               )}
+              <span className={styles.subtle}>
+                Closing this window doesn't stop the upload — you'll be told how it ends.
+              </span>
             </div>
 
             <div className={styles.footer}>
-              <button type="button" className={styles.toolButton} onClick={onClose}>
+              <button type="button" className={styles.toolButton} onClick={handleClose}>
                 Close
               </button>
               <button type="button" className={styles.primaryButton} disabled>
@@ -324,9 +352,22 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
           </>
         )}
 
+        {phase === 'lost' && (
+          <>
+            <p className={styles.resultSummary} role="status">
+              {lostTrackMessage(phone.trim() || 'the recipient')}
+            </p>
+            <div className={styles.footer}>
+              <button type="button" className={styles.toolButton} onClick={onClose}>
+                Close
+              </button>
+            </div>
+          </>
+        )}
+
         {phase === 'result' && progress && (
           <>
-            <p className={styles.resultSummary}>
+            <p className={styles.resultSummary} role="status">
               Sent {progress.sent} of {progress.total} file(s).
             </p>
             {progress.errors.length > 0 && (

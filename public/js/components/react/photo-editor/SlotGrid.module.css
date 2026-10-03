@@ -71,3 +71,12 @@
   max-height: 70%;
   object-fit: contain;
 }
+
+/* No logo set: the install's name instead (FE-F14-11). */
+.logoName {
+  padding: var(--spacing-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}

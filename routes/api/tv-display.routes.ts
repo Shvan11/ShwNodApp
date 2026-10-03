@@ -27,7 +27,7 @@ import { authorize } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import { timeouts } from '../../middleware/timeout.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
-import { UploadRejectedError, uploadErrorMessage } from '../../middleware/upload.js';
+import { createUpload, UploadRejectedError, uploadErrorMessage } from '../../middleware/upload.js';
 import { log } from '../../utils/logger.js';
 import { ALL_ROLES } from '../../shared/auth/roles.js';
 import {
@@ -69,7 +69,7 @@ router.use('/tv-display', authorize(ALL_ROLES));
  * EXDEV risk on a network-mounted deployment. Staged names are random; the real
  * (sanitized, de-duplicated) name is chosen at commit time by the store.
  */
-const upload = multer({
+const upload = createUpload({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
       mkdir(UPLOAD_STAGE_DIR, { recursive: true })

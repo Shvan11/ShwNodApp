@@ -20,7 +20,9 @@ import {
     patientInfoQuery,
     hasAppointmentQuery,
     paymentHistoryQuery,
+    galleryQuery,
 } from '@/query/queries';
+import { buildWorkingContentUrl } from './files/fileHelpers';
 import {
     deleteInvoice as deleteInvoiceContract,
     type PaymentHistoryResponse,
@@ -127,6 +129,16 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
     const [patientPhotoError, setPatientPhotoError] = useState(false);
+    // The card's photo is the first session's Smile, from the gallery read (shared
+    // with the photo grid): the file that is on disk (either case) and its mtime as
+    // the version, served as the small thumbnail. It used to be `/DolImgs/{id}00.i13`
+    // — the full render, lower case only, with no version, so a re-crop stayed stale
+    // behind the immutable cache header (FE-F13-1's sibling).
+    const { data: initialGallery } = useQuery({
+        ...galleryQuery(personId ?? '', 0),
+        enabled: !!personId,
+    });
+    const smile = initialGallery?.i13 ?? null;
 
     // Payment-related state
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -507,11 +519,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             {patientInfo && (
                 <div className={styles.patientInfoCard}>
                     <div className={styles.patientPhotoContainer}>
-                        {patientPhotoError ? (
+                        {patientPhotoError || !smile || !personId ? (
                             <i className={`fas fa-user ${styles.patientPhotoFallback}`} aria-hidden="true"></i>
                         ) : (
                             <img
-                                src={`/DolImgs/${personId}00.i13`}
+                                src={buildWorkingContentUrl(personId, smile.name, { thumb: 240, v: smile.mtime })}
                                 alt={t('patientCard.smileAlt', { name: patientInfo.patient_name })}
                                 className={styles.patientPhoto}
                                 onError={() => setPatientPhotoError(true)}

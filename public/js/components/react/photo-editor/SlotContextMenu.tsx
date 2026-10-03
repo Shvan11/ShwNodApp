@@ -1,10 +1,12 @@
 /**
  * Right-click context menu for a photo slot (Dolphin-style). Generic: the caller
- * (SlotGrid) builds the items per slot mode — Restore original / Remove. Open/close
- * behaviour mirrors CalendarContextMenu (outside-mousedown + Escape close); the menu
- * is position:fixed at the cursor so it escapes the grid's scroll/clip.
+ * (SlotGrid) builds the items per slot mode — Restore original / Remove. Focus,
+ * arrow keys, Escape, outside-click and viewport clamping come from the shared
+ * `useFloatingMenu`, as for the calendar menus (FE-F14-13b); the menu is
+ * position:fixed at the cursor so it escapes the grid's scroll/clip.
  */
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
+import { useFloatingMenu } from '@/hooks/useFloatingMenu';
 import styles from './SlotContextMenu.module.css';
 
 export interface SlotMenuItem {
@@ -26,26 +28,18 @@ interface Props {
 
 const SlotContextMenu = ({ x, y, items, onClose }: Props) => {
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleOutside = (event: globalThis.MouseEvent): void => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) onClose();
-    };
-    const handleEsc = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose();
-    };
-    // Defer the outside-click listener a frame so the opening right-click doesn't close it.
-    const raf = requestAnimationFrame(() => document.addEventListener('mousedown', handleOutside));
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      cancelAnimationFrame(raf);
-      document.removeEventListener('mousedown', handleOutside);
-      document.removeEventListener('keydown', handleEsc);
-    };
-  }, [onClose]);
+  const { position, onKeyDown } = useFloatingMenu(menuRef, { x, y }, onClose);
 
   return (
-    <div ref={menuRef} className={styles.menu} style={{ left: `${x}px`, top: `${y}px` }} role="menu">
+    <div
+      ref={menuRef}
+      className={styles.menu}
+      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+      role="menu"
+      tabIndex={-1}
+      aria-label="Photo slot actions"
+      onKeyDown={onKeyDown}
+    >
       {items.map((item) => (
         <button
           key={item.key}

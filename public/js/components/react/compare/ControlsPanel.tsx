@@ -4,10 +4,10 @@
  * the export actions (Save / Share).
  */
 
-import React, { ChangeEvent } from 'react';
+import type { ChangeEvent } from 'react';
 import cn from 'classnames';
 import type { ComparisonEngine, EngineSnapshot } from './ComparisonEngine';
-import { CANVAS_SIZES, TOOLS } from './types';
+import { CANVAS_SIZES, TOOLS, type LogoTone } from './types';
 import {
     IconArrowDown,
     IconArrowLeft,
@@ -43,6 +43,8 @@ interface Props {
 }
 
 const SELECT_FIRST_HINT = 'Select an element first (click a photo or use the target picker)';
+const LOGO_TONE_LABEL: Record<LogoTone, string> = { white: 'white', black: 'black', original: 'its own colours' };
+const NEXT_TONE: Record<LogoTone, LogoTone> = { white: 'black', black: 'original', original: 'white' };
 // Step applied to every crop edge by the symmetric expand/contract buttons.
 const CROP_NUDGE_STEP = 0.03;
 
@@ -91,7 +93,7 @@ const ControlsPanel = ({
             <div className={styles.section}>
                 <h4 className={styles.sectionTitle}>Target</h4>
                 <div className={styles.segmented} role="group" aria-label="Element to adjust">
-                    {TOOLS.map(tool => (
+                    {TOOLS.filter(tool => tool.value !== 3 || snap.hasLogo).map(tool => (
                         <button
                             key={tool.value}
                             onClick={() => engine?.setSelectedImage(tool.value)}
@@ -253,26 +255,31 @@ const ControlsPanel = ({
                     >
                         <IconBisect size={16} />
                     </button>
-                    <button
-                        onClick={() => engine?.toggleLogo()}
-                        disabled={!engine}
-                        aria-pressed={snap.showLogo}
-                        title={snap.showLogo ? 'Hide the clinic logo' : 'Show the clinic logo'}
-                        aria-label="Toggle clinic logo"
-                        className={cn(styles.iconButton, snap.showLogo && styles.iconButtonActive)}
-                    >
-                        <IconBadge size={16} />
-                    </button>
-                    <button
-                        onClick={() => void engine?.toggleLogoColor()}
-                        disabled={!engine || !snap.showLogo}
-                        aria-pressed={snap.logoBlack}
-                        title={snap.logoBlack ? 'Switch to the white logo' : 'Switch to the black logo'}
-                        aria-label="Toggle logo color"
-                        className={cn(styles.iconButton, snap.logoBlack && styles.iconButtonActive)}
-                    >
-                        <IconContrast size={16} />
-                    </button>
+                    {/* The watermark is this install's logo (Settings → General); with none
+                        set there is nothing to toggle (FE-F13-7). */}
+                    {snap.hasLogo && (
+                        <>
+                            <button
+                                onClick={() => engine?.toggleLogo()}
+                                disabled={!engine}
+                                aria-pressed={snap.showLogo}
+                                title={snap.showLogo ? 'Hide the clinic logo' : 'Show the clinic logo'}
+                                aria-label="Toggle clinic logo"
+                                className={cn(styles.iconButton, snap.showLogo && styles.iconButtonActive)}
+                            >
+                                <IconBadge size={16} />
+                            </button>
+                            <button
+                                onClick={() => engine?.cycleLogoTone()}
+                                disabled={!engine || !snap.showLogo}
+                                title={`Logo colour: ${LOGO_TONE_LABEL[snap.logoTone]} — click for ${LOGO_TONE_LABEL[NEXT_TONE[snap.logoTone]]}`}
+                                aria-label={`Logo colour: ${LOGO_TONE_LABEL[snap.logoTone]}`}
+                                className={styles.iconButton}
+                            >
+                                <IconContrast size={16} />
+                            </button>
+                        </>
+                    )}
                 </div>
                 <button
                     onClick={() => engine?.reset()}
@@ -291,7 +298,7 @@ const ControlsPanel = ({
                     <button
                         onClick={onSave}
                         disabled={!engine || !isReady}
-                        title="Download the comparison as a PNG file"
+                        title="Download the comparison as a JPEG file"
                         className={styles.exportButton}
                     >
                         <IconDownload size={18} />

@@ -410,7 +410,7 @@ export const routesConfig: RouteObject[] = [
           {
             path: ':personId/:page/*',
             element: (
-              <RouteErrorBoundary routeName="Patient Portal">
+              <RouteErrorBoundary routeName="patient record">
                 <PatientShell />
               </RouteErrorBoundary>
             ),

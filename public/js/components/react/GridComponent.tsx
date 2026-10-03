@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef, MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { invalidatePatientPhotos } from '@/query/photos';
 import { reportClientError, describeHttpError } from '@/core/error-reporter';
 import { qk } from '@/query/keys';
-import { timepointsQuery, galleryQuery, photoVisibilityQuery, patientInfoQuery } from '@/query/queries';
+import { timepointsQuery, galleryQuery, photoVisibilityQuery, brandingQuery } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
+import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
 import tpStyles from './TimePointsSelector.module.css';
 import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
@@ -32,24 +34,8 @@ interface Props {
 // API payload — see patient.contract.ts `gallery`.
 type GalleryView = patientContract.GalleryView;
 
-interface Timepoint {
-    tp_code: string;
-    tp_description: string;
-    tp_date_time: string;
-}
-
-// Legacy shape expected by EditTimepointModal / DeleteTimepointModal (not in this file's edit scope)
-interface LegacyTimepoint {
-    tpCode: string;
-    tpDescription: string;
-    tpDateTime: string;
-}
-
-const toLegacyTp = (tp: Timepoint): LegacyTimepoint => ({
-    tpCode: tp.tp_code,
-    tpDescription: tp.tp_description,
-    tpDateTime: tp.tp_date_time,
-});
+type Timepoint = patientContract.TimepointRow;
+type PrivateImages = patientContract.PhotoVisibilityListResponse['privateImages'];
 
 interface GridCell {
     id: string;
@@ -58,6 +44,14 @@ interface GridCell {
     alt: string;
     isLogo?: boolean;
 }
+
+// A touch-first device (phone/tablet) gets the OS share sheet in the lightbox; a
+// desktop gets *Send Message* (the clinic-WhatsApp page). "Has navigator.share"
+// was the old test, and Chrome/Edge on Windows have it, so clinic PCs lost Send
+// Message and showed two buttons called "Share" (FE-F12-2).
+const isTouchFirst = (): boolean =>
+    typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+const canNativeShare = (): boolean => 'share' in navigator && 'canShare' in navigator;
 
 interface CachedShareBlob {
     url: string | null;
@@ -87,7 +81,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Timepoints read on useQuery (loose contract models only tp_code/date/desc;
     // rows carry the full Timepoint shape). A timepoint mutation's invalidation
     // refreshes this live (Phase 3).
-    const { data: timepointsData, isLoading: loadingTimepoints, refetch: refetchTimepoints } = useQuery({
+    const { data: timepointsData, isLoading: loadingTimepoints } = useQuery({
         ...timepointsQuery(personId ?? ''),
         enabled: !!personId,
     });
@@ -95,25 +89,22 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Gallery images for the current timepoint, on useQuery. The gallery drives the
     // grid's loading/error state (the visibility read below is best-effort, exactly
     // as in the prior Promise.all where gallery threw and visibility .catch→null'd).
-    const galleryQ = useQuery({ ...galleryQuery(personId ?? '', tpCode), enabled: !!personId });
-    const visibilityQ = useQuery({ ...photoVisibilityQuery(personId ?? ''), enabled: !!personId });
-    // Patient name for the New Photo Session dialog (shared cache — Navigation
-    // on this page already fetches it).
-    const { data: patientInfo } = useQuery({
-        ...patientInfoQuery(personId ?? ''),
+    // keepPreviousData: a switch to an uncached tab keeps the previous session's grid
+    // (and the tab strip) on screen while the new one loads, instead of replacing the
+    // whole page with "Loading gallery..." (FE-F12-8a).
+    const galleryQ = useQuery({
+        ...galleryQuery(personId ?? '', tpCode),
         enabled: !!personId,
+        placeholderData: keepPreviousData,
     });
+    const visibilityQ = useQuery({ ...photoVisibilityQuery(personId ?? ''), enabled: !!personId });
+    const { data: branding } = useQuery(brandingQuery());
+    const clinicName = branding?.clinicName?.trim() || '';
     // Gallery keyed by view code ({ i10: {...}|null, … }); null = unrendered slot.
     const gallery = galleryQ.data;
     const loading = !!personId && galleryQ.isLoading;
-    const error = galleryQ.error ? httpErrorMessage(galleryQ.error, 'Unknown error') : null;
-    // Refresh both gallery reads after a render/delete; callers await it (the await
-    // settles once the refetch completes, preserving the old reload-then-act order).
-    const reloadGallery = () =>
-        Promise.all([
-            queryClient.invalidateQueries({ queryKey: qk.patient.gallery(personId ?? '', tpCode) }),
-            queryClient.invalidateQueries({ queryKey: qk.patient.photoVisibility(personId ?? '') }),
-        ]);
+    const switching = galleryQ.isPlaceholderData;
+    const error = galleryQ.error && !gallery ? httpErrorMessage(galleryQ.error, 'Unknown error') : null;
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
     // LocalSend share modal — opened imperatively from the lightbox toolbar.
     const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
@@ -122,42 +113,34 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Originals-folder existence for the open menu (null = still checking).
     const [menuFolder, setMenuFolder] = useState<{ folder: string | null; exists: boolean } | null>(null);
     const menuTpRef = useRef<string | null>(null);
-    const [editTp, setEditTp] = useState<LegacyTimepoint | null>(null);
-    const [deleteTp, setDeleteTp] = useState<LegacyTimepoint | null>(null);
+    const [editTp, setEditTp] = useState<Timepoint | null>(null);
+    const [deleteTp, setDeleteTp] = useState<Timepoint | null>(null);
     // "New session" dialog (also reachable from Navigation + Patient Info).
     const [showNewSession, setShowNewSession] = useState(false);
     const [deleteScope, setDeleteScope] = useState<DeleteScope>('all');
     const [savingTp, setSavingTp] = useState(false);
     const [deletingTp, setDeletingTp] = useState(false);
-    // Set of private photo filenames (lowercase) for the CURRENT tpCode.
-    // Used both for grid badges and for the PhotoSwipe eye-toggle button.
-    const [privateNames, setPrivateNames] = useState<Set<string>>(() => new Set());
-    // Ref mirrors privateNames so PhotoSwipe callbacks (outside React's tree) read fresh
-    // state. Kept in sync two ways: the effect below (for the query re-seed) AND a direct
-    // write in togglePhotoPrivacy — the click handler runs syncButton() synchronously
-    // right after a toggle, before this effect runs on the next commit, so the effect
-    // alone would leave the lightbox icon a toggle behind.
-    const privateNamesRef = useRef<Set<string>>(privateNames);
-    useEffect(() => {
-        privateNamesRef.current = privateNames;
-    }, [privateNames]);
-    // Seed the private-name set from the visibility query (filtered to this tpCode).
-    // togglePhotoPrivacy still updates this set optimistically; a visibility
-    // invalidation re-seeds it from the server on the next settle. Done during render
-    // (adjust-state-during-render), keyed on the visibility-data identity + tpCode,
-    // rather than in an effect so the React Compiler can optimize it.
-    const [seededFor, setSeededFor] = useState<{ data: typeof visibilityQ.data; tpCode: string } | null>(null);
-    if (seededFor === null || seededFor.data !== visibilityQ.data || seededFor.tpCode !== tpCode) {
-        setSeededFor({ data: visibilityQ.data, tpCode });
-        const priv = (visibilityQ.data?.privateImages ?? []) as Array<{ tp: string; name: string }>;
-        setPrivateNames(new Set(priv.filter((r) => r.tp === tpCode).map((r) => r.name.toLowerCase())));
-    }
+    // Private (hidden-from-patient) photo names for the CURRENT tpCode, lowercased —
+    // derived from the visibility query on every render. A toggle writes the query
+    // cache itself (setQueryData), so the marks survive a tab switch; they used to live
+    // in local state re-seeded from the mount-time read, and a switch put them back to
+    // how they were when the page opened (FE-F12-4).
+    const privateNames = new Set(
+        (visibilityQ.data?.privateImages ?? [])
+            .filter((r) => r.tp === tpCode)
+            .map((r) => r.name.toLowerCase())
+    );
+    // PhotoSwipe's buttons live outside React's tree and run synchronously right after
+    // a toggle, so they read the CACHE (always current), not a render-time snapshot.
+    const isPrivateNow = (fileName: string): boolean =>
+        (queryClient.getQueryData<{ privateImages: PrivateImages }>(qk.patient.photoVisibility(personId ?? ''))
+            ?.privateImages ?? []
+        ).some((r) => r.tp === tpCode && r.name.toLowerCase() === fileName.toLowerCase());
     const componentRef = useRef<HTMLDivElement>(null);
     const isSharingRef = useRef(false);
 
     // Anonymize toggle (session-local, never persisted). Ref mirror so PhotoSwipe
-    // callbacks (outside React's tree) read fresh state — same pattern as
-    // privateNamesRef above.
+    // callbacks (outside React's tree) read fresh state.
     const [anonymize, setAnonymize] = useState(false);
     const anonymizeRef = useRef(anonymize);
     useEffect(() => {
@@ -228,7 +211,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         { id: 'fr', view: 'i12', alt: 'Rest' },
         { id: 'fs', view: 'i13', alt: 'Smile' },
         { id: 'up', view: 'i23', alt: 'Upper' },
-        { id: 'logo', alt: 'Shwan Orthodontics', isLogo: true },
+        { id: 'logo', alt: clinicName, isLogo: true },
         { id: 'lw', view: 'i24', alt: 'Lower' },
         { id: 'rt', view: 'i20', alt: 'Right' },
         { id: 'ct', view: 'i22', alt: 'Center' },
@@ -258,11 +241,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
     // Pre-fetch blob for current slide (called on slide change, mobile only)
     const prefetchBlobForShare = async (imageUrl: string) => {
-        // Only pre-fetch if native share is available
-        if (!navigator.share || !navigator.canShare) return;
+        // Only pre-fetch where the lightbox offers the native share button.
+        if (!canNativeShare() || !isTouchFirst()) return;
 
-        // Skip logo and placeholder images
-        if (imageUrl.includes('logo.png') || imageUrl.includes('placeholder')) return;
+        // Only real Dolphin renders.
+        if (!/\.i\d+$/i.test(getFileNameFromUrl(imageUrl))) return;
 
         // Increment fetchId to handle race conditions
         const currentFetchId = ++cachedShareBlobRef.current.fetchId;
@@ -272,9 +255,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         cachedShareBlobRef.current.blob = null;
 
         try {
-            // Raw image fetch read as a Blob for the native share sheet — not a
-            // JSON API call, so it stays on bare fetch().
-            // eslint-disable-next-line no-restricted-syntax
+            // eslint-disable-next-line no-restricted-syntax -- a raw image read as a Blob for the native share sheet, not a JSON API call
             const response = await fetch(imageUrl);
             if (!response.ok) return;
 
@@ -329,36 +310,29 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             });
     };
 
-    // Refetch the timepoints query and return the fresh array (callers that act on
-    // the new list — e.g. after a create/delete — still get it synchronously).
-    // TODO(phase3): post-mutation callers should invalidate the query instead.
-    const loadTimepoints = async (): Promise<Timepoint[]> => {
-        if (!personId) return [];
-        const { data } = await refetchTimepoints();
-        return data ?? [];
-    };
-
     // Toggle a photo's private flag. Called from the PhotoSwipe eye button (outside
-    // React's tree), so it reads state from the ref and writes to setPrivateNames.
+    // React's tree), so it reads and writes the visibility query's cache directly.
     const togglePhotoPrivacy = async (fileName: string): Promise<void> => {
         if (!personId) return;
         const lower = fileName.toLowerCase();
-        const wasPrivate = privateNamesRef.current.has(lower);
-        const nextPrivate = !wasPrivate;
+        const nextPrivate = !isPrivateNow(fileName);
         try {
             await postJSON(`/api/patients/${personId}/photos/visibility`, {
                 tp: tpCode,
                 name: fileName,
                 isPrivate: nextPrivate,
             });
-            // Write the ref synchronously so the immediate syncButton() (and the grid)
-            // reflect the toggle right away — the [privateNames] effect only runs on the
-            // next commit, which is too late for the click handler's own re-sync.
-            const next = new Set(privateNamesRef.current);
-            if (nextPrivate) next.add(lower);
-            else next.delete(lower);
-            privateNamesRef.current = next;
-            setPrivateNames(next);
+            // Write the stored state into the cache: the grid re-renders from it, and the
+            // lightbox button's immediate re-sync reads it synchronously.
+            queryClient.setQueryData<{ privateImages: PrivateImages }>(
+                qk.patient.photoVisibility(personId),
+                (old) => {
+                    const rest = (old?.privateImages ?? []).filter(
+                        (r) => !(r.tp === tpCode && r.name.toLowerCase() === lower)
+                    );
+                    return { privateImages: nextPrivate ? [...rest, { tp: tpCode, name: fileName }] : rest };
+                }
+            );
             toast.success(nextPrivate ? 'Photo hidden from patient' : 'Photo visible to patient');
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to update visibility'));
@@ -370,8 +344,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         // Strip any `?v=` cache-bust token so callers see the bare `….iNN` name.
         return imageUrl.substring(imageUrl.lastIndexOf('/') + 1).split('?')[0];
     };
-
-    const LOGO_SRC = '/images/logo.png';
 
     // The rendered view shown in a cell (null for the logo or an unrendered slot).
     const cellImage = (cell: GridCell): GalleryView | null =>
@@ -463,7 +435,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
 
             // Add eye-toggle button: staff can mark individual photos as
             // private (hidden from the patient portal). Reads current
-            // state from privateNamesRef; updates on slide change.
+            // state from the visibility cache; updates on slide change.
             pswpUi.registerElement({
                 name: 'visibility-toggle-button',
                 order: 7.5,
@@ -482,16 +454,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         const src = pswp.currSlide?.data?.src;
                         if (!src) return;
                         const fileName = getFileNameFromUrl(src);
-                        const isPlaceholder =
-                            src.includes('logo.png') ||
-                            src.includes('placeholder') ||
-                            !/\.i\d+$/i.test(fileName);
-                        if (isPlaceholder) {
+                        if (!/\.i\d+$/i.test(fileName)) {
                             el.style.display = 'none';
                             return;
                         }
                         el.style.display = '';
-                        const isPrivate = privateNamesRef.current.has(fileName.toLowerCase());
+                        const isPrivate = isPrivateNow(fileName);
                         el.classList.toggle(PRIVATE_CLASS, isPrivate);
                         const icon = el.querySelector('i');
                         if (icon) icon.className = isPrivate ? 'fas fa-eye-slash' : 'fas fa-eye';
@@ -518,8 +486,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 }
             });
 
-            // Add native share button (mobile only)
-            if ('share' in navigator && 'canShare' in navigator) {
+            // Native share button (touch-first devices only — see isTouchFirst).
+            if (canNativeShare() && isTouchFirst()) {
                 pswpUi.registerElement({
                     name: 'native-share-button',
                     order: 8.5,
@@ -541,8 +509,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 });
             }
 
-            // Add send message button (desktop only - mobile uses native share)
-            if (!navigator.share || !navigator.canShare) {
+            // Send Message button (desktop — touch-first devices use the native share).
+            if (!(canNativeShare() && isTouchFirst())) {
                 pswpUi.registerElement({
                     name: 'send-message-button',
                     order: 9,
@@ -614,17 +582,16 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 },
 
                 onInit: (el: HTMLElement, pswp: PhotoSwipeInstance) => {
-                    el.setAttribute('title', 'Share');
-                    el.setAttribute('aria-label', 'Share');
+                    // Its own name: the OS share button above is "Share" (FE-F12-2).
+                    el.setAttribute('title', 'Send to a device or Telegram');
+                    el.setAttribute('aria-label', 'Send to a device or Telegram');
 
                     el.addEventListener('click', () => {
                         const src = pswp.currSlide?.data?.src;
                         if (!src || !personId) return;
                         const fileName = getFileNameFromUrl(src);
-                        // Skip logo / placeholder — only real Dolphin views.
-                        if (src.includes('logo.png') || src.includes('placeholder') || !/\.i\d+$/i.test(fileName)) {
-                            return;
-                        }
+                        // Only real Dolphin views.
+                        if (!/\.i\d+$/i.test(fileName)) return;
                         setShareSources([{
                             source: 'patient-image',
                             personId,
@@ -664,8 +631,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             bar.style.height = `${Math.round(height * ANON_BAR_HEIGHT)}px`;
         });
 
-        // Pre-fetch the current slide's blob for the native share sheet (mobile only).
-        if ('share' in navigator && 'canShare' in navigator) {
+        // Pre-fetch the current slide's blob for the native share sheet (touch-first only).
+        if (canNativeShare() && isTouchFirst()) {
             lightboxInstance.on('firstUpdate', () => {
                 const src = lightboxInstance.pswp?.currSlide?.data?.src;
                 if (src) prefetchBlobForShare(src);
@@ -712,17 +679,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // When a background render for THIS patient+timepoint completes, refetch the
     // gallery (and timepoints, in case the save created a brand-new one) so the new
     // photos appear without a manual reload.
+    // (A render from ANOTHER tab or desk; the saving tab's photo-render-watch already
+    // invalidates.) Any session of this patient: the gallery keys are all prefixed by
+    // `galleryAll`, and only the mounted ones refetch.
     useEffect(() => {
         const onPhotosRendered = (payload: unknown): void => {
-            const p = payload as { personId?: number | string; tpCode?: number | string; tp_code?: number | string };
-            if (!personId) return;
-            // Tolerate either casing for the timepoint code: the internal emitter is
-            // untyped, so a snake_case `tp_code` slipped through historically and
-            // silently broke this match (→ no refetch → stale image until reload).
-            const pTp = p.tpCode ?? p.tp_code;
-            if (String(p.personId) !== String(personId) || String(pTp) !== String(tpCode)) return;
-            void reloadGallery();
-            void loadTimepoints();
+            const p = photoEditorContract.renderedEvent.safeParse(payload);
+            if (!personId || !p.success || String(p.data.personId) !== String(personId)) return;
+            void invalidatePatientPhotos(personId);
             // Outcome toasts (success / warnings / timeout) are owned by the
             // saving tab's photo-render-watch module — toasting here too would
             // double-notify when the user is parked on this grid.
@@ -731,8 +695,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         return () => {
             sseAppointments.off('photos_rendered', onPhotosRendered);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [personId, tpCode]);
+    }, [personId]);
 
     // Clear cached share blob on unmount. The lightbox instance itself is owned
     // and destroyed by the init effect's cleanup above.
@@ -741,22 +704,6 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             clearCachedBlob();
         };
     }, []);
-
-    if (loading) {
-        return (
-            <div className={styles.loadingSpinner}>
-                Loading gallery...
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className={styles.errorMessage}>
-                Error: {error}
-            </div>
-        );
-    }
 
     const formatDate = (dateTime: string): string => {
         if (!dateTime) return '';
@@ -810,24 +757,25 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     // Open the native photo editor for THIS time point (its own name+date, so a
     // re-render resolves to the same timepoint and reuses its originals folder).
     const handleReimport = (tp: Timepoint) => {
-        const date = (tp.tp_date_time ?? '').substring(0, 10);
-        navigate(
-            `/patient/${personId}/photo-editor/tp${tp.tp_code}` +
-                `?tpName=${encodeURIComponent(tp.tp_description ?? '')}&date=${date}`
-        );
+        // By code alone: the editor takes the session's name and date from the
+        // timepoints read, so a URL can never carry a stale pair (FE-F14-3).
+        navigate(`/patient/${personId}/photo-editor/tp${tp.tp_code}`);
     };
 
     const handleSaveTimepoint = async (fields: { tpDescription: string; tpDateTime: string }) => {
         if (!personId || !editTp) return;
         setSavingTp(true);
         try {
-            await putJSON(`/api/patients/${personId}/timepoints/${editTp.tpCode}`, fields);
-            queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) });
+            await putJSON(`/api/patients/${personId}/timepoints/${editTp.tp_code}`, fields);
+            // The rename moved the originals folder too, so the Files tree is stale as
+            // well as the tabs (FE-F12-3b). One invalidation, one refetch (FE-F12-12).
+            await invalidatePatientPhotos(personId);
             toast.success('Time point updated');
             setEditTp(null);
-            await loadTimepoints();
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update time point');
+            // The server's reason ("A folder named … already exists", "Name cannot
+            // contain path characters"), not the funnel's status line (FE-F12-12).
+            toast.error(httpErrorMessage(err, 'Failed to update time point'));
         } finally {
             setSavingTp(false);
         }
@@ -839,8 +787,10 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         const scope = deleteScope;
         setDeletingTp(true);
         try {
-            await deleteJSON(`/api/patients/${personId}/timepoints/${removed.tpCode}?scope=${scope}`);
-            queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) });
+            await deleteJSON(`/api/patients/${personId}/timepoints/${removed.tp_code}?scope=${scope}`);
+            // Every session's gallery, not just the one on screen: a cropped delete of
+            // another tab used to leave its photos cached and shown (FE-F12-3a).
+            await invalidatePatientPhotos(personId);
             toast.success(
                 scope === 'cropped'
                     ? 'Cropped photos deleted'
@@ -849,22 +799,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                       : 'Time point deleted'
             );
             setDeleteTp(null);
-            if (scope === 'cropped') {
-                // The time point stays — just refresh the gallery if we're viewing it.
-                if (removed.tpCode === tpCode) await reloadGallery();
-            } else {
-                const next = await loadTimepoints();
-                // If the active tab was the one removed, move to a remaining timepoint.
-                if (removed.tpCode === tpCode) {
-                    if (next.length > 0) {
-                        navigate(`/patient/${personId}/photos/tp${next[0].tp_code}`);
-                    } else {
-                        navigate(`/patient/${personId}/photos`);
-                    }
-                }
+            if (scope !== 'cropped' && removed.tp_code === tpCode) {
+                // The active tab was the one removed: move to a remaining session (the
+                // invalidation above has already refetched the list).
+                const next = queryClient.getQueryData<Timepoint[]>(qk.patient.timepoints(personId)) ?? [];
+                navigate(next.length > 0 ? `/patient/${personId}/photos/tp${next[0].tp_code}` : `/patient/${personId}/photos`);
             }
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to delete time point');
+            toast.error(httpErrorMessage(err, 'Failed to delete time point'));
         } finally {
             setDeletingTp(false);
         }
@@ -929,7 +871,18 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 </div>
             )}
 
-            {!hasRealPhotos ? (
+            {/* Loading and errors replace the grid only — the session tabs above stay,
+                so a slow or failed tab is never a dead end (FE-F12-8). */}
+            {loading ? (
+                <div className={styles.loadingSpinner}>Loading gallery...</div>
+            ) : error ? (
+                <div className={styles.errorMessage} role="alert">
+                    <p>Couldn't load this session's photos: {error}</p>
+                    <button type="button" className="btn btn-secondary" onClick={() => void galleryQ.refetch()}>
+                        <i className="fas fa-redo" aria-hidden="true"></i> Retry
+                    </button>
+                </div>
+            ) : !hasRealPhotos ? (
                 <div className={styles.emptyState}>
                     <i className="fas fa-camera-retro" aria-hidden="true"></i>
                     <h3>
@@ -989,29 +942,29 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             <div
                 id="dolph_gallery"
                 className={`pswp-gallery ${styles.galleryPadded}`}
+                aria-busy={switching || undefined}
             >
                 {gridCells.map((cell) => {
-                    // Centre logo — a fixed lightbox anchor showing the clinic logo.
+                    // Centre cell — THIS install's logo (Settings → General), or its name
+                    // when no logo is set. It used to be a file in the repository with this
+                    // clinic's name as alt text, on every install (FE-F12-7). Not a lightbox
+                    // slide: an uploaded logo's size is unknown, and a slideshow of the
+                    // patient's photos does not need it.
                     if (cell.isLogo) {
                         return (
-                            <a
-                                key={`dolph_gallery-${cell.id}`}
-                                id={`a${cell.id}`}
-                                href={LOGO_SRC}
-                                data-pswp-width={400}
-                                data-pswp-height={400}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={styles.galleryCell}
-                            >
-                                <img
-                                    id={cell.id}
-                                    src={LOGO_SRC}
-                                    alt={cell.alt}
-                                    decoding="async"
-                                    className={`${styles.galleryImage} ${styles.logoBorder}`}
-                                />
-                            </a>
+                            <div key={`dolph_gallery-${cell.id}`} className={styles.logoCell}>
+                                {branding?.logo ? (
+                                    <img
+                                        id={cell.id}
+                                        src={branding.logo}
+                                        alt={clinicName}
+                                        decoding="async"
+                                        className={`${styles.galleryImage} ${styles.logoBorder}`}
+                                    />
+                                ) : (
+                                    <span className={styles.logoName}>{clinicName}</span>
+                                )}
+                            </div>
                         );
                     }
 
@@ -1110,11 +1063,11 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                               ? 'present'
                               : 'absent') satisfies FolderState
                     }
-                    onEdit={() => { setEditTp(toLegacyTp(menuFor.tp)); setMenuFor(null); }}
+                    onEdit={() => { setEditTp(menuFor.tp); setMenuFor(null); }}
                     onReimport={() => { handleReimport(menuFor.tp); setMenuFor(null); }}
                     onOpenFolder={handleOpenFolder}
                     onOpenWorking={handleOpenWorking}
-                    onDelete={(scope) => { setDeleteScope(scope); setDeleteTp(toLegacyTp(menuFor.tp)); setMenuFor(null); }}
+                    onDelete={(scope) => { setDeleteScope(scope); setDeleteTp(menuFor.tp); setMenuFor(null); }}
                     onClose={() => setMenuFor(null)}
                 />
             )}
@@ -1145,16 +1098,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             {showNewSession && personId && (
                 <PhotoSessionDialog
                     personId={String(personId)}
-                    patientInfo={patientInfo ?? null}
                     onClose={() => setShowNewSession(false)}
-                    onPrepared={({ tpCode: newTp, tpName, tpDate }) => {
+                    onPrepared={({ tpCode: newTp }) => {
                         setShowNewSession(false);
-                        // Refresh the tab strip now — the new session should show even
-                        // if the user backs out of the editor without rendering.
-                        void queryClient.invalidateQueries({ queryKey: qk.patient.timepoints(personId) });
-                        navigate(
-                            `/patient/${personId}/photo-editor/tp${newTp}?tpName=${encodeURIComponent(tpName)}&date=${tpDate}`
-                        );
+                        // (The dialog itself refreshes the photo caches, for all three of
+                        // its call sites — FE-F12-3d.)
+                        navigate(`/patient/${personId}/photo-editor/tp${newTp}`);
                     }}
                 />
             )}

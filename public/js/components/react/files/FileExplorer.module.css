@@ -192,11 +192,24 @@
   flex-direction: column;
   min-width: 0;
 }
+/* A button (the tile's keyboard/AT control) styled as the plain name text. */
 .entryName {
+  font: inherit;
   font-size: var(--font-size-sm);
   color: var(--text-primary);
+  background: none;
+  border: 0;
+  padding: 0;
+  max-width: 100%;
+  text-align: inherit;
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.entryName:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 .entryMeta {
   font-size: var(--font-size-xs);

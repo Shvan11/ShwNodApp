@@ -22,7 +22,6 @@ import { toDateOnly } from '../../utils/date.js';
 import { createAlert } from '../database/queries/alert-queries.js';
 import {
   getTimePoints,
-  getTimePointImgs,
   type TimePoint,
 } from '../database/queries/timepoint-queries.js';
 import { getTimePointCodesForPatient } from '../database/queries/native-timepoint-queries.js';
@@ -179,39 +178,6 @@ export async function getPatientTimePoints(
     }
     log.error(`Error fetching time points for patient ${pid}:`, { error: error instanceof Error ? error.message : String(error) });
     throw new Error('Failed to fetch patient time points', { cause: error });
-  }
-}
-
-/**
- * Get patient time point images with validation
- * @param patientId - Patient id
- * @param timePoint - Time point code
- * @returns Array of time point images
- * @throws PatientValidationError If validation fails
- */
-export async function getPatientTimePointImages(
-  patientId: string | number | undefined | null,
-  timePoint: string | number | undefined | null
-): Promise<string[]> {
-  const pid = validatePatientId(patientId);
-
-  // Validate time point (can be 0 for latest)
-  if (timePoint === undefined || timePoint === null) {
-    throw new PatientValidationError(
-      'Time point is required',
-      'MISSING_TIME_POINT'
-    );
-  }
-
-  try {
-    const images = await getTimePointImgs(pid, String(timePoint));
-    return images || [];
-  } catch (error) {
-    if (error instanceof PatientValidationError) {
-      throw error;
-    }
-    log.error(`Error fetching time point images for patient ${pid}, tp ${timePoint}:`, { error: error instanceof Error ? error.message : String(error) });
-    throw new Error('Failed to fetch time point images', { cause: error });
   }
 }
 

@@ -23,21 +23,24 @@ function reducer(state: SlotMap, action: Action): SlotMap {
   // Seed read-only "saved" display + re-edit info when a timepoint is opened. Has no
   // single `view`, so it's handled before the per-view `slot` lookup below.
   if (action.type === 'HYDRATE') {
+    // Authoritative: a view absent from `views` is not saved any more, so its saved
+    // display is cleared — a removed photo used to stay (FE-F14-2).
     const next = { ...state };
     for (const v of VIEW_CODES) {
       const h = action.views[v];
-      if (!h) continue;
       // A live edit always wins over (possibly late) hydration — e.g. the SSE
       // re-hydrate after a background render must not wipe a slot the user has
       // already started re-framing.
       if (state[v].sourceRelPath) continue;
-      next[v] = {
-        ...makeInitialSlot(v),
-        savedImageUrl: h.savedImageUrl,
-        canReEdit: h.canReEdit,
-        reEditRelPath: h.reEditRelPath,
-        reEditName: h.reEditName,
-      };
+      next[v] = h
+        ? {
+            ...makeInitialSlot(v),
+            savedImageUrl: h.savedImageUrl,
+            canReEdit: h.canReEdit,
+            reEditRelPath: h.reEditRelPath,
+            reEditName: h.reEditName,
+          }
+        : makeInitialSlot(v);
     }
     return next;
   }

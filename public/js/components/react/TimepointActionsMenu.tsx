@@ -2,10 +2,13 @@
  * Actions popover for a time-point tab: Edit, Re-import, and three delete
  * variants. Portaled to <body> and fixed-positioned from the kebab button's
  * viewport coordinates so it escapes the timepoint selector's `overflow-x` clip
- * and the tab `:hover` transform. Closes on outside-click/Esc.
+ * and the tab `:hover` transform. Keyboard behaviour (focus in on open, arrows,
+ * Escape, focus back to the kebab on close) and viewport clamping come from the
+ * shared `useFloatingMenu` (FE-F12-13b).
  */
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useFloatingMenu } from '@/hooks/useFloatingMenu';
 import styles from './TimepointActionsMenu.module.css';
 
 export type DeleteScope = 'cropped' | 'entry' | 'all';
@@ -24,7 +27,6 @@ interface Props {
 }
 
 const MENU_WIDTH = 270;
-const MENU_HEIGHT = 380;
 
 const TimepointActionsMenu = ({
     x,
@@ -38,31 +40,18 @@ const TimepointActionsMenu = ({
     onClose,
 }: Props) => {
     const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleOutside = (e: globalThis.MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-        };
-        const handleEsc = (e: globalThis.KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        // Defer the outside-click listener one frame so the opening click
-        // doesn't immediately close the menu.
-        const frame = requestAnimationFrame(() => document.addEventListener('mousedown', handleOutside));
-        document.addEventListener('keydown', handleEsc);
-        return () => {
-            cancelAnimationFrame(frame);
-            document.removeEventListener('mousedown', handleOutside);
-            document.removeEventListener('keydown', handleEsc);
-        };
-    }, [onClose]);
-
-    // Keep the menu inside the viewport.
-    const left = Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH - 8));
-    const top = Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT - 8));
+    const { position, onKeyDown } = useFloatingMenu(ref, { x, y }, onClose);
 
     return createPortal(
-        <div ref={ref} className={styles.menu} role="menu" style={{ left, top, width: MENU_WIDTH }}>
+        <div
+            ref={ref}
+            className={styles.menu}
+            role="menu"
+            tabIndex={-1}
+            aria-label="Photo session actions"
+            style={{ left: position.x, top: position.y, width: MENU_WIDTH }}
+            onKeyDown={onKeyDown}
+        >
             <button type="button" role="menuitem" className={styles.item} onClick={onEdit}>
                 <i className="fas fa-pen" aria-hidden="true"></i>
                 <span className={styles.itemText}>Edit name &amp; date</span>
@@ -134,7 +123,7 @@ const TimepointActionsMenu = ({
                 <i className="fas fa-trash" aria-hidden="true"></i>
                 <span className={styles.itemText}>
                     Everything
-                    <small className={styles.hint}>Originals + cropped + session</small>
+                    <small className={styles.hint}>Originals to trash + cropped + session</small>
                 </span>
             </button>
         </div>,

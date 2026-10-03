@@ -104,6 +104,27 @@
   cursor: grabbing;
 }
 
+/* The thumbnail is a button: drag it, or click (Enter) to pick it for a slot. */
+.thumbButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: grab;
+}
+
+.thumbButton:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.thumbArmed .thumbButton {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
 .thumbName {
   font-size: 0.68rem;
   color: var(--text-muted);

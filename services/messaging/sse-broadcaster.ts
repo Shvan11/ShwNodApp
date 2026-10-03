@@ -18,6 +18,7 @@ import type { EventEmitter } from 'events';
 import { InternalEmitterEvents } from './websocket-events.js';
 import { buildChairPatientPayload, type ChairPatientPayload } from './chair-payload-builder.js';
 import { log } from '../../utils/logger.js';
+import type { RenderedEvent } from '../../shared/contracts/photo-editor.contract.js';
 
 const appointmentsClients = new Set<Response>();
 // Every open kiosk stream per chair. A chair may have more than one screen (a
@@ -93,13 +94,7 @@ function ensureInitialized(emitter: EventEmitter): void {
 
   // A background photo render finished — notify every appointments-stream viewer
   // (the photos grid rides this same stream). Clients filter by personId/tpCode.
-  const onPhotoTimepointRendered = (payload: {
-    personId: number | string;
-    tpCode: number | string;
-    written?: number;
-    warnings?: number;
-    total?: number;
-  }): void => {
+  const onPhotoTimepointRendered = (payload: RenderedEvent): void => {
     if (appointmentsClients.size === 0) return;
     const frame = `event: photos_rendered\ndata: ${JSON.stringify(payload)}\n\n`;
     for (const res of appointmentsClients) safeWrite(res, frame);

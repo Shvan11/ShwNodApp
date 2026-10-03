@@ -1,6 +1,7 @@
 /**
- * API contract — saved slideshow configurations (`slideshow_configs`, LOCAL-ONLY
- * table; see migrations/pg/1782600000000_slideshow-configs.sql).
+ * API contract — saved slideshow configurations (`slideshow_configs`, mirrored
+ * forward-only to Supabase since 2026-07-21; its DDL and CDC trigger are in the
+ * baseline migration).
  *
  * Imported by BOTH the Express routes (relative `.js`) and the React app
  * (`@shared` alias). One `export const <action> = { … } as const` per endpoint;

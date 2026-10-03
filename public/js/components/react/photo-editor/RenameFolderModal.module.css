@@ -87,3 +87,21 @@
     background: var(--gray-50);
     border-radius: 0 0 12px 12px;
 }
+
+/* Folders that belong to a session or to the X-ray card (FE-F14-5). */
+.ownedHeading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    color: var(--warning-color);
+    font-size: 0.85rem;
+    font-weight: var(--font-weight-semibold);
+}
+
+.ownerNote {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: normal;
+}

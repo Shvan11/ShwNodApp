@@ -652,13 +652,10 @@ const ViewPatientInfo = ({ personId }: Props) => {
             {showPhotoSessionDialog && validPersonId && (
                 <PhotoSessionDialog
                     personId={String(validPersonId)}
-                    patientInfo={patientInfo}
                     onClose={() => setShowPhotoSessionDialog(false)}
-                    onPrepared={({ tpCode, tpName, tpDate }) => {
+                    onPrepared={({ tpCode }) => {
                         setShowPhotoSessionDialog(false);
-                        navigate(
-                            `/patient/${validPersonId}/photo-editor/tp${tpCode}?tpName=${encodeURIComponent(tpName)}&date=${tpDate}`
-                        );
+                        navigate(`/patient/${validPersonId}/photo-editor/tp${tpCode}`);
                     }}
                 />
             )}

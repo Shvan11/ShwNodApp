@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
@@ -9,27 +9,17 @@ import styles from './PhotoSessionDialog.module.css';
 import { formatISODate } from '../../core/utils';
 import { postJSON, httpErrorMessage } from '../../core/http';
 import { photoDatesQuery } from '@/query/queries';
+import { invalidatePatientPhotos } from '@/query/photos';
+import { parseLocalDate } from '@/utils/calendarDate';
 import * as photoEditor from '@shared/contracts/photo-editor.contract';
 import type { PhotoPrepareResult } from '../../types/api.types';
 
 interface Props {
     personId?: string;
-    patientInfo: {
-        first_name?: string | null;
-        patient_name?: string | null;
-    } | null;
     onClose: () => void;
-    /** Called once a timepoint is prepared, to hand off to the in-app editor. */
+    /** Called once a timepoint is prepared (and the photo caches refreshed), to hand off
+     *  to the in-app editor. */
     onPrepared?: (result: { tpCode: number; tpName: string; tpDate: string }) => void;
-}
-
-interface Appointment {
-    date: string;
-    description?: string;
-}
-
-interface Visit {
-    visitDate: string;
 }
 
 interface TimepointType {
@@ -51,7 +41,7 @@ interface ConflictInfo {
     message: string;
 }
 
-const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Props) => {
+const PhotoSessionDialog = ({ personId, onClose, onPrepared }: Props) => {
     const toast = useToast();
     const navigate = useNavigate();
     const location = useLocation();
@@ -71,25 +61,29 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
         ...photoDatesQuery(personId ?? ''),
         enabled: !!personId,
     });
-    const appointments = (photoDates?.appointments ?? []) as Appointment[];
-    const visits = (photoDates?.visits ?? []) as Visit[];
+    // Date shortcuts: the five most recent appointment days up to TODAY (a photo
+    // session is not taken in the future — the list used to lead with an appointment
+    // three weeks ahead, FE-F12-10b), and the five most recent photo visits (the
+    // server orders those oldest-first, so the old slice showed the five OLDEST).
+    const today = formatISODate();
+    const appointmentDays = [...new Set((photoDates?.appointments ?? []).map((a) => a.date.substring(0, 10)))]
+        .filter((d) => d <= today)
+        .sort()
+        .reverse()
+        .slice(0, 5);
+    const visitDays = [...new Set((photoDates?.visits ?? []).map((v) => v.visitDate.substring(0, 10)))]
+        .sort()
+        .reverse()
+        .slice(0, 5);
 
     useEffect(() => {
         if (isError) toast.error('Failed to load appointments and visits');
     }, [isError, toast]);
 
-    const handleDateSelect = (date: Date | string) => {
-        // Always parse and use local date components to match the display format
-        const dateObj = date instanceof Date ? date : new Date(date);
-
-        if (isNaN(dateObj.getTime())) {
-            return; // Invalid date
-        }
-
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        setSelectedDate(`${year}-${month}-${day}`);
+    // The shortcuts carry 'YYYY-MM-DD' already. `new Date()` on one is UTC midnight,
+    // so west of UTC the button showed and SELECTED the day before (FE-F12-10a).
+    const handleDateSelect = (day: string) => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(day)) setSelectedDate(day);
     };
 
     const handleOpenEditPatient = () => {
@@ -100,12 +94,10 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
         });
     };
 
+    // (No client-side "Patient name is required" check: the patient read it used was
+    // often still in flight, so a quick click toasted it for a patient who has a name
+    // (FE-F12-10c). The server answers `needsName` when the name really is missing.)
     const handleSubmit = async (overrideDate = false) => {
-        if (!patientInfo?.first_name && !patientInfo?.patient_name) {
-            toast.error('Patient name is required');
-            return;
-        }
-
         try {
             setSubmitting(true);
             setConflictInfo(null);
@@ -136,11 +128,15 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                 return;
             }
 
+            // The new session must show in the tabs even if the user backs out of the
+            // editor, and an override rewrote the works' Initial/Final photo date —
+            // done HERE so all three call sites get it (FE-F12-3d).
+            if (personId) await invalidatePatientPhotos(personId, { works: overrideDate });
+
             // Hand off to the in-app editor.
             onPrepared?.({ tpCode: result.tp_code, tpName: timepointType, tpDate: selectedDate });
             onClose();
         } catch (error) {
-            console.error('Error preparing photo session:', error);
             toast.error(httpErrorMessage(error, 'Failed to prepare photo session'));
         } finally {
             setSubmitting(false);
@@ -173,7 +169,7 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
 
     const formatDate = (dateStr: string): string => {
         if (!dateStr) return '';
-        const date = new Date(dateStr);
+        const date = parseLocalDate(dateStr);
         return date.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: 'short',
@@ -340,6 +336,12 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                                     )}
                                 </div>
 
+                                {/* The editor's "Move from card" deletes the photos it moves from
+                                    this folder; say so where the folder is chosen (FE-F14-10). */}
+                                <p className={styles.iniHint}>
+                                    In the editor, “Move from card” uploads photos from this folder and then deletes
+                                    them from it. “Upload (copy)” leaves them in place.
+                                </p>
                                 {(importFolder.status === 'prompt' || importFolder.status === 'denied') && (
                                     <p className={styles.iniHint}>Tip: choose “Allow on every visit” so access sticks.</p>
                                 )}
@@ -352,39 +354,36 @@ const PhotoSessionDialog = ({ personId, patientInfo, onClose, onPrepared }: Prop
                         <div className={styles.loadingPlaceholder}>Loading dates...</div>
                     ) : (
                         <>
-                            {appointments.length > 0 && (
+                            {appointmentDays.length > 0 && (
                                 <div className={styles.dateList}>
                                     <span>Recent Appointments</span>
                                     <div className={styles.dateItems}>
-                                        {appointments.slice(0, 5).map((appt, idx) => (
+                                        {appointmentDays.map((day) => (
                                             <button
-                                                key={idx}
+                                                key={day}
                                                 type="button"
                                                 className={styles.dateItem}
-                                                onClick={() => handleDateSelect(appt.date)}
+                                                onClick={() => handleDateSelect(day)}
                                             >
-                                                <span className={styles.dateValue}>{formatDate(appt.date)}</span>
-                                                {appt.description && (
-                                                    <span className={styles.dateDesc}>{appt.description}</span>
-                                                )}
+                                                <span className={styles.dateValue}>{formatDate(day)}</span>
                                             </button>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
-                            {visits.length > 0 && (
+                            {visitDays.length > 0 && (
                                 <div className={styles.dateList}>
-                                    <span>Recent Visits</span>
+                                    <span>Recent Photo Visits</span>
                                     <div className={styles.dateItems}>
-                                        {visits.slice(0, 5).map((visit, idx) => (
+                                        {visitDays.map((day) => (
                                             <button
-                                                key={idx}
+                                                key={day}
                                                 type="button"
                                                 className={styles.dateItem}
-                                                onClick={() => handleDateSelect(visit.visitDate)}
+                                                onClick={() => handleDateSelect(day)}
                                             >
-                                                <span className={styles.dateValue}>{formatDate(visit.visitDate)}</span>
+                                                <span className={styles.dateValue}>{formatDate(day)}</span>
                                             </button>
                                         ))}
                                     </div>

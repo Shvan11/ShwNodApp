@@ -16,11 +16,9 @@
   color: var(--text-muted);
 }
 
-.emptyLogo {
-  width: 40%;
-  max-width: 90px;
+.emptyIcon {
+  font-size: 2rem;
   opacity: 0.3;
-  object-fit: contain;
 }
 
 .emptyLabel {

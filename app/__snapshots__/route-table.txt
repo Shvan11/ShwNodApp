@@ -81,10 +81,9 @@ PUT     /api/patients/:personId/estimated-cost  [authenticate -> authorize(admin
 GET     /api/patients/:personId/has-appointment
 MOUNT   /api
 GET     /api/patients/:personId/timepoints
-GET     /api/patients/:personId/timepoints/:tp/images
 GET     /api/patients/:personId/timepoints/:tpCode/folder
-PUT     /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk) -> validate(params,body)]
-DELETE  /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk) -> validate(params)]
+PUT     /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/patients/:personId/timepoints/:tpCode  [authorize(admin|front_desk|clinical) -> validate(params)]
 GET     /api/patients/:personId/gallery/:tp  [validate(params)]
 GET     /api/patients/:personId/xray
 GET     /api/patients/:personId/xray/preview  [validate(params,query)]
@@ -100,18 +99,18 @@ GET     /api/patients/:personId/portal  [authorize(admin|front_desk)]
 POST    /api/patients/:personId/portal/reset-pin  [authorize(admin|front_desk) -> validate(params)]
 POST    /api/patients/:personId/portal/enable  [authorize(admin|front_desk) -> validate(params,body)]
 POST    /api/patients/:personId/portal/unlock  [authorize(admin|front_desk) -> validate(params)]
-GET     /api/patients/:personId/photos/visibility  [authorize(admin|front_desk)]
-POST    /api/patients/:personId/photos/visibility  [authorize(admin|front_desk) -> validate(params,body)]
+GET     /api/patients/:personId/photos/visibility  [authorize(admin|front_desk|clinical)]
+POST    /api/patients/:personId/photos/visibility  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 MOUNT   /api
 GET     /api/patients/:personId/files
 GET     /api/patients/:personId/files/content
 GET     /api/patients/:personId/working-files
 GET     /api/patients/:personId/working-files/content
-POST    /api/patients/:personId/files/upload  [authorize(admin|front_desk) -> validate(params) -> timeout(120000ms) -> runUpload]
-POST    /api/patients/:personId/files/folder  [authorize(admin|front_desk) -> validate(params,body)]
-POST    /api/patients/:personId/files/rename  [authorize(admin|front_desk) -> validate(params,body)]
-DELETE  /api/patients/:personId/files  [authorize(admin|front_desk) -> validate(params)]
-POST    /api/patients/:personId/files/delete-batch  [authorize(admin|front_desk) -> validate(params) -> timeout(120000ms)]
+POST    /api/patients/:personId/files/upload  [authorize(admin|front_desk|clinical) -> validate(params) -> timeout(120000ms) -> runUpload]
+POST    /api/patients/:personId/files/folder  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+POST    /api/patients/:personId/files/rename  [authorize(admin|front_desk|clinical) -> validate(params,body)]
+DELETE  /api/patients/:personId/files  [authorize(admin|front_desk|clinical) -> validate(params)]
+POST    /api/patients/:personId/files/delete-batch  [authorize(admin|front_desk|clinical) -> validate(params) -> timeout(120000ms)]
 MOUNT   /api
 GET     /api/slideshow-configs  [validate(query)]
 POST    /api/slideshow-configs  [authorize(admin|front_desk|clinical) -> validate(body)]
@@ -347,7 +346,7 @@ GET     /api/telegram/status
 POST    /api/telegram/send  [authorize(admin|front_desk|clinical) -> validate(body)]
 GET     /api/telegram/send/:jobId  [validate(params)]
 MOUNT   /api/share
-POST    /api/share/stage  [authorize(admin|front_desk|clinical) -> uploadImage -> validate(body)]
+POST    /api/share/stage  [authorize(admin|front_desk|clinical) -> timeout(120000ms) -> uploadImage -> validate(body)]
 MOUNT   /api
 GET     /api/branding
 GET     /api/branding/logo

@@ -87,11 +87,16 @@ export const folder = {
 } as const;
 
 // POST /api/patients/:personId/files/rename → FileEntry.
+// A top-level folder that a photo session or the X-ray card owns is refused with a
+// 409 (`details.code` 'SESSION_FOLDER' | 'RESERVED_FOLDER') unless `force` is set —
+// renaming it silently detaches it from its owner (FE-F14-5). The client confirms,
+// then resends with `force: true`.
 export const rename = {
   params: personIdParams,
-  body: z.object({ path: z.string().optional(), newName: z.string().optional() }),
+  body: z.object({ path: z.string().optional(), newName: z.string().optional(), force: z.boolean().optional() }),
   response: fileEntry,
 } as const;
+export type RenameBody = z.infer<typeof rename.body>;
 
 // DELETE /api/patients/:personId/files[?path=] → { path }.
 export const deleteEntry = {

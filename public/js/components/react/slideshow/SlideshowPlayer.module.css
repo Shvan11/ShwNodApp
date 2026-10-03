@@ -194,9 +194,28 @@
   transition: opacity var(--transition-base);
 }
 
+/* Hidden controls must not take taps: the top bar and the dots set
+   `pointer-events: auto` on themselves, which beat this container's `none`, so an
+   invisible ✕ closed the presentation (FE-F15-1). `visibility: hidden` removes the
+   hit targets AND the tab stops; it switches after the fade, so the fade still shows. */
 .chromeHidden {
   opacity: 0;
   pointer-events: none;
+  visibility: hidden;
+  transition: opacity var(--transition-base), visibility 0s linear 250ms;
+}
+
+/* Text for screen readers only (the slide announcement). */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .topBar {

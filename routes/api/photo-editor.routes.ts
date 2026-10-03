@@ -36,6 +36,7 @@ import {
 import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/photo-render.service.js';
 import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
+import { FileExplorerError } from '../../services/files/file-explorer.service.js';
 import { toDateOnly, parseLocalDate } from '../../utils/date.js';
 import { log } from '../../utils/logger.js';
 
@@ -72,14 +73,29 @@ type SlotSpec = {
 // only reuses the contract's `personIdParams` guard.
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
-const renderBodySchema = z.object({
-  tpName: z.string().min(1, 'tpName is required'),
-  tpDate: z.string().regex(YMD, 'Invalid tpDate (expected YYYY-MM-DD)'),
-  // Keep slot contents opaque: per-slot shape is validated tolerantly in
-  // processRenderJob (malformed slots are skipped, not rejected). z.unknown()
-  // preserves each slot object untouched through the validate() write-back.
-  slots: z.array(z.unknown()).min(1, 'No slots to render'),
-});
+const renderBodySchema = z
+  .object({
+    // The session the editor SHOWS. When present it is authoritative: the render
+    // goes into that session and its name/date come from its row. Before it, the
+    // editor posted the name + date out of its URL and the server found-or-CREATED a
+    // session by them, so a stale URL (Back after a re-date, a second tab) silently
+    // made a duplicate session and rendered into that (FE-F14-3).
+    tpCode: z.number().int().nonnegative().optional(),
+    tpName: z.string().min(1, 'tpName is required').optional(),
+    tpDate: z.string().regex(YMD, 'Invalid tpDate (expected YYYY-MM-DD)').optional(),
+    // Client-made id echoed in the completion event, so the client can register its
+    // watcher BEFORE the request leaves: a job that fails instantly announces before
+    // the 202 is even parsed, and was being reported 105 s later as "taking longer
+    // than expected" (FE-F14-4).
+    jobId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Invalid jobId').optional(),
+    // Keep slot contents opaque: per-slot shape is validated tolerantly in
+    // processRenderJob (malformed slots are skipped, not rejected). z.unknown()
+    // preserves each slot object untouched through the validate() write-back.
+    slots: z.array(z.unknown()).min(1, 'No slots to render'),
+  })
+  .refine((b) => b.tpCode !== undefined || (b.tpName !== undefined && b.tpDate !== undefined), {
+    message: 'tpCode, or tpName and tpDate, is required',
+  });
 
 // Schema-derived types — the validated, post-coercion shapes (slots stay opaque
 // and are narrowed to SlotSpec[] at the processRenderJob boundary).
@@ -194,20 +210,38 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
-      const { tpName, tpDate, slots } = req.body as RenderBody;
+      const { tpCode, jobId, slots } = req.body as RenderBody;
 
+      let tp_code: number;
+      let timePointId: number;
+      let tpName: string;
+      let tpDate: string;
+      if (tpCode !== undefined) {
+        const existing = await getNativeTimePoint(Number(personId), tpCode);
+        if (!existing) {
+          ErrorResponses.notFound(res, 'Photo session');
+          return;
+        }
+        tp_code = tpCode;
+        timePointId = existing.timePointId;
+        tpName = existing.tp_description;
+        tpDate = existing.tp_date_time;
+      } else {
+        // Legacy shape (name + date). Idempotent: find-or-create the session.
+        tpName = req.body.tpName as string;
+        tpDate = req.body.tpDate as string;
+        const parsed = parseLocalDate(tpDate);
+        if (!parsed) {
+          ErrorResponses.badRequest(res, 'Invalid tpDate (expected YYYY-MM-DD)');
+          return;
+        }
+        ({ tp_code, timePointId } = await findOrCreateNativeTimePoint(Number(personId), tpName, parsed));
+      }
       const parsedDate = parseLocalDate(tpDate);
       if (!parsedDate) {
         ErrorResponses.badRequest(res, 'Invalid tpDate (expected YYYY-MM-DD)');
         return;
       }
-
-      // Idempotent: resolve the authoritative tp_code + timePointId for (name, date).
-      const { tp_code, timePointId } = await findOrCreateNativeTimePoint(
-        Number(personId),
-        tpName,
-        parsedDate
-      );
 
       // Rendering is heavy: full-res sharp encodes of up to 8 ~15 MP views from
       // sources read over the SMB share. Running it inside the request pegs the CPU
@@ -219,6 +253,7 @@ router.post(
 
       void processRenderJob({
         personId: Number(personId),
+        jobId,
         tpName,
         tpDate,
         parsedDate,
@@ -239,6 +274,7 @@ router.post(
 
 interface RenderJob {
   personId: number;
+  jobId?: string;
   tpName: string;
   tpDate: string;
   parsedDate: Date;
@@ -256,9 +292,12 @@ interface RenderJob {
  * completion event. Wrapped so a stray error can't become an unhandledRejection.
  */
 async function processRenderJob(job: RenderJob): Promise<void> {
-  const { personId, tpName, tpDate, parsedDate, tp_code, timePointId, slots, userId } = job;
+  const { personId, jobId, tpName, tpDate, parsedDate, tp_code, timePointId, slots, userId } = job;
   const written: string[] = [];
-  const warnings: string[] = [];
+  // One entry per slot that did not render: the view and a reason a user can act
+  // on. They ride the completion event, so the toast can say WHICH photo failed
+  // and why, not just "1 photo(s) had problems" (FE-F14-4).
+  const warnings: Array<{ view: string; reason: string }> = [];
   const toTag: Array<{ view: string; sourceRelPath: string }> = [];
 
   try {
@@ -271,7 +310,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
         const opOk = !!op && [op.width, op.height].every(isFiniteNum);
         const exOk = !ex || [ex.left, ex.top, ex.width, ex.height].every(isFiniteNum);
         if (typeof view !== 'string' || typeof slot?.sourceRelPath !== 'string' || !opOk || !exOk) {
-          warnings.push(`Skipped malformed slot "${view ?? '?'}"`);
+          warnings.push({ view: typeof view === 'string' ? view : '?', reason: 'Malformed slot — not saved' });
           continue;
         }
 
@@ -317,7 +356,18 @@ async function processRenderJob(job: RenderJob): Promise<void> {
         written.push(filename);
         toTag.push({ view, sourceRelPath: slot.sourceRelPath });
       } catch (err) {
-        warnings.push(`${view ?? '?'}: ${(err as Error).message}`);
+        // A FileExplorerError carries curated text ("Not found", "Source is not an
+        // image"); anything else is an internal error whose message may name a server
+        // path, so it stays in the log.
+        warnings.push({
+          view: typeof view === 'string' ? view : '?',
+          reason:
+            err instanceof FileExplorerError
+              ? err.status === 404
+                ? 'Its original photo was moved or renamed'
+                : err.message
+              : 'Could not be rendered',
+        });
         log.warn('[PhotoEditor] slot render failed', {
           personId,
           view,
@@ -361,8 +411,10 @@ async function processRenderJob(job: RenderJob): Promise<void> {
     wsEmitter?.emit(InternalEmitterEvents.PHOTO_TIMEPOINT_RENDERED, {
       personId,
       tpCode: tp_code,
+      jobId,
       written: written.length,
       warnings: warnings.length,
+      problems: warnings,
       total: slots.length,
     });
   }
@@ -382,7 +434,7 @@ router.delete(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
-      const { tpCode, tpName, tpDate, view } = req.body as DeleteViewBody;
+      const { tpCode, view } = req.body as DeleteViewBody;
       const tpCodeNum = tpCode; // already coerced to a non-negative int by the schema
 
       // 1. Delete the cropped working file (idempotent).
@@ -395,7 +447,9 @@ router.delete(
       }
 
       // 3. Untag the source original so it returns to the sidebar (original kept).
-      const folder = tpName && tpDate ? timepointFolderName(tpName, tpDate) : null;
+      //    The folder comes from the session's row, by code — never from a name/date
+      //    the client carried in its URL, which may be stale (FE-F14-3).
+      const folder = tp ? timepointFolderName(tp.tp_description, tp.tp_date_time) : null;
       if (folder) {
         await untagOriginalForView(Number(personId), folder, view);
       }

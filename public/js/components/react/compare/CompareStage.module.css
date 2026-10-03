@@ -106,6 +106,14 @@
     object-fit: contain;
 }
 
+/* The no-element-fullscreen fallback (iPhone Safari): the stage covers the viewport
+   itself. The Fullscreen button used to do nothing there (FE-F13-13c). */
+.stageOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-index-fixed);
+}
+
 .canvasElFullscreen {
     display: block;
     background: transparent;

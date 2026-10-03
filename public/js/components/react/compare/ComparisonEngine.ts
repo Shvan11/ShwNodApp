@@ -10,27 +10,38 @@
  * (the old in-place `useState` handler tripped react-hooks/immutability).
  */
 
-import type { AutoImageSize, CanvasDimensions, CropInset, CropState, ImageKey, Transform, TransformState } from './types';
-import { KEY_FOR_TOOL, LOGO_BLACK_URL, LOGO_WHITE_URL } from './types';
+import type { AutoImageSize, CanvasDimensions, CropInset, CropState, ImageKey, LogoTone, Transform, TransformState } from './types';
+import { KEY_FOR_TOOL } from './types';
 
-export interface ImageInfo {
+interface ImageInfo {
     width: number;
     height: number;
 }
 
+/** The longest edge an `auto` canvas may have (the `auto-full` mode lifts it). Renders
+ *  keep their native resolution (up to 8,000 px), so a 100 % pair made a 26–36 MP canvas
+ *  and a 30–45 MB PNG that a phone could not hold and *Share* could not upload off the
+ *  LAN in 30 s (FE-F13-6). 4,096 px is past any screen and any social preset. */
+export const AUTO_LONG_EDGE_CAP = 4096;
+
 /** Immutable render snapshot — rebuilt lazily after each commit. */
 export interface EngineSnapshot {
-    version: number;
-    /** True while loadImages is in flight (drives the stage loading veil). */
+    /** True while a pair is loading (drives the stage loading veil). */
     loading: boolean;
+    /** 2 while a pair is drawn, else 0. */
     imageCount: number;
+    /** The `key` of the pair on the canvas — the caller compares it with what is
+     *  selected, so Save/Share can never export a pair other than the selected one
+     *  (FE-F13-4). Null when nothing is drawn. */
+    sourceKey: string | null;
     /** Natural size per slot (img1, img2, logo); null until that image is loaded. */
     imageInfo: (ImageInfo | null)[];
     orientation: 'vertical' | 'horizontal';
     showBisect: boolean;
+    /** False when this install has no logo (Settings → General) — then no watermark. */
+    hasLogo: boolean;
     showLogo: boolean;
-    /** True when the dark logo variant is active (vs the default white). */
-    logoBlack: boolean;
+    logoTone: LogoTone;
     /** 0 = none, 1 = img1, 2 = img2, 3 = logo. */
     selectedImage: number;
     autoMode: boolean;
@@ -59,14 +70,15 @@ function freshCrop(): CropState {
 
 /** Snapshot served before the engine exists, so the UI renders consistently. */
 export const EMPTY_SNAPSHOT: EngineSnapshot = {
-    version: -1,
     loading: false,
     imageCount: 0,
+    sourceKey: null,
     imageInfo: [],
     orientation: 'vertical',
     showBisect: false,
-    showLogo: true,
-    logoBlack: false,
+    hasLogo: false,
+    showLogo: false,
+    logoTone: 'white',
     selectedImage: 0,
     autoMode: true,
     autoImageSize: null,
@@ -80,26 +92,84 @@ export const EMPTY_SNAPSHOT: EngineSnapshot = {
 export const getEmptySnapshot = (): EngineSnapshot => EMPTY_SNAPSHOT;
 export const emptySubscribe = (): (() => void) => () => {};
 
+/** Thrown by `loadPair` when one photo fails; `index` says which (0 = before, 1 = after). */
+export class PairLoadError extends Error {
+    constructor(readonly index: number) {
+        super(`Failed to load photo ${index + 1}`);
+        this.name = 'PairLoadError';
+    }
+}
+
+/** Release a decoded image (its pixels and any request still in flight). */
+function release(img: HTMLImageElement): void {
+    img.onload = null;
+    img.onerror = null;
+    img.removeAttribute('src');
+}
+
+/** True when any pixel of the image is (partly) transparent — sampled at ≤128 px. */
+function hasTransparency(img: HTMLImageElement): boolean {
+    const scale = Math.min(1, 128 / Math.max(img.naturalWidth, img.naturalHeight, 1));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    for (let i = 3; i < data.length; i += 4) if (data[i] < 250) return true;
+    return false;
+}
+
+/** The logo in the requested tone: itself, or a white/black silhouette (alpha kept). */
+function recolor(img: HTMLImageElement, tone: LogoTone): HTMLImageElement | HTMLCanvasElement {
+    if (tone === 'original') return img;
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    if (!ctx) return img;
+    ctx.drawImage(img, 0, 0);
+    // Keep the logo's shape (its alpha) and paint it one colour.
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = tone === 'white' ? '#ffffff' : '#000000';
+    ctx.fillRect(0, 0, c.width, c.height);
+    return c;
+}
+
 export class ComparisonEngine {
     private canvas: HTMLCanvasElement;
     private context: CanvasRenderingContext2D;
-    private images: HTMLImageElement[] = [];
+    /** The two photos on the canvas (0 or 2). The logo lives apart (see `logo*`). */
+    private photos: HTMLImageElement[] = [];
+    private sourceKey: string | null = null;
+    private sourceView: string | null = null;
+    /** Images of the load in flight — released when a newer load supersedes it. */
+    private pending: HTMLImageElement[] = [];
+    private logoImg: HTMLImageElement | null = null;
+    private logoUrl: string | null = null;
+    private logoOpaque = false;
+    /** The logo as drawn: the image itself, or a recoloured silhouette of it. */
+    private logoSource: HTMLImageElement | HTMLCanvasElement | null = null;
     private transform: TransformState = freshTransforms();
     private crop: CropState = freshCrop();
     private cropMode = false;
     private orientation: 'vertical' | 'horizontal' = 'vertical';
     private showBisect = false;
-    private showLogo = true;
-    private logoBlack = false;
+    private showLogo = false;
+    private logoTone: LogoTone = 'white';
     private selectedImage = 0;
     private autoMode = true;
     private autoScale = 1;
+    /** `auto` caps the long edge at AUTO_LONG_EDGE_CAP; `auto-full` does not. */
+    private autoCapped = true;
     private autoImageSize: AutoImageSize | null = null;
     private originalDimensions: CanvasDimensions;
     private loadSeq = 0;
     private logoSeq = 0;
     private loading = false;
-    private version = 0;
     private listeners = new Set<() => void>();
     private snapshot: EngineSnapshot | null = null;
 
@@ -117,17 +187,18 @@ export class ComparisonEngine {
     };
 
     getSnapshot = (): EngineSnapshot => {
+        const info = (img: HTMLImageElement | null): ImageInfo | null =>
+            img && img.complete && img.naturalWidth > 0 ? { width: img.naturalWidth, height: img.naturalHeight } : null;
         this.snapshot ??= {
-            version: this.version,
             loading: this.loading,
-            imageCount: this.images.length,
-            imageInfo: this.images.map(img =>
-                img.complete && img.naturalWidth > 0 ? { width: img.width, height: img.height } : null,
-            ),
+            imageCount: this.photos.length,
+            sourceKey: this.sourceKey,
+            imageInfo: [...this.photos.map(info), this.photos.length ? info(this.logoImg) : null],
             orientation: this.orientation,
             showBisect: this.showBisect,
-            showLogo: this.showLogo,
-            logoBlack: this.logoBlack,
+            hasLogo: this.logoImg !== null,
+            showLogo: this.showLogo && this.logoImg !== null,
+            logoTone: this.logoTone,
             selectedImage: this.selectedImage,
             autoMode: this.autoMode,
             autoImageSize: this.autoImageSize ? { ...this.autoImageSize } : null,
@@ -149,7 +220,6 @@ export class ComparisonEngine {
     };
 
     private commit(): void {
-        this.version++;
         this.snapshot = null;
         for (const listener of this.listeners) listener();
     }
@@ -157,24 +227,56 @@ export class ComparisonEngine {
     // --- image loading ---
 
     /**
-     * Loads all URLs, then atomically swaps the image set (the previous
-     * comparison stays visible until the new one is ready). Throws on the
-     * first failed/timed-out image; a load superseded by a newer call is
-     * silently abandoned.
+     * Loads the two photos IN PARALLEL, then swaps them in together. A newer call
+     * supersedes this one and releases its images, which cancels their downloads;
+     * there is no fixed timeout (a 3.5 MB render on a weak link took 11 s and used to
+     * fail at 10 s, while a superseded load kept fetching — FE-F13-9).
+     *
+     * On a failure the canvas is CLEARED and the error says which photo: the previous
+     * pair used to stay drawn under the new selection, and Save exported it (FE-F13-4).
+     *
+     * @param key   identifies the selection; echoed as `snap.sourceKey`.
+     * @param view  the photo type; a different view starts from a clean alignment —
+     *              position, zoom, rotation and crop set for one view never suit another
+     *              (FE-F13-10).
      */
-    async loadImages(urls: string[]): Promise<void> {
+    async loadPair(urls: [string, string], opts: { key: string; view: string }): Promise<void> {
         const seq = ++this.loadSeq;
+        this.pending.forEach(release);
+        const imgs = urls.map(() => new Image());
+        this.pending = imgs;
         this.loading = true;
         this.commit();
         try {
-            const loaded: HTMLImageElement[] = [];
-            for (const url of urls) {
-                loaded.push(await this.loadOneImage(url));
-            }
+            await Promise.all(
+                imgs.map(
+                    (img, i) =>
+                        new Promise<void>((resolve, reject) => {
+                            img.onload = () => resolve();
+                            img.onerror = () => reject(new PairLoadError(i));
+                            img.src = urls[i];
+                        })
+                )
+            );
             if (seq !== this.loadSeq) return;
-            this.images = loaded;
+            this.pending = [];
+            this.photos.forEach(release);
+            this.photos = imgs;
+            if (opts.view !== this.sourceView) {
+                this.transform = freshTransforms();
+                this.crop = freshCrop();
+                this.cropMode = false;
+            }
+            this.sourceKey = opts.key;
+            this.sourceView = opts.view;
             if (this.autoMode) this.resizeCanvasToFitImages();
             this.render();
+        } catch (err) {
+            if (seq !== this.loadSeq) return;
+            imgs.forEach(release);
+            this.pending = [];
+            this.clearPhotos();
+            throw err;
         } finally {
             // A superseded load leaves the flag to the call that superseded it.
             if (seq === this.loadSeq) {
@@ -184,21 +286,76 @@ export class ComparisonEngine {
         }
     }
 
-    /** Loads a single image, rejecting on error or a 10s timeout. */
-    private loadOneImage(url: string): Promise<HTMLImageElement> {
-        return new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            const timeout = setTimeout(() => reject(new Error(`Timeout loading image: ${url}`)), 10000);
-            img.onload = () => {
-                clearTimeout(timeout);
-                resolve(img);
-            };
-            img.onerror = () => {
-                clearTimeout(timeout);
-                reject(new Error(`Failed to load image: ${url}`));
-            };
-            img.src = url;
-        });
+    /**
+     * Take the pair off the canvas — called whenever the selection stops being a
+     * complete pair + type, so the canvas never shows a pair that is not selected
+     * (FE-F13-4) and a change of patient never keeps the previous one's (FE-F13-12).
+     */
+    clear(): void {
+        ++this.loadSeq;
+        this.pending.forEach(release);
+        this.pending = [];
+        if (this.photos.length === 0 && !this.loading) return;
+        this.loading = false;
+        this.clearPhotos();
+        this.commit();
+    }
+
+    private clearPhotos(): void {
+        this.photos.forEach(release);
+        this.photos = [];
+        this.sourceKey = null;
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    /**
+     * The watermark: THIS install's logo (Settings → General), or none. It used to be
+     * this clinic's wordmark from the repository, on by default, on every export
+     * (FE-F13-7). With no logo set there is no watermark and no toggle.
+     */
+    async setLogo(url: string | null): Promise<void> {
+        if (url === this.logoUrl) return;
+        this.logoUrl = url;
+        const seq = ++this.logoSeq;
+        if (!url) {
+            if (this.logoImg) release(this.logoImg);
+            this.logoImg = null;
+            this.logoSource = null;
+            this.showLogo = false;
+            this.render();
+            this.commit();
+            return;
+        }
+        const img = new Image();
+        try {
+            await new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve();
+                img.onerror = () => reject(new Error('logo'));
+                img.src = url;
+            });
+        } catch {
+            if (seq === this.logoSeq) {
+                this.logoImg = null;
+                this.logoSource = null;
+                this.showLogo = false;
+                this.commit();
+            }
+            return; // no logo is a valid state, not an error to report
+        }
+        if (seq !== this.logoSeq) return;
+        if (this.logoImg) release(this.logoImg);
+        const firstLogo = this.logoImg === null;
+        this.logoImg = img;
+        this.logoOpaque = !hasTransparency(img);
+        // A logo with no transparency (a JPEG) would recolour into a solid block, so
+        // it starts in its own colours; a transparent one starts as a white mark.
+        if (firstLogo) {
+            this.logoTone = this.logoOpaque ? 'original' : 'white';
+            this.showLogo = true;
+        }
+        this.logoSource = recolor(img, this.logoTone);
+        this.render();
+        this.commit();
     }
 
     // --- selection / view options ---
@@ -213,7 +370,7 @@ export class ComparisonEngine {
 
     toggleOrientation(): void {
         this.orientation = this.orientation === 'vertical' ? 'horizontal' : 'vertical';
-        if (this.autoMode && this.images.length >= 2) {
+        if (this.autoMode && this.photos.length >= 2) {
             this.resizeCanvasToFitImages();
         }
         this.render();
@@ -227,42 +384,38 @@ export class ComparisonEngine {
     }
 
     toggleLogo(): void {
+        if (!this.logoImg) return;
         this.showLogo = !this.showLogo;
         this.render();
         this.commit();
     }
 
-    /** The static asset URL for the current logo variant. */
-    getLogoUrl(): string {
-        return this.logoBlack ? LOGO_BLACK_URL : LOGO_WHITE_URL;
-    }
-
     /**
-     * Flips the logo between the white and dark asset. Swaps only the logo image
-     * (slot 2) so the patient photos aren't reloaded; a newer toggle or a pair
-     * reload supersedes an in-flight swap (logoSeq guard).
+     * Cycle the watermark's colour: white → black → its own colours. Recoloured
+     * locally from the one loaded logo, synchronously — the old toggle flipped its
+     * flag, then fetched a second asset, so a failed fetch left the button and the
+     * canvas disagreeing and an unhandled rejection behind (FE-F13-15b).
      */
-    async toggleLogoColor(): Promise<void> {
-        this.logoBlack = !this.logoBlack;
-        this.commit();
-        if (this.images.length < 3) return; // no pair yet; next loadImages uses the flag
-        const seq = ++this.logoSeq;
-        const img = await this.loadOneImage(this.getLogoUrl());
-        if (seq !== this.logoSeq || this.images.length < 3) return;
-        this.images[2] = img;
+    cycleLogoTone(): void {
+        if (!this.logoImg) return;
+        const order: LogoTone[] = ['white', 'black', 'original'];
+        this.logoTone = order[(order.indexOf(this.logoTone) + 1) % order.length];
+        this.logoSource = recolor(this.logoImg, this.logoTone);
         this.render();
         this.commit();
     }
 
     /**
-     * 'auto' | 'auto-50' | 'auto-25' keep the canvas sized from the source
-     * images; any other value is a JSON `{width,height}` fixed preset.
+     * 'auto' (long edge capped at AUTO_LONG_EDGE_CAP) | 'auto-full' | 'auto-50' |
+     * 'auto-25' keep the canvas sized from the source images; any other value is a
+     * JSON `{width,height}` fixed preset.
      */
     setSizeMode(value: string): void {
-        if (value === 'auto' || value === 'auto-50' || value === 'auto-25') {
+        if (value === 'auto' || value === 'auto-full' || value === 'auto-50' || value === 'auto-25') {
             this.autoMode = true;
+            this.autoCapped = value === 'auto';
             this.autoScale = value === 'auto-50' ? 0.5 : value === 'auto-25' ? 0.25 : 1;
-            if (this.images.length >= 2) {
+            if (this.photos.length >= 2) {
                 this.resizeCanvasToFitImages();
             } else {
                 this.canvas.width = 800;
@@ -270,6 +423,7 @@ export class ComparisonEngine {
             }
         } else {
             this.autoMode = false;
+            this.autoCapped = false;
             this.autoScale = 1;
             const size = JSON.parse(value) as CanvasDimensions;
             this.canvas.width = size.width;
@@ -395,7 +549,7 @@ export class ComparisonEngine {
         // images so reset restores the same layout the user first saw.
         // Falling back to originalDimensions here would leave a stale
         // autoImageSize and draw the images huge on a tiny canvas.
-        if (this.autoMode && this.images.length >= 2) {
+        if (this.autoMode && this.photos.length >= 2) {
             this.resizeCanvasToFitImages();
         } else {
             this.canvas.width = this.originalDimensions.width;
@@ -405,21 +559,32 @@ export class ComparisonEngine {
         this.commit();
     }
 
-    toDataURL(): string {
-        return this.canvas.toDataURL('image/png');
+    /**
+     * The export, as a JPEG (quality 0.9). `toDataURL('image/png')` blocked the main
+     * thread for ~1–1.4 s and produced 30–45 MB (FE-F13-6); `toBlob` encodes off the
+     * main thread, at a fraction of the size.
+     */
+    exportBlob(): Promise<Blob> {
+        return new Promise((resolve, reject) => {
+            this.canvas.toBlob(
+                (blob) => (blob ? resolve(blob) : reject(new Error('The canvas could not be encoded'))),
+                'image/jpeg',
+                0.9
+            );
+        });
     }
 
     // --- canvas drawing (private) ---
 
     private resizeCanvasToFitImages(): void {
-        if (this.images.length < 2) return;
-        const img1 = this.images[0];
-        const img2 = this.images[1];
+        if (this.photos.length < 2) return;
+        const img1 = this.photos[0];
+        const img2 = this.photos[1];
         if (!img1.complete || !img2.complete) return;
 
         // Simple approach: use the larger dimensions to ensure both fit without distortion
-        const containerWidth = Math.max(img1.width, img2.width);
-        const containerHeight = Math.max(img1.height, img2.height);
+        const containerWidth = Math.max(img1.naturalWidth, img2.naturalWidth);
+        const containerHeight = Math.max(img1.naturalHeight, img2.naturalHeight);
 
         let canvasWidth: number, canvasHeight: number;
         if (this.orientation === 'vertical') {
@@ -430,7 +595,10 @@ export class ComparisonEngine {
             canvasHeight = containerHeight;
         }
 
-        const scale = this.autoScale ?? 1;
+        let scale = this.autoScale ?? 1;
+        if (this.autoCapped) {
+            scale = Math.min(scale, AUTO_LONG_EDGE_CAP / Math.max(canvasWidth, canvasHeight));
+        }
         if (scale !== 1) {
             canvasWidth = Math.round(canvasWidth * scale);
             canvasHeight = Math.round(canvasHeight * scale);
@@ -447,7 +615,7 @@ export class ComparisonEngine {
     }
 
     private render(): void {
-        if (this.images.length < 2) return;
+        if (this.photos.length < 2) return;
         const { canvas, context: ctx } = this;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -468,58 +636,58 @@ export class ComparisonEngine {
     private renderVertical(): void {
         const canvas = this.canvas;
 
-        if (this.autoMode && this.images.length >= 2 && this.autoImageSize) {
+        if (this.autoMode && this.photos.length >= 2 && this.autoImageSize) {
             // In auto mode, use common smallest dimensions for both images
             const commonWidth = this.autoImageSize.width;
             const commonHeight = this.autoImageSize.height;
-            if (this.images[0]) {
-                this.drawImage(this.images[0], 0, 0, commonWidth, commonHeight, 'img1');
+            if (this.photos[0]) {
+                this.drawImage(this.photos[0], 0, 0, commonWidth, commonHeight, 'img1');
             }
-            if (this.images[1]) {
-                this.drawImage(this.images[1], 0, commonHeight, commonWidth, commonHeight, 'img2');
+            if (this.photos[1]) {
+                this.drawImage(this.photos[1], 0, commonHeight, commonWidth, commonHeight, 'img2');
             }
         } else {
             // Fixed mode - use split layout
             const halfHeight = canvas.height / 2;
-            if (this.images[0]) {
-                this.drawImage(this.images[0], 0, 0, canvas.width, halfHeight, 'img1');
+            if (this.photos[0]) {
+                this.drawImage(this.photos[0], 0, 0, canvas.width, halfHeight, 'img1');
             }
-            if (this.images[1]) {
-                this.drawImage(this.images[1], 0, halfHeight, canvas.width, halfHeight, 'img2');
+            if (this.photos[1]) {
+                this.drawImage(this.photos[1], 0, halfHeight, canvas.width, halfHeight, 'img2');
             }
         }
 
-        if (this.images[2] && this.showLogo) {
-            this.drawLogo(this.images[2]);
+        if (this.logoSource && this.showLogo) {
+            this.drawLogo(this.logoSource);
         }
     }
 
     private renderHorizontal(): void {
         const canvas = this.canvas;
 
-        if (this.autoMode && this.images.length >= 2 && this.autoImageSize) {
+        if (this.autoMode && this.photos.length >= 2 && this.autoImageSize) {
             // In auto mode, give each image a container but let them maintain aspect ratio
             const containerWidth = this.autoImageSize.width;
             const containerHeight = this.autoImageSize.height;
-            if (this.images[0]) {
-                this.drawImage(this.images[0], 0, 0, containerWidth, containerHeight, 'img1');
+            if (this.photos[0]) {
+                this.drawImage(this.photos[0], 0, 0, containerWidth, containerHeight, 'img1');
             }
-            if (this.images[1]) {
-                this.drawImage(this.images[1], containerWidth, 0, containerWidth, containerHeight, 'img2');
+            if (this.photos[1]) {
+                this.drawImage(this.photos[1], containerWidth, 0, containerWidth, containerHeight, 'img2');
             }
         } else {
             // Fixed mode - use split layout
             const halfWidth = canvas.width / 2;
-            if (this.images[0]) {
-                this.drawImage(this.images[0], 0, 0, halfWidth, canvas.height, 'img1');
+            if (this.photos[0]) {
+                this.drawImage(this.photos[0], 0, 0, halfWidth, canvas.height, 'img1');
             }
-            if (this.images[1]) {
-                this.drawImage(this.images[1], halfWidth, 0, halfWidth, canvas.height, 'img2');
+            if (this.photos[1]) {
+                this.drawImage(this.photos[1], halfWidth, 0, halfWidth, canvas.height, 'img2');
             }
         }
 
-        if (this.images[2] && this.showLogo) {
-            this.drawLogo(this.images[2]);
+        if (this.logoSource && this.showLogo) {
+            this.drawLogo(this.logoSource);
         }
     }
 
@@ -529,6 +697,8 @@ export class ComparisonEngine {
         const crop = this.crop[key];
 
         if (!img.complete || img.naturalWidth === 0) return;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
 
         // Per-side crop insets (fractions of the container) → an axis-aligned
         // clip rect in canvas space. Because the clip is set before the rotate,
@@ -546,7 +716,7 @@ export class ComparisonEngine {
         // In auto mode with no transforms AND no crop, prioritize aspect ratio preservation
         if (this.autoMode && !hasCrop && transform.x === 0 && transform.y === 0 && transform.scale === 1 && transform.rotation === 0) {
             // Pure aspect ratio preservation without transforms
-            const aspectRatio = img.width / img.height;
+            const aspectRatio = imgW / imgH;
             const containerRatio = width / height;
 
             let drawWidth: number, drawHeight: number, drawX: number, drawY: number;
@@ -578,7 +748,7 @@ export class ComparisonEngine {
             ctx.rotate(transform.rotation * Math.PI / 180);
             ctx.scale(transform.scale, transform.scale);
 
-            const aspectRatio = img.width / img.height;
+            const aspectRatio = imgW / imgH;
             const containerRatio = width / height;
 
             let drawWidth: number, drawHeight: number;
@@ -595,7 +765,7 @@ export class ComparisonEngine {
         }
     }
 
-    private drawLogo(img: HTMLImageElement): void {
+    private drawLogo(img: HTMLImageElement | HTMLCanvasElement): void {
         const { canvas, context: ctx } = this;
         const transform = this.transform.logo;
 

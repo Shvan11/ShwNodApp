@@ -7,12 +7,10 @@ import { useState, type FormEvent } from 'react';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import styles from './TimepointModals.module.css';
+import type { TimepointRow } from '@shared/contracts/patient.contract';
 
-interface Timepoint {
-    tpCode: string;
-    tpDescription: string;
-    tpDateTime: string;
-}
+// The timepoints read's own row (FE-F12-15: no hand-written copy, no adapter).
+type Timepoint = TimepointRow;
 
 interface Props {
     isOpen: boolean;
@@ -29,13 +27,13 @@ const EditTimepointModal = ({ isOpen, timepoint, saving, onClose, onSave }: Prop
     // Prefill from the selected timepoint. Done during render (keyed on the
     // timepoint identity) rather than in an effect, so the React Compiler can
     // optimize and there's no extra post-paint render.
-    const initKey = timepoint ? timepoint.tpCode : '';
+    const initKey = timepoint ? timepoint.tp_code : '';
     const [initializedKey, setInitializedKey] = useState('');
     if (initKey !== initializedKey) {
         setInitializedKey(initKey);
         if (timepoint) {
-            setName(timepoint.tpDescription ?? '');
-            setDate((timepoint.tpDateTime ?? '').substring(0, 10));
+            setName(timepoint.tp_description ?? '');
+            setDate((timepoint.tp_date_time ?? '').substring(0, 10));
         }
     }
 

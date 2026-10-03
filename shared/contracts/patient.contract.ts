@@ -209,9 +209,7 @@ export const patientsFolder = {
 
 // GET /api/patients/:personId/timepoints — time-point rows.
 export const timepoints = { response: z.array(timepointRow) } as const;
-
-// GET /api/patients/:personId/timepoints/:tp/images — array of image-code strings.
-export const timepointImages = { response: z.array(z.string()) } as const;
+export type TimepointRow = z.infer<typeof timepointRow>;
 
 // GET /api/patients/:personId/timepoints/:tpCode/folder — { folder, exists }.
 // `folder` is `timepointFolderName(...)` which returns `string | null` (null when
@@ -343,9 +341,12 @@ export const portalStatus = {
 } as const;
 
 // GET /api/patients/:personId/photos/visibility — { privateImages: [{tp,name}] }.
+// `tp` is the session code as stored (`private_photos.timepoint_code`, text), so the
+// grid compares it as a string (FE-F12-15: an unvalidated `{}` row hid a type drift).
 export const photoVisibilityList = {
-  response: z.object({ privateImages: z.array(z.looseObject({})) }),
+  response: z.object({ privateImages: z.array(z.object({ tp: z.string(), name: z.string() })) }),
 } as const;
+export type PhotoVisibilityListResponse = z.infer<typeof photoVisibilityList.response>;
 
 // ===========================================================================
 // TIME-POINT MUTATIONS

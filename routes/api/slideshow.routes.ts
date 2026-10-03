@@ -6,7 +6,9 @@
  * (index.ts); mutations are CSRF-checked by the staff funnel AND carry an
  * explicit `authorize(CLINICAL_ROLES)` — a saved sequence is per-patient
  * clinical content, so the tier matches the photo/timepoint routes it presents.
- * Backed by the LOCAL-ONLY `slideshow_configs` table.
+ * Backed by the `slideshow_configs` table, mirrored forward-only to Supabase since
+ * 2026-07-21 (migrations/supabase/mirror-approvals-slideshow-2026-07-21.sql; its CDC trigger is in
+ * the baseline).
  */
 import { Router, type Request, type Response } from 'express';
 import { authorize } from '../../middleware/auth.js';

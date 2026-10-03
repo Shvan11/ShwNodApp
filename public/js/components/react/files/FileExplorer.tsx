@@ -19,15 +19,16 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { postJSON, postFormData, deleteJSON } from '@/core/http';
+import { postJSON, postFormData, deleteJSON, httpErrorMessage } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import Modal from '@/components/react/Modal';
-import type { FileEntry, FileListing, FileBatchDeleteResult } from '@/types/api.types';
+import type { FileEntry, FileBatchDeleteResult } from '@/types/api.types';
 import * as fileExplorer from '@shared/contracts/file-explorer.contract';
 import { patientFilesQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
-import { encodeRelPath, errorMessage } from './fileHelpers';
+import { invalidatePatientPhotos } from '@/query/photos';
+import { encodeRelPath } from './fileHelpers';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
 import type { ShareSource } from '@/components/react/localsend/LocalSendShareModal';
@@ -50,6 +51,13 @@ interface PreviewState {
   index: number;
 }
 
+/** A 409 from the rename guard: the folder belongs to a photo session or the X-ray card. */
+function isOwnedFolderConflict(err: unknown): boolean {
+  const e = err as { status?: number; data?: { details?: { code?: unknown } } };
+  const code = e?.data?.details?.code;
+  return e?.status === 409 && (code === 'SESSION_FOLDER' || code === 'RESERVED_FOLDER');
+}
+
 const VIEW_KEY = 'fileExplorer.view';
 const FLAT_KEY = 'fileExplorer.flat';
 const TILE_MIN_PX = 170;
@@ -68,6 +76,21 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   const [flat, setFlat] = useState<boolean>(() => localStorage.getItem(FLAT_KEY) === '1');
   const [dragActive, setDragActive] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The synchronous twin of `busy`: a second Enter in the prompt, or a drop while an
+  // upload runs, fires before the re-render that disables the button — two
+  // identical renames, the second failing ENOENT into the server's error log
+  // (FE-F12-9). State alone cannot close that window; a ref can.
+  const busyRef = useRef(false);
+  const begin = (): boolean => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setBusy(true);
+    return true;
+  };
+  const end = (): void => {
+    busyRef.current = false;
+    setBusy(false);
+  };
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -83,9 +106,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     ...patientFilesQuery(personId ?? '', currentPath, flat),
     enabled: !!personId,
   });
-  const listing = (data as FileListing | undefined) ?? null;
+  const listing = data ?? null;
   const loading = !!personId && isLoading;
-  const error = queryError ? errorMessage(queryError, 'Failed to load files') : null;
+  const error = queryError ? httpErrorMessage(queryError, 'Failed to load files') : null;
   // Refresh every listing for this patient (any path/flat) after a file mutation.
   const reload = useCallback(
     () => queryClient.invalidateQueries({ queryKey: qk.patient.filesAll(personId ?? '') }),
@@ -178,7 +201,10 @@ const FileExplorer = ({ personId, subPath }: Props) => {
       const form = new FormData();
       list.forEach((f) => form.append('files', f));
       const qs = new URLSearchParams({ path: currentPath });
-      setBusy(true);
+      if (!begin()) {
+        toast.info('Wait for the current operation to finish');
+        return;
+      }
       try {
         // 120s to match the server's timeouts.long — a multi-file drop exceeds the
         // funnel's 30s default, which would abort it while the server was still writing.
@@ -186,9 +212,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
         toast.success(`Uploaded ${list.length} file(s)`);
         reload();
       } catch (err) {
-        toast.error(errorMessage(err, 'Upload failed'));
+        toast.error(httpErrorMessage(err, 'Upload failed'));
       } finally {
-        setBusy(false);
+        end();
       }
     },
     [personId, currentPath, toast, reload]
@@ -198,26 +224,45 @@ const FileExplorer = ({ personId, subPath }: Props) => {
     if (!prompt || !personId) return;
     const value = prompt.value.trim();
     if (!value) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       if (prompt.mode === 'newFolder') {
         await postJSON(`/api/patients/${personId}/files/folder`, { path: currentPath, name: value });
         toast.success('Folder created');
       } else if (prompt.target) {
-        await postJSON(`/api/patients/${personId}/files/rename`, {
-          path: prompt.target.relPath,
-          newName: value,
-        });
+        const rename = (force: boolean) =>
+          postJSON(`/api/patients/${personId}/files/rename`, {
+            path: prompt.target!.relPath,
+            newName: value,
+            ...(force ? { force: true } : {}),
+          });
+        try {
+          await rename(false);
+        } catch (err) {
+          // A photo session's originals folder, or one the X-ray card reads by name:
+          // the server refuses unless the user confirms, because the rename detaches
+          // it from its owner (FE-F14-5).
+          if (!isOwnedFolderConflict(err)) throw err;
+          const ok = await confirm(
+            `${httpErrorMessage(err, 'This folder belongs to something else.')} Rename it anyway?`,
+            { title: 'Rename this folder?', confirmText: 'Rename anyway', danger: true }
+          );
+          if (!ok) return;
+          await rename(true);
+        }
         toast.success('Renamed');
+        // A session folder rename moves what the photo editor and the grid's
+        // "Open original folder" point at.
+        void invalidatePatientPhotos(personId);
       }
       setPrompt(null);
       reload();
     } catch (err) {
-      toast.error(errorMessage(err, 'Operation failed'));
+      toast.error(httpErrorMessage(err, 'Operation failed'));
     } finally {
-      setBusy(false);
+      end();
     }
-  }, [prompt, personId, currentPath, toast, reload]);
+  }, [prompt, personId, currentPath, toast, reload, confirm]);
 
   const doDelete = useCallback(
     async (entry: FileEntry) => {
@@ -227,17 +272,16 @@ const FileExplorer = ({ personId, subPath }: Props) => {
         confirmText: 'Delete',
         danger: true,
       });
-      if (!ok) return;
-      setBusy(true);
+      if (!ok || !begin()) return;
       try {
         const qs = new URLSearchParams({ path: entry.relPath });
         await deleteJSON(`/api/patients/${personId}/files?${qs}`);
         toast.success('Moved to trash');
         reload();
       } catch (err) {
-        toast.error(errorMessage(err, 'Delete failed'));
+        toast.error(httpErrorMessage(err, 'Delete failed'));
       } finally {
-        setBusy(false);
+        end();
       }
     },
     [personId, confirm, toast, reload]
@@ -300,9 +344,8 @@ const FileExplorer = ({ personId, subPath }: Props) => {
       confirmText: 'Delete',
       danger: true,
     });
-    if (!ok) return;
+    if (!ok || !begin()) return;
 
-    setBusy(true);
     try {
       const result = await postJSON<FileBatchDeleteResult>(
         `/api/patients/${personId}/files/delete-batch`,
@@ -316,9 +359,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
       setSelected(new Set());
       reload();
     } catch (err) {
-      toast.error(errorMessage(err, 'Delete failed'));
+      toast.error(httpErrorMessage(err, 'Delete failed'));
     } finally {
-      setBusy(false);
+      end();
     }
   }, [personId, entries, selected, confirm, toast, reload]);
 
@@ -557,7 +600,7 @@ const FileExplorer = ({ personId, subPath }: Props) => {
             value={prompt.value}
             onChange={(e) => setPrompt((p) => (p ? { ...p, value: e.target.value } : p))}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void submitPrompt();
+              if (e.key === 'Enter' && !busyRef.current) void submitPrompt();
             }}
             placeholder={prompt.mode === 'newFolder' ? 'Folder name' : 'New name'}
           />

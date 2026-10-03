@@ -6,8 +6,9 @@
  * delete). All path safety lives in services/files/file-explorer.service.ts.
  *
  * Reads ride the global `/api` `authenticate` gate (index.ts). Writes add
- * `authorize(FINANCE_ROLES)`. Every content fetch + mutation is
- * audit-logged with the acting user id.
+ * `authorize(CLINICAL_ROLES)` — all three staff roles: doctors and assistants
+ * manage a patient's files and photo sessions too (owner decision, FE-F12-6).
+ * Every content fetch + mutation is audit-logged with the acting user id.
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
@@ -15,13 +16,15 @@ import path from 'path';
 import { createReadStream, promises as fsp } from 'fs';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendError, sendData } from '../../utils/error-response.js';
-import { uploadErrorMessage } from '../../middleware/upload.js';
+import { createUpload, uploadErrorMessage } from '../../middleware/upload.js';
 import { authorize } from '../../middleware/auth.js';
-import { FINANCE_ROLES } from '../../shared/auth/roles.js';
+import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { timeouts } from '../../middleware/timeout.js';
 import * as fileExplorer from '../../shared/contracts/file-explorer.contract.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
+import { folderOwner } from '../../shared/photo-session-folder.js';
+import { getTimePoints } from '../../services/database/queries/timepoint-queries.js';
 import {
   FileExplorerError,
   listDirectory,
@@ -341,7 +344,7 @@ const uploadStorage = multer.diskStorage({
   },
 });
 
-const uploadMw = multer({ storage: uploadStorage, limits: { fileSize: MAX_UPLOAD_BYTES } });
+const uploadMw = createUpload({ storage: uploadStorage, limits: { fileSize: MAX_UPLOAD_BYTES } });
 
 /** Run multer and translate its errors (no `payloadTooLarge` helper exists). */
 function runUpload(req: Request, res: Response, next: NextFunction): void {
@@ -369,7 +372,7 @@ function runUpload(req: Request, res: Response, next: NextFunction): void {
 
 router.post(
   '/patients/:personId/files/upload',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ params: fileExplorer.upload.params }),
   // A multi-file photo/scan drop is far more than 30s of transfer; without this
   // the global requestTimeout 408s the upload while it is still streaming (the
@@ -417,7 +420,7 @@ router.post(
 
 router.post(
   '/patients/:personId/files/folder',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ params: fileExplorer.folder.params, body: fileExplorer.folder.body }),
   async (req: Request<PersonIdParams, unknown, { path?: string; name?: string }>, res: Response): Promise<void> => {
     try {
@@ -438,15 +441,38 @@ router.post(
 
 router.post(
   '/patients/:personId/files/rename',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ params: fileExplorer.rename.params, body: fileExplorer.rename.body }),
-  async (req: Request<PersonIdParams, unknown, { path?: string; newName?: string }>, res: Response): Promise<void> => {
+  async (req: Request<PersonIdParams, unknown, fileExplorer.RenameBody>, res: Response): Promise<void> => {
     try {
       const { personId } = req.params;
-      const { path: relPath = '', newName = '' } = req.body || {};
+      const { path: relPath = '', newName = '', force = false } = req.body || {};
       if (!relPath) {
         ErrorResponses.missingParameter(res, 'path');
         return;
+      }
+      // A top-level folder that a photo session or the X-ray card reads by name is
+      // refused unless the caller confirmed (FE-F14-5): renaming it detaches it from
+      // its owner without a word.
+      const top = relPath.replace(/^[\\/]+|[\\/]+$/g, '');
+      if (!force && top && !/[\\/]/.test(top)) {
+        const owner = folderOwner(top, await getTimePoints(String(personId)));
+        if (owner?.kind === 'session') {
+          ErrorResponses.conflict(
+            res,
+            `"${top}" holds the originals of the photo session "${owner.name}" (${owner.date}). Renaming it detaches them from that session.`,
+            { code: 'SESSION_FOLDER', tpCode: owner.tpCode }
+          );
+          return;
+        }
+        if (owner?.kind === 'reserved') {
+          ErrorResponses.conflict(
+            res,
+            `"${top}" is read by the app under that exact name (X-rays). Renaming it empties that view.`,
+            { code: 'RESERVED_FOLDER' }
+          );
+          return;
+        }
       }
       const entry = await renameEntry(personId, relPath, newName);
       log.info('[Files] rename', { userId: req.session?.userId, personId, relPath, newName: entry.name });
@@ -463,7 +489,7 @@ router.post(
 
 router.delete(
   '/patients/:personId/files',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ params: fileExplorer.deleteEntry.params }),
   async (req: Request<PersonIdParams>, res: Response): Promise<void> => {
     try {
@@ -491,7 +517,7 @@ const MAX_BATCH_DELETE = 5000;
 
 router.post(
   '/patients/:personId/files/delete-batch',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ params: fileExplorer.deleteBatch.params }),
   timeouts.long, // bulk renames over SMB can exceed the global 30s gate
   async (

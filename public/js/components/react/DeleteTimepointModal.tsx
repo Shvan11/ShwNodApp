@@ -6,13 +6,11 @@
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import styles from './TimepointModals.module.css';
+import type { TimepointRow } from '@shared/contracts/patient.contract';
 import type { DeleteScope } from './TimepointActionsMenu';
 
-interface Timepoint {
-    tpCode: string;
-    tpDescription: string;
-    tpDateTime: string;
-}
+// The timepoints read's own row (FE-F12-15: no hand-written copy, no adapter).
+type Timepoint = TimepointRow;
 
 interface Props {
     isOpen: boolean;
@@ -51,7 +49,7 @@ const SCOPE_CONFIG: Record<DeleteScope, { title: string; confirmLabel: string; l
         title: 'Delete everything',
         confirmLabel: 'Delete everything',
         lines: [
-            { removed: true, text: 'Original photos will be permanently deleted' },
+            { removed: true, text: "Original photos will be moved to the clinic's trash folder (recoverable on the server)" },
             { removed: true, text: 'Modified (cropped) photos will be deleted' },
             { removed: true, text: 'The photo session entry will be removed' },
         ],
@@ -62,8 +60,8 @@ const DeleteTimepointModal = ({ isOpen, timepoint, scope, deleting, onConfirm, o
     if (!timepoint) return null;
 
     const cfg = SCOPE_CONFIG[scope];
-    const date = (timepoint.tpDateTime ?? '').substring(0, 10).split('-').reverse().join('-');
-    const label = `${timepoint.tpDescription || 'this photo session'}${date ? ` (${date})` : ''}`;
+    const date = (timepoint.tp_date_time ?? '').substring(0, 10).split('-').reverse().join('-');
+    const label = `${timepoint.tp_description || 'this photo session'}${date ? ` (${date})` : ''}`;
 
     return (
         <Modal
@@ -98,7 +96,11 @@ const DeleteTimepointModal = ({ isOpen, timepoint, scope, deleting, onConfirm, o
                         </li>
                     ))}
                 </ul>
-                <p className={styles.warningSubtle}>This action cannot be undone.</p>
+                <p className={styles.warningSubtle}>
+                    {scope === 'all'
+                        ? 'The cropped photos and the session entry cannot be restored.'
+                        : 'This action cannot be undone.'}
+                </p>
             </div>
 
             <div className={styles.modalFooter}>

@@ -11,7 +11,7 @@ import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { ComparisonEngine, EMPTY_SNAPSHOT, emptySubscribe, getEmptySnapshot } from './ComparisonEngine';
 import type { EngineSnapshot } from './ComparisonEngine';
 
-export interface UseComparisonEngineResult {
+interface UseComparisonEngineResult {
     engine: ComparisonEngine | null;
     snap: EngineSnapshot;
     /** Attach to the <canvas> element. */

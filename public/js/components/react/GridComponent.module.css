@@ -303,6 +303,32 @@
   border: 2px solid var(--gray-300);
 }
 
+/* Centre cell: the install's own logo (contained, not cropped), or its name when
+   none is set. Not a lightbox anchor (FE-F12-7). */
+.logoCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.logoCell .galleryImage {
+  object-fit: contain;
+}
+
+.logoName {
+  padding: var(--spacing-sm);
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 /* Loading spinner */
 .loadingSpinner {
   display: flex;
@@ -313,9 +339,11 @@
   font-size: 1rem;
 }
 
-/* Error message */
+/* Error message (with its Retry) */
 .errorMessage {
   display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   align-items: center;
   justify-content: center;
   padding: var(--spacing-lg);
@@ -396,7 +424,8 @@
   }
 
   .galleryPadded a,
-  .galleryPadded .placeholderCell {
+  .galleryPadded .placeholderCell,
+  .galleryPadded .logoCell {
     min-height: 250px;
     border-radius: var(--radius-lg);
   }
@@ -410,7 +439,8 @@
   }
 
   .galleryPadded a,
-  .galleryPadded .placeholderCell {
+  .galleryPadded .placeholderCell,
+  .galleryPadded .logoCell {
     min-height: 200px;
   }
 }

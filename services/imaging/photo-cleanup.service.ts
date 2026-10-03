@@ -13,25 +13,17 @@ import fs from 'fs/promises';
 import { log } from '../../utils/logger.js';
 import { workingFileNameVariants, workingFilePath } from '../files/clinic-paths.js';
 import { VIEW_CODES } from '../../shared/photo-views.js';
+import { sessionFolderName } from '../../shared/photo-session-folder.js';
 
 /**
- * Originals-folder convention on the share: `{tpName}_{DD-MM-YYYY}`. Mirrors
- * `public/js/components/react/photo-editor/PhotoEditor.tsx#folderName` so the
- * server can locate the folder a timepoint's source photos were uploaded into.
- * Returns null when the date is missing or isn't a valid 'YYYY-MM-DD' (no
- * deterministic folder name → caller skips the filesystem step). The nullable params
- * are for CLIENT input, not DB nullability: `time_points.tp_description`/`tp_date_time`
- * are NOT NULL (migrations/pg/1785700253568), but photo-editor.routes.ts feeds this
- * helper the request body's optional `tpName`/`tpDate` (photo-editor.contract.ts).
+ * Originals-folder convention on the share: `{tpName}_{DD-MM-YYYY}`. The rule itself
+ * lives in `shared/photo-session-folder.ts` so the photo editor's *Rename folder* list
+ * and the server's rename guard classify folders by the same name. Null when the date
+ * is missing or isn't a valid 'YYYY-MM-DD' (no deterministic folder name → caller skips
+ * the filesystem step).
  */
-export function timepointFolderName(
-  tpName: string | null,
-  tpDate: string | null
-): string | null {
-  const name = (tpName || '').trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tpDate || '');
-  if (!name || !m) return null;
-  return `${name}_${m[3]}-${m[2]}-${m[1]}`;
+export function timepointFolderName(tpName: string | null, tpDate: string | null): string | null {
+  return sessionFolderName(tpName, tpDate);
 }
 
 /**

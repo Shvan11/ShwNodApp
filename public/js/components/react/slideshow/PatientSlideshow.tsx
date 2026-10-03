@@ -3,66 +3,53 @@
  *
  * Lets staff hand-pick photos across a single patient's timepoints, arrange the
  * order, then play an immersive, touch-driven slideshow (for chair-side consults
- * and social-media reels). Frontend-only: reuses the existing timepoints/gallery
- * endpoints. The working sequence is mirrored to sessionStorage so it survives
- * navigating away and back within the session.
+ * and social-media reels). Reads the timepoints and gallery endpoints; saved
+ * presentations and the clinic's generic templates live in `slideshow_configs`
+ * (`/api/slideshow-configs`). The working sequence is mirrored to sessionStorage
+ * so it survives navigating away and back within the session.
+ *
+ * Mounted with `key={personId}` (ContentRenderer), so nothing — open sessions, the
+ * timeline, an in-flight gallery read — carries over to another patient (FE-F15-8).
+ *
+ * Galleries are React Query reads (`galleryQuery`, shared with the grid and the
+ * editor), so a photo saved or removed in the editor reaches this page through the
+ * same invalidation. The timeline keeps each photo's IDENTITY; its URL, version and
+ * caption are resolved on every render from those reads (FE-F15-4).
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../../contexts/ToastContext';
-import { generateId } from '../../../core/utils';
-import { fetchJSON, postJSON, putJSON, deleteJSON } from '@/core/http';
-import { slideshowConfigsQuery, timepointsQuery } from '@/query/queries';
+import { useConfirm } from '../../../contexts/ConfirmContext';
+import { postJSON, putJSON, deleteJSON } from '@/core/http';
+import { galleryQuery, slideshowConfigsQuery, timepointsQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import { useApiMutation } from '@/query/useApiMutation';
-import * as patientContract from '@shared/contracts/patient.contract';
 import * as slideshowContract from '@shared/contracts/slideshow.contract';
 import type { ConfigPayload, ConfigRow } from '@shared/contracts/slideshow.contract';
-import Modal from '../Modal';
-import ModalHeader from '../ModalHeader';
-import SlideshowBuilder from './SlideshowBuilder';
+import type { GalleryResponse } from '@shared/contracts/patient.contract';
+import SlideshowBuilder, { type GalleryStatus } from './SlideshowBuilder';
 import SlideshowPlayer from './SlideshowPlayer';
-import { rebuildLiteral, resolveTemplate } from './configResolver';
-import { labelForImageName, isLogoImage, slidePhotoCount, MAX_PHOTOS_PER_SLIDE } from './photoTypes';
-import type { SlideItem, SlidePhoto, Timepoint } from './types';
+import { folderPhoto, galleryPhotos, rebuildLiteral, resolveTemplate, type GetGallery } from './configResolver';
+import { slidePhotos, slidePhotoCount, MAX_PHOTOS_PER_SLIDE } from './photoTypes';
+import { storedSlide, type SlideItem, type SlidePhoto } from './types';
+import { generateId } from '../../../core/utils';
 import styles from './PatientSlideshow.module.css';
-import modalStyles from './SlideshowModals.module.css';
 
 interface Props {
   personId?: number | null;
 }
 
-/** Raw shape from GET /api/patients/:id/timepoints (snake_case API). */
-interface TimepointApiRow {
-  tp_code: string;
-  tp_date_time: string;
-  tp_description: string;
-}
-
-// dd-mm-yyyy, matching the convention used elsewhere (Navigation.formatDate).
-function formatDate(dateTime: string): string {
-  if (!dateTime) return '';
-  return dateTime.substring(0, 10).split('-').reverse().join('-');
-}
-
 const sessionKey = (pid: number | null | undefined): string => `slideshow_seq_${pid ?? 'none'}`;
 
+/** The stored timeline, parsed entry by entry — a malformed one is dropped (FE-F15-11). */
 function readSession(pid: number | null | undefined): SlideItem[] {
   try {
     const raw = sessionStorage.getItem(sessionKey(pid));
-    const parsed = raw ? JSON.parse(raw) : null;
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
     if (!Array.isArray(parsed)) return [];
-    // Back-compat: legacy sessions stored a non-unique `id` and no `uid`, and held
-    // a single paired photo in `second` (now generalized to the `extras` array).
-    // Drop the old id, fold `second` into `extras`, and mint a unique instance id.
-    return parsed.map((s: Record<string, unknown>) => {
-      const { id: _legacyId, uid, second, extras, ...rest } = s;
-      const folded = Array.isArray(extras) ? extras : second ? [second] : undefined;
-      return {
-        ...rest,
-        uid: typeof uid === 'string' ? uid : generateId(),
-        ...(folded ? { extras: folded } : {}),
-      } as SlideItem;
+    return parsed.flatMap((s) => {
+      const r = storedSlide.safeParse(s);
+      return r.success ? [r.data] : [];
     });
   } catch {
     return [];
@@ -71,21 +58,22 @@ function readSession(pid: number | null | undefined): SlideItem[] {
 
 function writeSession(pid: number | null | undefined, items: SlideItem[]): void {
   try {
-    sessionStorage.setItem(sessionKey(pid), JSON.stringify(items));
+    // Identity and captions only — the URLs are rebuilt on every render.
+    const lean = items.map(({ thumbUrl: _t, missing: _m, extras, ...rest }) => ({
+      ...rest,
+      ...(extras ? { extras: extras.map(({ thumbUrl: _t2, missing: _m2, ...e }) => e) } : {}),
+    }));
+    sessionStorage.setItem(sessionKey(pid), JSON.stringify(lean));
   } catch {
     /* storage disabled / quota — non-fatal */
   }
 }
 
-// --- Slide/photo helpers (a slide carries one photo, or two when paired) ---
-const toPhoto = (item: SlideItem): SlidePhoto => ({
-  name: item.name,
-  url: item.url,
-  tp: item.tp,
-  tpDescription: item.tpDescription,
-  tpDate: item.tpDate,
-  label: item.label,
-});
+// --- Slide/photo helpers (a slide carries one photo, or up to three when paired) ---
+const toPhoto = (item: SlideItem): SlidePhoto => {
+  const { uid: _uid, extras: _extras, ...photo } = item;
+  return photo;
+};
 
 // Wrap a palette photo as a fresh slide instance (unique uid → duplicates allowed).
 const newSlide = (photo: SlidePhoto): SlideItem => ({ ...photo, uid: generateId() });
@@ -98,33 +86,78 @@ const withoutExtras = (slide: SlideItem): SlideItem => {
 
 const PatientSlideshow = ({ personId }: Props) => {
   const toast = useToast();
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [galleries, setGalleries] = useState<Record<string, SlidePhoto[]>>({});
   const [selected, setSelected] = useState<SlideItem[]>(() => readSession(personId));
   const [mode, setMode] = useState<'build' | 'play'>('build');
-  // A config awaiting confirm because applying it would replace a non-empty timeline.
-  const [pendingApply, setPendingApply] = useState<ConfigRow | null>(null);
+  // Sessions the builder has opened (their galleries are read on first open).
+  const [openedTps, setOpenedTps] = useState<string[]>([]);
 
-  // Load timepoints whenever the patient changes.
-  const { data: timepointsData, isLoading: loadingTimepoints, isError: timepointsError } = useQuery({
+  const { data: sessionsData, isLoading: loadingTimepoints, isError: timepointsError } = useQuery({
     ...timepointsQuery(personId ?? ''),
     enabled: !!personId,
   });
-  const timepoints: Timepoint[] = useMemo(
-    () =>
-      Array.isArray(timepointsData)
-        ? (timepointsData as TimepointApiRow[]).map((r) => ({
-            tpCode: r.tp_code,
-            tpDateTime: r.tp_date_time,
-            tpDescription: r.tp_description,
-          }))
-        : [],
-    [timepointsData]
-  );
+  const sessions = sessionsData ?? [];
 
   useEffect(() => {
     if (timepointsError) toast.error('Failed to load photo sessions');
   }, [timepointsError, toast]);
+
+  useEffect(() => {
+    writeSession(personId, selected);
+  }, [personId, selected]);
+
+  // Every gallery this page needs: the sessions opened in the builder, plus every
+  // session the timeline uses (so its photos resolve to their current version).
+  const timelineTps = selected
+    .flatMap(slidePhotos)
+    .filter((p) => p.source !== 'folder' && p.tp)
+    .map((p) => p.tp);
+  const neededTps = [...new Set([...openedTps, ...timelineTps])];
+  // `combine` keeps the result referentially stable while its content is unchanged
+  // (replaceEqualDeep) — see [[usequeries-combine-referential-stability]].
+  const galleryReads = useQueries({
+    queries: neededTps.map((tp) => ({ ...galleryQuery(personId ?? '', tp), enabled: !!personId })),
+    combine: (results) => {
+      const rec: Record<string, { data?: GalleryResponse; status: GalleryStatus }> = {};
+      neededTps.forEach((tp, i) => {
+        const r = results[i];
+        rec[tp] = { data: r?.data, status: r?.data ? 'ready' : r?.isError ? 'error' : 'loading' };
+      });
+      return rec;
+    },
+  });
+
+  // Palette photos per opened session.
+  const galleries: Record<string, SlidePhoto[]> = {};
+  const galleryStatus: Record<string, GalleryStatus> = {};
+  for (const tp of openedTps) {
+    const read = galleryReads[tp];
+    const session = sessions.find((s) => s.tp_code === tp);
+    galleryStatus[tp] = read?.status ?? 'loading';
+    galleries[tp] = read?.data && session && personId ? galleryPhotos(personId, session, read.data) : [];
+  }
+
+  // The timeline as it is NOW: each gallery photo takes its current URL, version and
+  // caption from its session's gallery; one whose file or session is gone is marked
+  // `missing`. Folder photos rebuild their URL from the path.
+  const resolvePhoto = (p: SlidePhoto): SlidePhoto => {
+    if (!personId) return p;
+    if (p.source === 'folder' && p.path) return folderPhoto(personId, p.path, p.name);
+    const session = sessions.find((s) => s.tp_code === p.tp);
+    const read = galleryReads[p.tp];
+    if (sessionsData && !session) return { ...p, missing: true };
+    if (!session || !read?.data) return p; // still loading: keep what we have
+    const now = galleryPhotos(personId, session, read.data).find((g) => g.name.toLowerCase() === p.name.toLowerCase());
+    return now ?? { ...p, missing: true };
+  };
+  const resolved: SlideItem[] = selected.map((s) => ({
+    ...s,
+    ...resolvePhoto(s),
+    uid: s.uid,
+    ...(s.extras ? { extras: s.extras.map(resolvePhoto) } : {}),
+  }));
 
   // Saved configs: this patient's sequences + the clinic-wide generic templates.
   const { data: configsData } = useQuery({
@@ -133,57 +166,30 @@ const PatientSlideshow = ({ personId }: Props) => {
   });
   const configs: ConfigRow[] = configsData ?? [];
 
+  // A template is in EVERY patient's list, so a write refreshes them all — another
+  // patient's page kept a deleted template for its 30 s staleTime (FE-F15-7).
   const createMut = useApiMutation({
     mutationFn: (body: slideshowContract.CreateConfigBody) =>
       postJSON<ConfigRow, slideshowContract.CreateConfigBody>('/api/slideshow-configs', body, {
         schema: slideshowContract.createConfig.response,
       }),
-    invalidate: () => [qk.slideshow.list(personId ?? '')],
+    invalidate: () => [qk.slideshow.all()],
   });
   const renameMut = useApiMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
       putJSON<ConfigRow, { name: string }>(`/api/slideshow-configs/${id}`, { name }, {
         schema: slideshowContract.updateConfig.response,
       }),
-    invalidate: () => [qk.slideshow.list(personId ?? '')],
+    invalidate: () => [qk.slideshow.all()],
   });
   const deleteMut = useApiMutation({
     mutationFn: (id: number) =>
       deleteJSON<{ id: number }>(`/api/slideshow-configs/${id}`, { schema: slideshowContract.deleteConfig.response }),
-    invalidate: () => [qk.slideshow.list(personId ?? '')],
+    invalidate: () => [qk.slideshow.all()],
   });
 
-  // Hydrate the sequence on patient change; otherwise persist it for this session.
-  const pidRef = useRef(personId);
-  useEffect(() => {
-    if (pidRef.current !== personId) {
-      pidRef.current = personId;
-      setSelected(readSession(personId));
-      setGalleries({});
-      setMode('build');
-      return;
-    }
-    writeSession(personId, selected);
-  }, [personId, selected]);
-
-  // Lazy-load a timepoint's gallery on first expand; cache the palette photos.
-  const loadGallery = async (tp: Timepoint): Promise<SlidePhoto[]> => {
-    if (galleries[tp.tpCode]) return galleries[tp.tpCode];
-    if (!personId) return [];
-    const raw = await fetchJSON<patientContract.GalleryResponse>(`/api/patients/${personId}/gallery/${tp.tpCode}`, { schema: patientContract.gallery.response });
-    const items: SlidePhoto[] = Object.values(raw)
-      .filter((e): e is NonNullable<typeof e> => !!e && !isLogoImage(e.name))
-      .map((e) => ({
-        name: e.name,
-        // Cache-bust with mtime so a re-rendered slot isn't served stale from cache.
-        url: e.mtime ? `/DolImgs/${e.name}?v=${e.mtime}` : `/DolImgs/${e.name}`,
-        tp: tp.tpCode,
-        tpDescription: tp.tpDescription,
-        tpDate: formatDate(tp.tpDateTime),
-        label: labelForImageName(e.name),
-      }));
-    setGalleries((prev) => ({ ...prev, [tp.tpCode]: items }));
-    return items;
+  const openSession = (tp: string): void => {
+    setOpenedTps((prev) => (prev.includes(tp) ? prev : [...prev, tp]));
   };
 
   // Gallery tap: append a fresh copy to the end (duplicates allowed).
@@ -212,7 +218,7 @@ const PatientSlideshow = ({ personId }: Props) => {
       return next;
     });
 
-  // Tray chip ✕ removes that one instance (both photos of a pair); use unpair to split.
+  // Tray chip ✕ removes that one instance (every photo of a pair); use unpair to split.
   const removeSelect = (uid: string) => setSelected((prev) => prev.filter((s) => s.uid !== uid));
 
   // Chip drag → another chip: add the dragged single photo to the target slide.
@@ -260,8 +266,23 @@ const PatientSlideshow = ({ personId }: Props) => {
     });
   };
 
+  // Play what still exists: a photo that is gone is skipped, and the user told.
+  const playable: SlideItem[] = resolved.flatMap((s) => {
+    const photos = slidePhotos(s).filter((p) => !p.missing);
+    if (photos.length === 0) return [];
+    const [primary, ...extras] = photos;
+    return [{ ...primary, uid: s.uid, ...(extras.length ? { extras } : {}) }];
+  });
+  const missingCount = resolved.flatMap(slidePhotos).filter((p) => p.missing).length;
+
   const play = () => {
-    if (selected.length === 0) return;
+    if (playable.length === 0) {
+      if (selected.length > 0) toast.error('None of the photos in the timeline exist any more');
+      return;
+    }
+    if (missingCount > 0) {
+      toast.info(`${missingCount} photo${missingCount === 1 ? '' : 's'} no longer exist${missingCount === 1 ? 's' : ''} and will be skipped`);
+    }
     setMode('play');
   };
 
@@ -281,42 +302,56 @@ const PatientSlideshow = ({ personId }: Props) => {
     await deleteMut.mutateAsync(id);
   };
 
-  // Resolve a config to slides and replace the timeline. Literals rebuild
-  // verbatim; templates resolve against this patient's timepoints (some photos
-  // may be missing → surfaced via toast).
+  // One gallery for the resolvers, read FRESH: applying is a deliberate act, and a
+  // cached gallery (up to its staleTime old) could still list a photo that was
+  // removed from another desk — the apply would then say nothing was missing.
+  const getGallery: GetGallery = (tp) =>
+    personId
+      ? queryClient.fetchQuery({ ...galleryQuery(personId, tp), staleTime: 0 }).catch(() => null)
+      : Promise.resolve(null);
+
+  // Resolve a config to slides and replace the timeline, against the patient's
+  // sessions and galleries as they are now; photos that are gone are skipped and
+  // counted, for saved presentations as for templates (FE-F15-4b).
   const doApply = async (row: ConfigRow): Promise<void> => {
     if (personId == null) return;
-    if (row.config.kind === 'literal') {
-      setSelected(rebuildLiteral(row.config, personId));
-      toast.success(`Applied “${row.name}”`);
-      return;
-    }
     try {
-      const { slides, missing } = await resolveTemplate(row.config, timepoints, loadGallery);
-      if (slides.length === 0) {
-        toast.error(`“${row.name}” has no matching photos for this patient`);
+      const result =
+        row.config.kind === 'literal'
+          ? { ...(await rebuildLiteral(row.config, personId, sessions, getGallery)), sameSession: 0 }
+          : await resolveTemplate(row.config, personId, sessions, getGallery);
+      if (result.slides.length === 0) {
+        toast.error(
+          result.sameSession > 0
+            ? `“${row.name}” compares two sessions, and this patient has only one with these photos`
+            : `“${row.name}” has no matching photos for this patient`
+        );
         return;
       }
-      setSelected(slides);
-      if (missing > 0) {
-        toast.info(`Applied “${row.name}” — ${missing} photo${missing === 1 ? '' : 's'} not available for this patient`);
-      } else {
-        toast.success(`Applied “${row.name}”`);
-      }
+      setSelected(result.slides);
+      const notes = [
+        result.missing > 0 ? `${result.missing} photo${result.missing === 1 ? '' : 's'} not available` : '',
+        result.sameSession > 0
+          ? `${result.sameSession} before/after slide${result.sameSession === 1 ? '' : 's'} skipped (only one session has the photo)`
+          : '',
+      ].filter(Boolean);
+      if (notes.length) toast.info(`Applied “${row.name}” — ${notes.join('; ')}`);
+      else toast.success(`Applied “${row.name}”`);
     } catch {
-      toast.error('Failed to build the presentation from this template');
+      toast.error('Failed to build the presentation from this configuration');
     }
   };
 
   // Confirm before replacing a non-empty timeline.
-  const requestApply = (row: ConfigRow): void => {
-    if (selected.length === 0) void doApply(row);
-    else setPendingApply(row);
-  };
-  const confirmApply = (): void => {
-    const row = pendingApply;
-    setPendingApply(null);
-    if (row) void doApply(row);
+  const requestApply = async (row: ConfigRow): Promise<void> => {
+    if (selected.length > 0) {
+      const ok = await confirm(
+        `Applying “${row.name}” will replace the ${selected.length} photo${selected.length === 1 ? '' : 's'} currently in your timeline.`,
+        { title: 'Replace current timeline?', confirmText: 'Replace' }
+      );
+      if (!ok) return;
+    }
+    await doApply(row);
   };
 
   if (!personId) {
@@ -331,11 +366,12 @@ const PatientSlideshow = ({ personId }: Props) => {
     <div className={styles.root}>
       <SlideshowBuilder
         personId={personId}
-        timepoints={timepoints}
+        timepoints={sessions}
         loadingTimepoints={loadingTimepoints}
         galleries={galleries}
-        loadGallery={loadGallery}
-        selected={selected}
+        galleryStatus={galleryStatus}
+        onOpenSession={openSession}
+        selected={resolved}
         configs={configs}
         onAdd={addToSequence}
         onInsertAt={insertAt}
@@ -346,44 +382,13 @@ const PatientSlideshow = ({ personId }: Props) => {
         onUnpair={unpair}
         onClear={clearSelect}
         onPlay={play}
-        onApplyConfig={requestApply}
+        onApplyConfig={(row) => void requestApply(row)}
         onSaveConfig={handleSaveConfig}
         onRenameConfig={handleRenameConfig}
         onDeleteConfig={handleDeleteConfig}
       />
-      {mode === 'play' && selected.length > 0 && (
-        <SlideshowPlayer slides={selected} onExit={() => setMode('build')} />
-      )}
-
-      {pendingApply && (
-        <Modal
-          isOpen
-          onClose={() => setPendingApply(null)}
-          contentClassName={modalStyles.dialog}
-          ariaLabelledBy="slideshow-apply-confirm-title"
-        >
-          <ModalHeader
-            title="Replace current timeline?"
-            titleId="slideshow-apply-confirm-title"
-            variant="warning"
-            icon={<i className="fas fa-triangle-exclamation" />}
-            onClose={() => setPendingApply(null)}
-          />
-          <div className={modalStyles.body}>
-            <p className={modalStyles.lead}>
-              Applying “{pendingApply.name}” will replace the {selected.length} photo
-              {selected.length === 1 ? '' : 's'} currently in your timeline.
-            </p>
-          </div>
-          <div className={modalStyles.footer}>
-            <button type="button" className="btn btn-secondary" onClick={() => setPendingApply(null)}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-primary" onClick={confirmApply}>
-              Replace
-            </button>
-          </div>
-        </Modal>
+      {mode === 'play' && playable.length > 0 && (
+        <SlideshowPlayer slides={playable} onExit={() => setMode('build')} />
       )}
     </div>
   );

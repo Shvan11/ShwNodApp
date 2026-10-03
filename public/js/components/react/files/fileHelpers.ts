@@ -2,7 +2,6 @@
  * Shared helpers for the patient file-explorer UI.
  */
 import type { FileEntry } from '@/types/api.types';
-import { httpErrorMessage } from '@/core/http';
 
 export interface ContentUrlOptions {
   download?: boolean;
@@ -100,9 +99,3 @@ export function formatDate(iso?: string): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-/**
- * Extract a server-provided error message from a thrown HttpError.
- * Thin re-export of `httpErrorMessage` from `@/core/http` (single source of truth);
- * new code should import that directly.
- */
-export const errorMessage = httpErrorMessage;

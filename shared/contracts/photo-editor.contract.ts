@@ -43,13 +43,13 @@ export const prepare = {
 } as const;
 export type PrepareBody = z.infer<typeof prepare.body>;
 
-// DELETE /api/photo-editor/:personId/view → { removed }.
+// DELETE /api/photo-editor/:personId/view → { removed }. The session is resolved by
+// code alone — its originals folder comes from the row, not from a name/date the
+// client carried in a possibly stale URL (FE-F14-3).
 export const view = {
   params: personIdParams,
   body: z.object({
     tpCode: z.coerce.number().int().nonnegative(),
-    tpName: z.string().optional(),
-    tpDate: z.string().optional(),
     view: z.string().regex(/^i(10|12|13|20|21|22|23|24)$/, 'Invalid view code'),
   }),
   response: z.object({ removed: z.string() }),
@@ -66,3 +66,19 @@ export const photoDates = {
     visits: z.array(z.looseObject({ visitDate: z.string() })),
   }),
 } as const;
+
+// SSE `photos_rendered` (appointments stream) — a background render finished. Not an
+// HTTP response: the frame the broadcaster forwards from POST /render's job. `jobId`
+// is the id the client sent with the render (absent for a legacy caller); `problems`
+// names each view that did not render and why (FE-F14-4). Parsed with `safeParse` by
+// the client — an event is a stream frame, not a fail-loud read.
+export const renderedEvent = z.looseObject({
+  personId: z.union([z.number(), z.string()]),
+  tpCode: z.union([z.number(), z.string()]),
+  jobId: z.string().optional(),
+  written: z.number().optional(),
+  warnings: z.number().optional(),
+  problems: z.array(z.object({ view: z.string(), reason: z.string() })).optional(),
+  total: z.number().optional(),
+});
+export type RenderedEvent = z.infer<typeof renderedEvent>;

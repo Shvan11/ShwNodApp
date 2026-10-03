@@ -13,7 +13,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import multer from 'multer';
+import { createUpload } from '../../middleware/upload.js';
 import path from 'path';
 
 // Services
@@ -33,7 +33,7 @@ import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import * as waContract from '../../shared/contracts/whatsapp.contract.js';
 
 const router = Router();
-const upload = multer();
+const upload = createUpload();
 
 
 interface SendMediaResult {

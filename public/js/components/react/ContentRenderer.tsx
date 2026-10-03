@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ComponentType } from 'react';
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { RouteErrorBoundary } from '../error-boundaries/RouteErrorBoundary';
 
 /**
  * Each patient sub-page is its own lazy chunk.
@@ -227,9 +228,13 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                     />
                 );
 
+            // Keyed by patient: a step between two patients' pages (an in-app history
+            // step) remounts instead of carrying the previous patient's canvas, open
+            // sessions or in-flight gallery reads over (FE-F13-12, FE-F15-8).
             case 'compare':
                 return (
                     <CompareComponent
+                        key={personId}
                         personId={personId}
                     />
                 );
@@ -237,6 +242,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
             case 'slideshow':
                 return (
                     <PatientSlideshow
+                        key={personId}
                         personId={personId}
                     />
                 );
@@ -316,8 +322,6 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                         key={tpCode || 'none'}
                         personId={personId}
                         tpCode={tpCode ? tpCode.replace('tp', '') : ''}
-                        tpName={searchParams.get('tpName') || ''}
-                        tpDate={searchParams.get('date') || ''}
                     />
                 );
 
@@ -340,12 +344,18 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
         }
     };
 
+    // The boundary sits where the Suspense does — around the page body only — so one
+    // tab's failed chunk or crash leaves the patient sidebar and header in place
+    // (FE-F4-17 / FE-F12-8c: a failed Photos chunk used to blank the whole shell).
+    // The boundary clears itself when the pathname changes, i.e. on another tab.
     return (
         <div className="content-area">
             <div className="content-body">
-                <Suspense fallback={<PageFallback />}>
-                    {renderContent()}
-                </Suspense>
+                <RouteErrorBoundary>
+                    <Suspense fallback={<PageFallback />}>
+                        {renderContent()}
+                    </Suspense>
+                </RouteErrorBoundary>
             </div>
         </div>
     );

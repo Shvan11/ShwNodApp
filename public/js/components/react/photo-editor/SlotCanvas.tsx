@@ -148,7 +148,8 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
     }
     return (
       <div className={styles.empty}>
-        <img src="/images/logo.png" alt="" className={styles.emptyLogo} />
+        {/* A neutral mark: every empty slot used to show this clinic's logo (FE-F14-11). */}
+        <i className={`fas fa-camera ${styles.emptyIcon}`} aria-hidden="true" />
         <span className={styles.emptyLabel}>{labelForView(slot.view)}</span>
       </div>
     );

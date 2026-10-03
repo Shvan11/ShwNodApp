@@ -4,7 +4,7 @@
  * slideshow / fullscreen), the slideshow chrome and the dimensions badge.
  */
 
-import React, { useEffect, useRef, useState, RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import cn from 'classnames';
 import type { ComparisonEngine, EngineSnapshot } from './ComparisonEngine';
 import type { SlideshowState } from './useSlideshow';
@@ -26,8 +26,12 @@ interface Props {
     snap: EngineSnapshot;
     canvasRef: (canvas: HTMLCanvasElement | null) => void;
     canvasEl: HTMLCanvasElement | null;
+    /** The canvas's accessible name — what is being compared (FE-F13-14c). */
+    canvasLabel: string;
     stageRef: RefObject<HTMLDivElement | null>;
     isFullscreen: boolean;
+    /** Fullscreen faked with a fixed overlay (no element fullscreen, e.g. iPhone Safari). */
+    isOverlay: boolean;
     onToggleFullscreen: () => void;
     emptyHint: string;
     onShare: () => void;
@@ -44,8 +48,10 @@ const CompareStage = ({
     snap,
     canvasRef,
     canvasEl,
+    canvasLabel,
     stageRef,
     isFullscreen,
+    isOverlay,
     onToggleFullscreen,
     emptyHint,
     onShare,
@@ -96,7 +102,7 @@ const CompareStage = ({
         <div
             ref={stageRef}
             onPointerDown={() => engine?.setSelectedImage(0)}
-            className={isFullscreen ? styles.stageFullscreen : styles.stage}
+            className={cn(isFullscreen ? styles.stageFullscreen : styles.stage, isOverlay && styles.stageOverlay)}
         >
             <div className={cn(styles.toolbar, slideshow.active && styles.toolbarHidden)}>
                 <button
@@ -173,6 +179,8 @@ const CompareStage = ({
                 <canvas
                     ref={canvasRef}
                     id="comparison-canvas"
+                    role="img"
+                    aria-label={canvasLabel}
                     width={800}
                     height={600}
                     className={isFullscreen ? styles.canvasElFullscreen : styles.canvasEl}

@@ -1,43 +1,54 @@
 /**
  * Step 1 / Step 2 rail card: pick exactly two timepoints, then a photo type
- * present in BOTH. The earlier timepoint is badged "Before", the later
- * "After" (the canvas always draws them in chronological order).
+ * present in BOTH. The earlier timepoint (by DATE) is badged "Before", the later
+ * "After" — the canvas draws them in the same order.
  */
 
-import React, { ChangeEvent } from 'react';
+import type { ChangeEvent } from 'react';
 import cn from 'classnames';
-import type { PhotoType, Timepoint } from './types';
+import type { TimepointRow } from '@shared/contracts/patient.contract';
+import { parseLocalDate } from '@/utils/calendarDate';
+import type { PhotoType } from './types';
 import { PHOTO_CATEGORIES, PHOTO_TYPES } from './types';
 import styles from './SelectionPanel.module.css';
 
 interface Props {
-    timepoints: Timepoint[];
-    selectedTimepoints: number[];
-    onToggleTimepoint: (tpCode: number, checked: boolean) => void;
+    timepoints: TimepointRow[];
+    /** The selected sessions in date order (Before, After). */
+    pair: TimepointRow[];
+    selectedTimepoints: string[];
+    onToggleTimepoint: (tpCode: string, checked: boolean) => void;
     selectedPhotoType: string;
     onSelectPhotoType: (id: string) => void;
-    isPhotoTypeAvailable: (code: string) => boolean;
+    isViewAvailable: (photoType: PhotoType) => boolean;
+    /** The session list's read failed (shown with a Retry — FE-F13-15c). */
+    loadError: string | null;
+    onRetry: () => void;
 }
 
 const SelectionPanel = ({
     timepoints,
+    pair,
     selectedTimepoints,
     onToggleTimepoint,
     selectedPhotoType,
     onSelectPhotoType,
-    isPhotoTypeAvailable,
+    isViewAvailable,
+    loadError,
+    onRetry,
 }: Props) => {
-    const pairChosen = selectedTimepoints.length === 2;
-    const sortedSelection = [...selectedTimepoints].sort((a, b) => a - b);
+    const pairChosen = pair.length === 2;
 
-    const orderBadge = (tpCode: number): 'Before' | 'After' | null => {
+    // By the sessions' DATE order (the list's), not their codes: a backdated or
+    // re-dated session used to be badged the wrong way round (FE-F13-3).
+    const orderBadge = (tpCode: string): 'Before' | 'After' | null => {
         if (!selectedTimepoints.includes(tpCode)) return null;
-        if (selectedTimepoints.length === 1) return 'Before';
-        return tpCode === sortedSelection[0] ? 'Before' : 'After';
+        if (pair.length < 2) return 'Before';
+        return tpCode === pair[0].tp_code ? 'Before' : 'After';
     };
 
     const renderChip = (photoType: PhotoType) => {
-        const available = pairChosen && isPhotoTypeAvailable(photoType.code);
+        const available = isViewAvailable(photoType);
         const selected = selectedPhotoType === photoType.id;
         return (
             <label
@@ -72,6 +83,14 @@ const SelectionPanel = ({
                     <span className={cn(styles.stepNumber, pairChosen && styles.stepNumberComplete)}>1</span>
                     Select 2 timepoints
                 </h4>
+                {loadError && (
+                    <div className={styles.loadError} role="alert">
+                        <span>{loadError}</span>
+                        <button type="button" className={styles.retryButton} onClick={onRetry}>
+                            Retry
+                        </button>
+                    </div>
+                )}
                 <div className={styles.timepointList}>
                     {timepoints.map(tp => {
                         const badge = orderBadge(tp.tp_code);
@@ -92,7 +111,13 @@ const SelectionPanel = ({
                                 <span className={styles.timepointText}>
                                     <span className={styles.timepointName}>{tp.tp_description}</span>
                                     <span className={styles.timepointDate}>
-                                        {new Date(tp.tp_date_time).toLocaleDateString()}
+                                        {/* A local parse: `new Date('YYYY-MM-DD')` is UTC midnight,
+                                            a day early west of UTC (FE-F13-11). */}
+                                        {parseLocalDate(tp.tp_date_time).toLocaleDateString('en-GB', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            year: 'numeric',
+                                        })}
                                     </span>
                                 </span>
                                 {badge && (

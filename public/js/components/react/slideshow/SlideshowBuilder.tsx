@@ -9,14 +9,19 @@
  *  - Tap a gallery photo → append a copy to the timeline.
  *  - Long-press (touch) / click-drag (mouse) a gallery photo → drop into the
  *    timeline at a position, or onto a chip to pair them side-by-side.
- *  - Grip-drag a timeline chip → reorder, or drop onto another chip to pair.
+ *  - Grip-drag a timeline chip → reorder, or drop onto another chip to pair. The grip
+ *    is also a button: ←/→ move the slide (FE-F15-9c).
  *  - ✕ removes that instance; the link-slash splits a pair back into two.
+ *
+ * Tiles, chips and the drag ghost show THUMBNAILS (`thumbUrl`); only the player loads
+ * the full photos. Opening four sessions used to download ~70 MB of full renders
+ * before anything played (FE-F15-10).
  */
-import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react';
+import { useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, SyntheticEvent } from 'react';
 import cn from 'classnames';
-import { useToast } from '../../../contexts/ToastContext';
-import { httpErrorMessage } from '../../../core/http';
+import { useFloatingMenu } from '@/hooks/useFloatingMenu';
+import { formatSessionDate } from './configResolver';
 import { photoId, slidePhotos, slidePhotoCount, MAX_PHOTOS_PER_SLIDE } from './photoTypes';
 import SaveConfigModal from './SaveConfigModal';
 import ManageConfigsModal from './ManageConfigsModal';
@@ -25,12 +30,18 @@ import type { SlideItem, SlidePhoto, Timepoint } from './types';
 import type { ConfigPayload, ConfigRow } from '@shared/contracts/slideshow.contract';
 import styles from './SlideshowBuilder.module.css';
 
+/** A session's gallery read, as the page reports it. */
+export type GalleryStatus = 'loading' | 'error' | 'ready';
+
 interface Props {
   personId: number;
   timepoints: Timepoint[];
   loadingTimepoints: boolean;
+  /** Palette photos per OPENED session. */
   galleries: Record<string, SlidePhoto[]>;
-  loadGallery: (tp: Timepoint) => Promise<SlidePhoto[]>;
+  galleryStatus: Record<string, GalleryStatus>;
+  /** A session was opened: the page reads its gallery. */
+  onOpenSession: (tp: string) => void;
   selected: SlideItem[];
   configs: ConfigRow[];
   onAdd: (photo: SlidePhoto) => void;
@@ -70,15 +81,67 @@ const PLACEHOLDER = '/images/placeholder.svg';
 const LONG_PRESS_MS = 220; // touch hold before a gallery photo becomes draggable
 const MOVE_THRESHOLD = 10; // px of travel that distinguishes a drag/scroll from a tap
 
-const formatTpDate = (dateTime: string): string =>
-  dateTime ? dateTime.substring(0, 10).split('-').reverse().join('-') : '';
+/** The small image for a tile, chip or ghost. */
+const thumbOf = (p: SlidePhoto): string => (p.missing ? PLACEHOLDER : (p.thumbUrl ?? p.url));
+
+interface ApplyMenuProps {
+  anchor: { x: number; y: number };
+  patientConfigs: ConfigRow[];
+  templates: ConfigRow[];
+  onPick: (row: ConfigRow) => void;
+  onClose: () => void;
+}
+
+/**
+ * The *Apply* menu: focus moves in on open, ↑/↓ move, Escape closes and returns focus
+ * to the button — the shared `useFloatingMenu` (FE-F15-9d; it had none of these).
+ */
+const ApplyMenu = ({ anchor, patientConfigs, templates, onPick, onClose }: ApplyMenuProps) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const { position, onKeyDown } = useFloatingMenu(ref, anchor, onClose);
+  return (
+    <div
+      ref={ref}
+      className={styles.applyMenu}
+      role="menu"
+      tabIndex={-1}
+      aria-label="Apply a saved presentation"
+      style={{ left: position.x, top: position.y }}
+      onKeyDown={onKeyDown}
+    >
+      {patientConfigs.length > 0 && (
+        <div className={styles.applyGroup} role="group" aria-label="This patient">
+          <div className={styles.applyGroupLabel}>This patient</div>
+          {patientConfigs.map((c) => (
+            <button key={c.id} type="button" role="menuitem" className={styles.applyItem} onClick={() => onPick(c)}>
+              <i className="fas fa-clock-rotate-left" aria-hidden="true" />
+              <span className={styles.applyItemName}>{c.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {templates.length > 0 && (
+        <div className={styles.applyGroup} role="group" aria-label="Generic templates">
+          <div className={styles.applyGroupLabel}>Generic templates</div>
+          {templates.map((c) => (
+            <button key={c.id} type="button" role="menuitem" className={styles.applyItem} onClick={() => onPick(c)}>
+              <i className="fas fa-wand-magic-sparkles" aria-hidden="true" />
+              <span className={styles.applyItemName}>{c.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SlideshowBuilder = ({
   personId,
   timepoints,
   loadingTimepoints,
   galleries,
-  loadGallery,
+  galleryStatus,
+  onOpenSession,
   selected,
   configs,
   onAdd,
@@ -95,33 +158,19 @@ const SlideshowBuilder = ({
   onRenameConfig,
   onDeleteConfig,
 }: Props) => {
-  const toast = useToast();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [tpLoading, setTpLoading] = useState<Record<string, boolean>>({});
-  const [tpError, setTpError] = useState<Record<string, boolean>>({});
 
   // --- Config bar (saved presentations + folder photos) ---
-  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyAnchor, setApplyAnchor] = useState<{ x: number; y: number } | null>(null);
+  const applyOpen = applyAnchor !== null;
   const [saveOpen, setSaveOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [folderOpen, setFolderOpen] = useState(false);
-  const applyRef = useRef<HTMLDivElement>(null);
-
   const patientConfigs = configs.filter((c) => c.kind === 'literal' && c.person_id === personId);
   const templates = configs.filter((c) => c.kind === 'template');
 
-  // Close the Apply menu on an outside click.
-  useEffect(() => {
-    if (!applyOpen) return;
-    const onDocDown = (e: PointerEvent) => {
-      if (applyRef.current && !applyRef.current.contains(e.target as Node)) setApplyOpen(false);
-    };
-    window.addEventListener('pointerdown', onDocDown);
-    return () => window.removeEventListener('pointerdown', onDocDown);
-  }, [applyOpen]);
-
   const applyAndClose = (row: ConfigRow): void => {
-    setApplyOpen(false);
+    setApplyAnchor(null);
     onApplyConfig(row);
   };
 
@@ -142,26 +191,23 @@ const SlideshowBuilder = ({
   const usesFromTp = (tp: string): number =>
     selected.reduce((n, s) => n + slidePhotos(s).filter((p) => p.tp === tp).length, 0);
 
-  const toggleExpand = async (tp: Timepoint) => {
-    const willExpand = !expanded.has(tp.tpCode);
+  const toggleExpand = (tp: Timepoint) => {
+    const willExpand = !expanded.has(tp.tp_code);
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (willExpand) next.add(tp.tpCode);
-      else next.delete(tp.tpCode);
+      if (willExpand) next.add(tp.tp_code);
+      else next.delete(tp.tp_code);
       return next;
     });
-    if (willExpand && !galleries[tp.tpCode] && !tpLoading[tp.tpCode]) {
-      setTpLoading((p) => ({ ...p, [tp.tpCode]: true }));
-      try {
-        await loadGallery(tp);
-        setTpError((p) => ({ ...p, [tp.tpCode]: false }));
-      } catch (err) {
-        setTpError((p) => ({ ...p, [tp.tpCode]: true }));
-        toast.error(httpErrorMessage(err, 'Failed to load photos for this session'));
-      } finally {
-        setTpLoading((p) => ({ ...p, [tp.tpCode]: false }));
-      }
-    }
+    if (willExpand) onOpenSession(tp.tp_code);
+  };
+
+  // ←/→ on a focused grip move its slide — the keyboard twin of grip-dragging.
+  const onGripKeyDown = (e: ReactKeyboardEvent, index: number) => {
+    const to = e.key === 'ArrowLeft' ? index - 1 : e.key === 'ArrowRight' ? index + 1 : null;
+    if (to === null) return;
+    e.preventDefault();
+    if (to >= 0 && to < selected.length) onReorder(index, to);
   };
 
   // --- Drop-zone hit testing (live, against the current chip layout) ---
@@ -272,7 +318,7 @@ const SlideshowBuilder = ({
       { kind: 'chip', fromIndex: index, isPair: slidePhotoCount(item) > 1 },
       e.clientX,
       e.clientY,
-      item.url,
+      thumbOf(item),
       e.pointerId,
     );
   };
@@ -292,7 +338,7 @@ const SlideshowBuilder = ({
       started = true;
       suppressClickRef.current = true; // a drag began → don't let the click add
       abort.abort(); // hand off to beginDrag's own listeners
-      beginDrag({ kind: 'gallery', photo }, x, y, photo.url, pointerId);
+      beginDrag({ kind: 'gallery', photo }, x, y, thumbOf(photo), pointerId);
     };
     const timer = window.setTimeout(() => {
       if (!started) launch(start.x, start.y);
@@ -343,42 +389,33 @@ const SlideshowBuilder = ({
           </p>
         </div>
         <div className={styles.configBar}>
-          <div className={styles.applyWrap} ref={applyRef}>
+          <div className={styles.applyWrap}>
             <button
               type="button"
               className={styles.configBtn}
               disabled={configs.length === 0}
               aria-haspopup="menu"
               aria-expanded={applyOpen}
-              onClick={() => setApplyOpen((o) => !o)}
+              onClick={(e) => {
+                if (applyOpen) {
+                  setApplyAnchor(null);
+                  return;
+                }
+                const r = e.currentTarget.getBoundingClientRect();
+                setApplyAnchor({ x: r.left, y: r.bottom + 4 });
+              }}
             >
-              <i className="fas fa-folder-open" /> Apply <i className={cn('fas fa-caret-down', styles.caret)} />
+              <i className="fas fa-folder-open" aria-hidden="true" /> Apply{' '}
+              <i className={cn('fas fa-caret-down', styles.caret)} aria-hidden="true" />
             </button>
-            {applyOpen && (
-              <div className={styles.applyMenu} role="menu">
-                {patientConfigs.length > 0 && (
-                  <div className={styles.applyGroup}>
-                    <div className={styles.applyGroupLabel}>This patient</div>
-                    {patientConfigs.map((c) => (
-                      <button key={c.id} type="button" role="menuitem" className={styles.applyItem} onClick={() => applyAndClose(c)}>
-                        <i className="fas fa-clock-rotate-left" />
-                        <span className={styles.applyItemName}>{c.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {templates.length > 0 && (
-                  <div className={styles.applyGroup}>
-                    <div className={styles.applyGroupLabel}>Generic templates</div>
-                    {templates.map((c) => (
-                      <button key={c.id} type="button" role="menuitem" className={styles.applyItem} onClick={() => applyAndClose(c)}>
-                        <i className="fas fa-wand-magic-sparkles" />
-                        <span className={styles.applyItemName}>{c.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {applyAnchor && (
+              <ApplyMenu
+                anchor={applyAnchor}
+                patientConfigs={patientConfigs}
+                templates={templates}
+                onPick={applyAndClose}
+                onClose={() => setApplyAnchor(null)}
+              />
             )}
           </div>
           <button type="button" className={styles.configBtn} disabled={selected.length === 0} onClick={() => setSaveOpen(true)}>
@@ -404,11 +441,12 @@ const SlideshowBuilder = ({
           </div>
         ) : (
           timepoints.map((tp) => {
-            const isOpen = expanded.has(tp.tpCode);
-            const items = galleries[tp.tpCode] ?? [];
-            const count = usesFromTp(tp.tpCode);
+            const isOpen = expanded.has(tp.tp_code);
+            const items = galleries[tp.tp_code] ?? [];
+            const status = galleryStatus[tp.tp_code] ?? 'loading';
+            const count = usesFromTp(tp.tp_code);
             return (
-              <section key={tp.tpCode} className={styles.session}>
+              <section key={tp.tp_code} className={styles.session}>
                 <button
                   type="button"
                   className={styles.sessionHeader}
@@ -416,18 +454,18 @@ const SlideshowBuilder = ({
                   onClick={() => toggleExpand(tp)}
                 >
                   <i className={cn('fas', isOpen ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevron)} />
-                  <span className={styles.sessionName}>{tp.tpDescription || `Timepoint ${tp.tpCode}`}</span>
-                  <span className={styles.sessionDate}>{formatTpDate(tp.tpDateTime)}</span>
+                  <span className={styles.sessionName}>{tp.tp_description || `Timepoint ${tp.tp_code}`}</span>
+                  <span className={styles.sessionDate}>{formatSessionDate(tp.tp_date_time)}</span>
                   {count > 0 && <span className={styles.sessionBadge}>{count} added</span>}
                 </button>
 
                 {isOpen && (
                   <div className={styles.grid}>
-                    {tpLoading[tp.tpCode] ? (
+                    {status === 'loading' ? (
                       <div className={styles.state}>
                         <i className="fas fa-spinner fa-spin" /> Loading…
                       </div>
-                    ) : tpError[tp.tpCode] ? (
+                    ) : status === 'error' ? (
                       <div className={styles.state}>
                         <i className="fas fa-exclamation-triangle" /> Couldn’t load photos.
                       </div>
@@ -446,7 +484,7 @@ const SlideshowBuilder = ({
                             title={used > 0 ? `In the timeline ${used}×` : 'Tap to add · drag to place'}
                           >
                             <img
-                              src={photo.url}
+                              src={thumbOf(photo)}
                               alt={photo.label}
                               loading="lazy"
                               draggable={false}
@@ -483,6 +521,7 @@ const SlideshowBuilder = ({
                 drag.drop.index === selected.length &&
                 index === selected.length - 1;
               const pairTarget = drag?.drop?.type === 'pair' && drag.drop.index === index;
+              const missing = photos.some((p) => p.missing);
               return (
                 <div
                   key={item.uid}
@@ -494,19 +533,24 @@ const SlideshowBuilder = ({
                     insertBefore && styles.insertBefore,
                     insertAfter && styles.insertAfter,
                     pairTarget && styles.chipPairTarget,
+                    missing && styles.chipMissing,
                   )}
+                  title={missing ? 'A photo on this slide no longer exists — it will be skipped' : undefined}
                 >
-                  <span
+                  <button
+                    type="button"
                     className={styles.chipGrip}
-                    title="Drag to reorder, or onto another photo to pair"
+                    title="Drag to reorder, or onto another photo to pair · ←/→ to move"
+                    aria-label={`Slide ${index + 1}: ${photos.map((p) => p.label).join(' + ')}. Use left and right arrows to move it`}
                     onPointerDown={(e) => onGripPointerDown(e, index)}
+                    onKeyDown={(e) => onGripKeyDown(e, index)}
                   >
-                    <i className="fas fa-grip-vertical" />
-                  </span>
+                    <i className="fas fa-grip-vertical" aria-hidden="true" />
+                  </button>
                   {photos.map((photo, i) => (
                     <img
                       key={`${photoId(photo)}-${i}`}
-                      src={photo.url}
+                      src={thumbOf(photo)}
                       alt={photo.label}
                       draggable={false}
                       onError={handleImgError}
@@ -562,7 +606,14 @@ const SlideshowBuilder = ({
         </div>
       )}
 
-      {saveOpen && <SaveConfigModal selected={selected} onSave={onSaveConfig} onClose={() => setSaveOpen(false)} />}
+      {saveOpen && (
+        <SaveConfigModal
+          selected={selected}
+          sessions={timepoints}
+          onSave={onSaveConfig}
+          onClose={() => setSaveOpen(false)}
+        />
+      )}
       {manageOpen && (
         <ManageConfigsModal
           personId={personId}

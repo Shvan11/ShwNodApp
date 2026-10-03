@@ -15,6 +15,7 @@
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
+import { createUpload } from '../../middleware/upload.js';
 import { readFile } from 'fs/promises';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
@@ -43,7 +44,7 @@ const LOGO_OPTION = 'CLINIC_LOGO';
 const NAME_OPTION = 'CLINIC_NAME';
 
 // Logos are small; 2 MB is generous. Memory storage → the service writes to disk.
-const upload = multer({
+const upload = createUpload({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024, files: 1 },
 });

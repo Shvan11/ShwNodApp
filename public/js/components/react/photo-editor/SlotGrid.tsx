@@ -4,6 +4,9 @@
  * makes it the active (editable) slot.
  */
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { brandingQuery } from '@/query/queries';
+import { anchorFrom } from '@/hooks/useFloatingMenu';
 import styles from './SlotGrid.module.css';
 import SlotCanvas from './SlotCanvas';
 import SlotToolbar from './SlotToolbar';
@@ -18,6 +21,7 @@ import {
   type PhotoViewCode,
 } from './photoEditorTypes';
 import type { PhotoEditorState } from './usePhotoEditorState';
+import type { ArmedPhoto } from './SequenceSidebar';
 
 interface Props {
   personId: number;
@@ -25,13 +29,20 @@ interface Props {
   activeView: PhotoViewCode | null;
   /** Crop against 2048px server thumbnails instead of the originals. */
   proxyMode: boolean;
+  /** A sidebar photo picked by click/keyboard: the next activated slot receives it. */
+  armed: ArmedPhoto | null;
+  onPlaced: () => void;
   onActivate: (view: PhotoViewCode) => void;
   /** Open the per-view delete confirm (right-click → Remove on a saved slot). */
   onRemoveView: (view: PhotoViewCode) => void;
 }
 
-const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemoveView }: Props) => {
+const SlotGrid = ({ personId, editor, activeView, proxyMode, armed, onPlaced, onActivate, onRemoveView }: Props) => {
   const [dragOver, setDragOver] = useState<PhotoViewCode | null>(null);
+  // The centre cell is THIS install's logo and name (Settings → General), not this
+  // clinic's file from the repository (FE-F14-11).
+  const { data: branding } = useQuery(brandingQuery());
+  const clinicName = branding?.clinicName?.trim() || '';
   const [menu, setMenu] = useState<{ view: PhotoViewCode; x: number; y: number } | null>(null);
 
   // Scroll-zoom for the SELECTED slot. react-easy-crop's own wheel listener only
@@ -75,11 +86,23 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemov
 
   // Right-click a populated slot (saved or live) → context menu. Empty slots keep
   // the browser's default menu.
+  // The menu key and Shift+F10 fire `contextmenu` too, with no pointer position —
+  // `anchorFrom` places that menu under the cell (FE-F14-13b).
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>, view: PhotoViewCode): void => {
     const slot = editor.slots[view];
     if (!slot.sourceRelPath && !slot.savedImageUrl) return;
     e.preventDefault();
-    setMenu({ view, x: e.clientX, y: e.clientY });
+    const { x, y } = anchorFrom(e);
+    setMenu({ view, x, y });
+  };
+
+  // Activate a cell; with a photo picked in the sidebar, place it there first.
+  const activate = (view: PhotoViewCode): void => {
+    if (armed) {
+      editor.place(view, armed.relPath, armed.name);
+      onPlaced();
+    }
+    onActivate(view);
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>, view: PhotoViewCode): void => {
@@ -105,7 +128,11 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemov
         if (cell === 'logo') {
           return (
             <div key="logo" className={styles.logoCell}>
-              <img src="/images/logo.png" alt="Shwan Orthodontics" className={styles.logoImg} />
+              {branding?.logo ? (
+                <img src={branding.logo} alt={clinicName} className={styles.logoImg} />
+              ) : (
+                <span className={styles.logoName}>{clinicName}</span>
+              )}
             </div>
           );
         }
@@ -119,9 +146,14 @@ const SlotGrid = ({ personId, editor, activeView, proxyMode, onActivate, onRemov
             data-active={isActive ? 'true' : undefined}
             role="button"
             tabIndex={0}
-            className={`${styles.cell} ${isActive ? styles.cellActive : ''} ${dragOver === view ? styles.cellDragOver : ''}`}
-            onClick={() => onActivate(view)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(view); } }}
+            aria-label={armed ? `Place ${armed.name} in ${labelForView(view)}` : labelForView(view)}
+            className={`${styles.cell} ${isActive ? styles.cellActive : ''} ${dragOver === view || (armed && !slot.sourceRelPath) ? styles.cellDragOver : ''}`}
+            onClick={() => activate(view)}
+            onKeyDown={(e) => {
+              // Only the cell itself: keys inside the cropper/toolbar are theirs.
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(view); }
+            }}
             onContextMenu={(e) => handleContextMenu(e, view)}
             onDragOver={(e) => {
               e.preventDefault();

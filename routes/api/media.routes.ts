@@ -13,7 +13,6 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { log } from '../../utils/logger.js';
-import multer from 'multer';
 import webcephService from '../../services/webceph/webceph-service.js';
 import {
   findPatientWebcephId,
@@ -23,7 +22,7 @@ import {
 import { resolveFileForServe, FileExplorerError } from '../../services/files/file-explorer.service.js';
 import { getFileMimeType } from '../../utils/file-mime.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
-import { uploadErrorMessage } from '../../middleware/upload.js';
+import { createUpload, uploadErrorMessage } from '../../middleware/upload.js';
 import { validate } from '../../middleware/validate.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
@@ -47,7 +46,7 @@ router.use('/webceph', authenticate, authorize(CLINICAL_ROLES));
 // In-memory upload with a hard size cap so an oversized/abusive body can't
 // balloon RAM. X-ray/photo formats (.dcm/.pano/JPEG) sit well under 50MB;
 // raise this if a legitimately larger study is ever rejected.
-const upload = multer({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
+const upload = createUpload({ limits: { fileSize: 50 * 1024 * 1024, files: 1 } });
 
 // Wrap multer so a size-limit / upload error returns a clean 400 instead of
 // falling through to the generic 500 handler.

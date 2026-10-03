@@ -4,7 +4,7 @@
 // Transport-agnostic: returns just the payload object. The caller decides
 // whether to cache it, broadcast it over WS, push it over SSE, or all three.
 
-import { getTimePointImgs } from '../database/queries/timepoint-queries.js';
+import { getImageSizes } from '../imaging/index.js';
 import { getLatestVisitsSum } from '../database/queries/visit-queries.js';
 import { getActiveWork } from '../database/queries/work-queries.js';
 import { getPatientById } from '../database/queries/patient-queries.js';
@@ -13,12 +13,15 @@ import { log } from '../../utils/logger.js';
 
 // Visit notes only show for active orthodontic work on the chair-side display.
 const ORTHO_WORK_TYPE_SET: ReadonlySet<number> = new Set(ORTHO_WORK_TYPE_IDS);
-const CHAIR_DISPLAY_INTRAORAL_EXTS = ['.i20', '.i22', '.i21'] as const;
+// Right, centre, left — in the kiosk's display order.
+const CHAIR_DISPLAY_INTRAORAL_VIEWS = ['i20', 'i22', 'i21'] as const;
 
 export interface ChairPatientPayload {
   pid: string;
   name: string | null;
-  images: Array<{ name: string }>;
+  /** `name` is the file actually on disk (either case); `v` its mtime, the URL's
+   *  cache-bust token — the photos are served as immutable (FE-F13-1's siblings). */
+  images: Array<{ name: string; v: number }>;
   latestVisit: { visit_date?: string; Summary?: string | null } | null | undefined;
 }
 
@@ -41,21 +44,11 @@ export async function buildChairPatientPayload(
   try {
     // Independent reads — the kiosk waits on the slowest, not on their sum. Only
     // the visit summary has to follow (it's gated on the work being orthodontic).
-    const [allImages, activeWork, patientRecord] = await Promise.all([
+    const [initialPhotos, activeWork, patientRecord] = await Promise.all([
       getPatientImagesLocal(pid),
       getActiveWork(personId),
       getPatientById(personId),
     ]);
-
-    const filteredImages = allImages.filter(img =>
-      CHAIR_DISPLAY_INTRAORAL_EXTS.some(ext => img.name.toLowerCase().endsWith(ext))
-    );
-    filteredImages.sort((a, b) => {
-      const aExt = CHAIR_DISPLAY_INTRAORAL_EXTS.find(ext => a.name.toLowerCase().endsWith(ext)) || '';
-      const bExt = CHAIR_DISPLAY_INTRAORAL_EXTS.find(ext => b.name.toLowerCase().endsWith(ext)) || '';
-      return CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(aExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number])
-        - CHAIR_DISPLAY_INTRAORAL_EXTS.indexOf(bExt as typeof CHAIR_DISPLAY_INTRAORAL_EXTS[number]);
-    });
 
     const isOrtho = !!(activeWork && ORTHO_WORK_TYPE_SET.has(activeWork.type_of_work as number));
     const latestVisit = isOrtho ? await getLatestVisitsSum(personId) : null;
@@ -67,7 +60,7 @@ export async function buildChairPatientPayload(
     return {
       pid,
       name,
-      images: filteredImages,
+      images: initialPhotos,
       latestVisit,
     };
   } catch (error) {
@@ -80,11 +73,18 @@ export async function buildChairPatientPayload(
   }
 }
 
-async function getPatientImagesLocal(pid: string): Promise<Array<{ name: string }>> {
+/**
+ * The first session's intraoral photos, from the FILES (the gallery's probe: either
+ * case on disk, with the mtime) — not rebuilt from `time_point_images` rows, which can
+ * name a file that is gone or miss one that exists (FE-F13-8's shape).
+ */
+async function getPatientImagesLocal(pid: string): Promise<Array<{ name: string; v: number }>> {
   try {
-    const tp = '0';
-    const images = await getTimePointImgs(pid, tp);
-    return images.map((code: string | number) => ({ name: `${pid}0${tp}.i${code}` }));
+    const gallery = await getImageSizes(pid, '0');
+    return CHAIR_DISPLAY_INTRAORAL_VIEWS.flatMap((view) => {
+      const img = gallery[view];
+      return img ? [{ name: img.name, v: img.mtime }] : [];
+    });
   } catch (error) {
     log.error('Error getting patient images', error as Error);
     return [];

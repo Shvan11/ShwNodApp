@@ -11,7 +11,7 @@ import Modal from '../Modal';
 import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
 import PatientFolderPicker from '../PatientFolderPicker';
-import { buildContentUrl } from '../files/fileHelpers';
+import { folderPhoto } from './configResolver';
 import type { FileEntry } from '@/types/api.types';
 import type { SlidePhoto } from './types';
 import styles from './SlideshowModals.module.css';
@@ -26,16 +26,9 @@ const FolderPickerModal = ({ personId, onAdd, onClose }: Props) => {
   const toast = useToast();
 
   const pick = (entry: FileEntry): void => {
-    onAdd({
-      source: 'folder',
-      path: entry.relPath,
-      name: entry.name,
-      label: entry.name,
-      url: buildContentUrl(personId, entry.relPath),
-      tp: '',
-      tpDescription: '',
-      tpDate: '',
-    });
+    // TIFF/HEIC play through the server's converter (folderPhoto) — Chrome and Edge
+    // cannot show the raw file, and it played as a placeholder (FE-F15-5).
+    onAdd(folderPhoto(personId, entry.relPath, entry.name));
     toast.success(`Added ${entry.name}`);
   };
 

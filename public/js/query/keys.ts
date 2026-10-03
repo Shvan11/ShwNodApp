@@ -48,11 +48,10 @@ export const qk = {
     portal: (id: Id) => ['patient', normId(id), 'portal'] as const,
     /** GET /api/patient-appointments/:id — the patient's appointment list. */
     appointments: (id: Id) => ['patient', normId(id), 'appointments'] as const,
+    /** Prefix over every session's gallery for a patient — see `invalidatePatientPhotos`. */
+    galleryAll: (id: Id) => ['patient', normId(id), 'gallery'] as const,
     /** GET /api/patients/:id/gallery/:tpCode — one timepoint's gallery images. */
     gallery: (id: Id, tpCode: Id) => ['patient', normId(id), 'gallery', normId(tpCode)] as const,
-    /** GET /api/patients/:id/timepoints/:tpCode/images — one timepoint's compare images. */
-    timepointImages: (id: Id, tpCode: Id) =>
-      ['patient', normId(id), 'timepoint-images', normId(tpCode)] as const,
     /** Prefix over every file listing for a patient (any path/flat) — broad reload. */
     filesAll: (id: Id) => ['patient', normId(id), 'files'] as const,
     /** GET /api/patients/:id/files?path=&flat= — file-explorer listing for a folder. */
@@ -68,6 +67,9 @@ export const qk = {
     search: (query: string) => ['patient', 'search', query] as const,
   },
   work: {
+    /** Every work's keys — for a write that can touch works it cannot name (a photo
+     *  session's date conflict override rewrites `works.i_photo_date`/`f_photo_date`). */
+    root: () => ['work'] as const,
     /** Parent — invalidates details/visits/payments for this work. */
     all: (workId: Id) => ['work', normId(workId)] as const,
     /** GET /api/getworkdetails?workId= — single work row. */
@@ -341,6 +343,11 @@ export const qk = {
     integrationsCloudflareListStatus: () => ['settings', 'integrations-cloudflare-list-status'] as const,
     /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */
     whatsappGroupSettings: () => ['settings', 'whatsapp-group-settings'] as const,
+  },
+  /** LocalSend — the LAN devices the server has heard announce themselves. */
+  localsend: {
+    /** GET /api/localsend/devices — known devices + whether LocalSend is enabled. */
+    devices: () => ['localsend', 'devices'] as const,
   },
   /** Telegram — transient share-job progress poll (keyed by job id). */
   telegram: {

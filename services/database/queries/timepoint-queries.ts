@@ -74,19 +74,3 @@ export function getTimePointCodes(PID: string): Promise<number[]> {
     .then((rows) => rows.map((r) => r.tp_code));
 }
 
-/**
- * Retrieves the view-code list (2-digit codes, e.g. '10', '22') for a patient's
- * timepoint. Callers build filenames as `{pid}0{tp}.i{code}`.
- */
-export function getTimePointImgs(pid: string, tp: string): Promise<string[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('time_point_images as ti')
-    .innerJoin('time_points as t', 't.time_point_id', 'ti.time_point_id')
-    .where('t.person_id', '=', Number.parseInt(pid, 10))
-    .where('t.tp_code', '=', Number.parseInt(tp, 10))
-    .orderBy('ti.image_type')
-    .select((eb) => sql<string>`rtrim(${eb.ref('ti.image_type')})`.as('image_type'))
-    .execute()
-    .then((rows) => rows.map((r) => r.image_type));
-}

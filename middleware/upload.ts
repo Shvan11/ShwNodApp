@@ -92,6 +92,20 @@ export function uploadErrorMessage(
   }
 }
 
+/**
+ * The ONE way to build a multer instance in this tree (ESLint enforces it).
+ *
+ * multer 2.x hands busboy `defParamCharset: 'latin1'` unless told otherwise, and
+ * browsers send a multipart `filename="…"` as raw UTF-8 — so every upload with an
+ * Arabic (or any non-ASCII) name reached `originalname` as mojibake and was saved
+ * that way: `صورة المريض.txt` → `ØµÙØ±Ø© Ø§ÙÙØ±ÙØ¶.txt` (FE-F12-1). The bytes
+ * survived, which is what `scripts/repair-upload-names.mjs` relies on to put the
+ * names already on disk back.
+ */
+export function createUpload(options: multer.Options = {}): multer.Multer {
+  return multer({ defParamCharset: 'utf8', ...options });
+}
+
 // Configure multer for memory storage (we'll upload directly to Google Drive)
 const storage: StorageEngine = multer.memoryStorage();
 
@@ -109,7 +123,7 @@ const fileFilter = (
 };
 
 // Configure multer
-const upload = multer({
+const upload = createUpload({
   storage: storage,
   fileFilter: fileFilter,
   limits: {

@@ -483,13 +483,10 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
             {showNativePhotoEditor && (
                 <PhotoSessionDialog
                     personId={personId}
-                    patientInfo={patientInfo}
                     onClose={() => setShowNativePhotoEditor(false)}
-                    onPrepared={({ tpCode, tpName, tpDate }) => {
+                    onPrepared={({ tpCode }) => {
                         setShowNativePhotoEditor(false);
-                        navigate(
-                            `/patient/${personId}/photo-editor/tp${tpCode}?tpName=${encodeURIComponent(tpName)}&date=${tpDate}`
-                        );
+                        navigate(`/patient/${personId}/photo-editor/tp${tpCode}`);
                     }}
                 />
             )}

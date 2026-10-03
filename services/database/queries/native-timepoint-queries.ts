@@ -195,15 +195,27 @@ export async function updateNativeTimePoint(
 }
 
 /**
- * Delete a timepoint by (person_id, tpCode). The `tblTimePointImages` FK is
- * `ON DELETE CASCADE`, so its image rows go with it in one statement.
+ * Delete a timepoint by (person_id, tpCode). The `time_point_images` FK is
+ * `ON DELETE CASCADE`, so its image rows go with it.
+ *
+ * Its `private_photos` rows go too, in the same transaction. That table has no FK
+ * (it is keyed by the code + file name), and codes are per-patient `MAX+1`, so
+ * deleting the newest session frees its code: the next session would get it and
+ * inherit "hidden from patient" marks nobody set on it (FE-F12-11).
  */
 export async function deleteNativeTimePoint(personId: number, tp_code: number): Promise<void> {
-  await getKysely()
-    .deleteFrom('time_points')
-    .where('person_id', '=', personId)
-    .where('tp_code', '=', tp_code)
-    .execute();
+  await withPgTransaction(async (trx) => {
+    await trx
+      .deleteFrom('private_photos')
+      .where('person_id', '=', personId)
+      .where('timepoint_code', '=', String(tp_code))
+      .execute();
+    await trx
+      .deleteFrom('time_points')
+      .where('person_id', '=', personId)
+      .where('tp_code', '=', tp_code)
+      .execute();
+  });
   log.info('Deleted native timepoint', { personId, tp_code });
 }
 

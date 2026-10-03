@@ -1,5 +1,6 @@
 /**
- * Saved slideshow configurations (`slideshow_configs`, LOCAL-ONLY table).
+ * Saved slideshow configurations (`slideshow_configs`; CDC-captured and mirrored
+ * forward-only to Supabase since 2026-07-21).
  *
  * CRUD for the Patient Presentation Slideshow: per-patient saved sequences
  * (`person_id` set, `kind='literal'`) + clinic-wide generic templates

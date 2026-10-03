@@ -6,6 +6,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
+import { createUpload } from '../../middleware/upload.js';
 import { promises as fsp, type Stats } from 'fs';
 import path from 'path';
 import { getMediaMimeType } from '../../utils/file-mime.js';
@@ -71,7 +72,7 @@ const fileFilter = (
   }
 };
 
-const upload = multer({
+const upload = createUpload({
   storage,
   fileFilter,
   limits: {

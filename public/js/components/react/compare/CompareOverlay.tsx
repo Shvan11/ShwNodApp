@@ -7,7 +7,7 @@
  * drawn pixels: every engine mutation commits a new snapshot → re-render.
  */
 
-import React, { useRef, CSSProperties } from 'react';
+import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import type { ComparisonEngine, EngineSnapshot } from './ComparisonEngine';
 import { applyTransform, getContainerRect, getCropRect, getDrawSize, getImageCorners } from './geometry';
 import type { CropSide, DragState, ImageKey, ImageRect, Point } from './types';
@@ -27,8 +27,16 @@ const CLOSE_STROKE = 'rgba(220, 53, 69, 0.95)';
 const CROP_STROKE = 'rgba(255, 176, 32, 0.97)';
 const ALL_KEYS: ImageKey[] = ['img1', 'img2', 'logo'];
 
+/** A finger is a fraction of the size of a mouse pointer's precision: on a touch
+ *  screen the handles are drawn bigger (FE-F13-13b). */
+const isCoarsePointer = (): boolean =>
+    typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+
 const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
-    const dragRef = useRef<DragState | null>(null);
+    // Pointers currently down on the selected element — two of them make a pinch.
+    const pointersRef = useRef(new Map<number, Point>());
+    // The gesture in progress (a drag or a pinch); a pinch supersedes the drag it grew from.
+    const gestureRef = useRef<AbortController | null>(null);
 
     if (snap.imageCount < 2) return null;
 
@@ -57,13 +65,58 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
         );
     };
 
-    const startDrag = (e: React.PointerEvent, mode: DragState['mode'], key: ImageKey) => {
+    /**
+     * Two fingers on the selected image zoom it (pinch). The wheel was the only zoom
+     * gesture, so a phone could only zoom with the rail's buttons (FE-F13-13b).
+     */
+    const startPinch = (key: ImageKey, ctrl: AbortController) => {
+        const pts = [...pointersRef.current.entries()];
+        if (pts.length < 2) return;
+        const [[idA, a0], [idB, b0]] = pts;
+        const startDist = Math.hypot(a0.x - b0.x, a0.y - b0.y);
+        if (startDist < 1) return;
+        const startTransform = engine.getTransform(key);
+        const onMove = (ev: PointerEvent) => {
+            if (ev.pointerId !== idA && ev.pointerId !== idB) return;
+            pointersRef.current.set(ev.pointerId, clientToCanvas(ev.clientX, ev.clientY));
+            const a = pointersRef.current.get(idA);
+            const b = pointersRef.current.get(idB);
+            if (!a || !b) return;
+            const dist = Math.hypot(a.x - b.x, a.y - b.y);
+            engine.setTransform(key, {
+                ...startTransform,
+                scale: Math.max(0.1, Math.min(5, startTransform.scale * (dist / startDist))),
+            });
+        };
+        const onUp = (ev: PointerEvent) => {
+            if (ev.pointerId !== idA && ev.pointerId !== idB) return;
+            ctrl.abort();
+        };
+        window.addEventListener('pointermove', onMove, { signal: ctrl.signal });
+        window.addEventListener('pointerup', onUp, { signal: ctrl.signal });
+        window.addEventListener('pointercancel', onUp, { signal: ctrl.signal });
+    };
+
+    const startDrag = (e: ReactPointerEvent, mode: DragState['mode'], key: ImageKey) => {
         const rect = getRectForKey(key);
         if (!rect) return;
         e.preventDefault();
         e.stopPropagation();
         const start = clientToCanvas(e.clientX, e.clientY);
         const ctrl = new AbortController();
+        // Track every pointer on the element; a second finger turns a translate
+        // drag into a pinch (the first drag's listeners are dropped).
+        pointersRef.current.set(e.pointerId, start);
+        const forget = (ev: PointerEvent) => pointersRef.current.delete(ev.pointerId);
+        window.addEventListener('pointerup', forget, { once: true });
+        window.addEventListener('pointercancel', forget, { once: true });
+        if (mode === 'translate' && pointersRef.current.size >= 2) {
+            gestureRef.current?.abort();
+            gestureRef.current = ctrl;
+            startPinch(key, ctrl);
+            return;
+        }
+        gestureRef.current = ctrl;
         const drag: DragState = {
             mode,
             key,
@@ -73,9 +126,7 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
             rectCx: rect.x + rect.w / 2,
             rectCy: rect.y + rect.h / 2,
             startTransform: engine.getTransform(key),
-            abort: ctrl,
         };
-        dragRef.current = drag;
 
         const onMove = (ev: PointerEvent) => {
             if (ev.pointerId !== drag.pointerId) return;
@@ -103,7 +154,6 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
         const onUp = (ev: PointerEvent) => {
             if (ev.pointerId !== drag.pointerId) return;
             ctrl.abort();
-            dragRef.current = null;
         };
 
         window.addEventListener('pointermove', onMove, { signal: ctrl.signal });
@@ -113,7 +163,7 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
 
     // Drag a single crop margin inward/outward. Insets are stored as container
     // fractions; the opposite margin is held back so a sliver always remains.
-    const startCropDrag = (e: React.PointerEvent, side: CropSide, key: ImageKey) => {
+    const startCropDrag = (e: ReactPointerEvent, side: CropSide, key: ImageKey) => {
         const cont = getRectForKey(key);
         if (!cont || cont.w === 0 || cont.h === 0) return;
         e.preventDefault();
@@ -149,7 +199,7 @@ const CompareOverlay = ({ engine, snap, canvasEl, displayWidth }: Props) => {
     };
 
     const dpi = snap.canvasWidth / Math.max(1, displayWidth);
-    const handlePx = 10 * dpi;
+    const handlePx = (isCoarsePointer() ? 22 : 10) * dpi;
     const rotPx = 30 * dpi;
     const strokeW = 1.5 * dpi;
     const dashOn = 5 * dpi;

@@ -16,6 +16,8 @@ import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
     name: string;
+    /** The file's mtime — the URL's cache-bust token (`/DolImgs` is served immutable). */
+    v?: number;
 }
 
 interface LatestVisit {
@@ -301,7 +303,7 @@ const ChairDisplay = () => {
                             patient.images.map((img) => (
                                 <img
                                     key={img.name}
-                                    src={`/DolImgs/${img.name}`}
+                                    src={`/DolImgs/${img.name}${img.v ? `?v=${img.v}` : ''}`}
                                     alt={`Intraoral ${img.name}`}
                                 />
                             ))

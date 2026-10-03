@@ -40,8 +40,20 @@
     color: var(--text-secondary);
 }
 
+/* An <ol> (with aria-current on the current step — FE-F13-14b). Wraps at narrow
+   widths: a no-wrap 451 px row scrolled the 412 px page sideways (FE-F13-13a). */
 .stepper {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.stepItem {
+    display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
 }

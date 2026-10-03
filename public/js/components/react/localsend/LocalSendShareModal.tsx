@@ -1,17 +1,29 @@
 /**
  * LocalSend share modal — pick a LAN device, then push the given file(s) to it.
  *
- * Rendered by both share entry points (the photo lightbox and the Files page),
- * driven entirely off a `ShareSource[]` so single + batch are one code path.
- * The server does the discovery/upload; this modal lists devices, fires the
+ * Rendered by every share entry point (the photo lightbox, Files, Compare) through
+ * `ShareSheet`, driven entirely off a `ShareSource[]` so single + batch are one code
+ * path. The server does the discovery/upload; this modal lists devices, fires the
  * transfer, and polls its status. All I/O goes through the core/http funnel
  * (reads carry `{ schema }`; mutations get CSRF for free).
+ *
+ * The device list is a React Query read, made the moment the dialog mounts. It used
+ * to be started by an adjust-during-render block keyed on a change of `open` — and
+ * ShareSheet mounts this modal already open, so it never ran: every share opened on
+ * "No devices found yet" until Rescan (FE-F14-1, a regression from 2026-06-15).
+ *
+ * Closing the dialog does NOT stop a transfer; `services/share-watch.ts` then
+ * reports how it ended (FE-F14-6). Cancel is the button that stops one.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from '../Modal';
 import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
+import { fetchJSON, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { qk } from '@/query/keys';
+import { localsendDevicesQuery } from '@/query/queries';
+import { lostTrackMessage, watchLocalSendTransfer } from '@/services/share-watch';
 import * as localsend from '@shared/contracts/localsend.contract';
 import type {
   LocalSendDevice,
@@ -54,64 +66,55 @@ function deviceIcon(type?: string): string {
 
 const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const [enabled, setEnabled] = useState(true);
-  const [devices, setDevices] = useState<LocalSendDevice[]>([]);
-  const [loadingDevices, setLoadingDevices] = useState(false);
+  const devicesQ = useQuery({ ...localsendDevicesQuery(), enabled: open });
+  const enabled = devicesQ.data?.enabled ?? true;
+  const [probed, setProbed] = useState<LocalSendDevice[]>([]);
+  const devices: LocalSendDevice[] = [
+    ...probed,
+    ...(devicesQ.data?.devices ?? []).filter((d) => !probed.some((p) => p.fingerprint === d.fingerprint)),
+  ];
+  const [rescanning, setRescanning] = useState(false);
+  const loadingDevices = devicesQ.isFetching || rescanning;
   const [ip, setIp] = useState('');
   const [probing, setProbing] = useState(false);
 
   // Active transfer (null until a device is picked).
   const [transfer, setTransfer] = useState<TransferStatus | null>(null);
+  // The server no longer knows the transfer (restart, or pruned) — final.
+  const [lost, setLost] = useState(false);
   const [pendingDevice, setPendingDevice] = useState<LocalSendDevice | null>(null);
   const [pin, setPin] = useState('');
   const transferIdRef = useRef<string | null>(null);
 
-  const loadDevices = useCallback(
-    async (rescan: boolean): Promise<void> => {
-      setLoadingDevices(true);
-      try {
-        const res = await fetchJSON<localsend.DevicesResponse>(
-          `/api/localsend/devices${rescan ? '?rescan=1' : ''}`,
-          { schema: localsend.devices.response }
-        );
-        setEnabled(res.enabled);
-        setDevices(res.devices);
-      } catch (err) {
-        toast.error(httpErrorMessage(err, 'Could not load LAN devices'));
-      } finally {
-        setLoadingDevices(false);
-      }
-    },
-    [toast]
-  );
-
-  // Reset the picker + kick off the LAN device scan whenever the modal opens.
-  // Adjust-during-render keyed on the open state so a fresh open re-seeds the
-  // fields (and starts the scan) once, without a setState-in-effect bailout.
-  const [openedKey, setOpenedKey] = useState(open);
-  if (open !== openedKey) {
-    setOpenedKey(open);
-    if (open) {
-      setTransfer(null);
-      setPendingDevice(null);
-      setPin('');
-      setIp('');
-      void loadDevices(true);
-    }
-  }
-
-  // Clear any stale transfer id on open (ref writes belong outside render).
   useEffect(() => {
-    if (open) transferIdRef.current = null;
-  }, [open]);
+    if (devicesQ.error) toast.error(httpErrorMessage(devicesQ.error, 'Could not load LAN devices'));
+  }, [devicesQ.error, toast]);
+
+  // Rescan: solicit fresh announcements, then read once more a moment later — the
+  // `?rescan=1` answer comes back before the new announce has its replies.
+  const rescan = useCallback(async (): Promise<void> => {
+    setRescanning(true);
+    try {
+      const res = await fetchJSON<localsend.DevicesResponse>('/api/localsend/devices?rescan=1', {
+        schema: localsend.devices.response,
+      });
+      queryClient.setQueryData(qk.localsend.devices(), res);
+      window.setTimeout(() => void queryClient.invalidateQueries({ queryKey: qk.localsend.devices() }), 1500);
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Could not load LAN devices'));
+    } finally {
+      setRescanning(false);
+    }
+  }, [queryClient, toast]);
 
   // Poll the active transfer ~every second until it settles. `pin-required` is
   // settled server-side too — a PIN retry starts a NEW transfer — so don't keep
-  // polling (it would 404 forever once the record is pruned).
+  // polling. A 404 is final: the server has forgotten the transfer (FE-F14-6b).
   useEffect(() => {
     const id = transferIdRef.current;
-    if (!id) return;
+    if (!id || lost) return;
     if (transfer && (TERMINAL.includes(transfer.status) || transfer.status === 'pin-required'))
       return;
 
@@ -121,13 +124,14 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
           schema: localsend.transfer.response,
         });
         setTransfer(status);
-      } catch {
-        /* transient — keep polling */
+      } catch (err) {
+        if ((err as HttpError)?.status === 404) setLost(true);
+        /* anything else is transient — keep polling */
       }
     };
     const handle = window.setInterval(() => void tick(), 1000);
     return () => window.clearInterval(handle);
-  }, [transfer]);
+  }, [transfer, lost]);
 
   const startTransfer = useCallback(
     async (device: LocalSendDevice, withPin?: string): Promise<void> => {
@@ -169,10 +173,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
         { ip: target },
         { schema: localsend.probe.response }
       );
-      setDevices((prev) => {
-        const without = prev.filter((d) => d.fingerprint !== device.fingerprint);
-        return [device, ...without];
-      });
+      setProbed((prev) => [device, ...prev.filter((d) => d.fingerprint !== device.fingerprint)]);
       setIp('');
       toast.success(`Added ${device.alias}`);
     } catch (err) {
@@ -209,15 +210,25 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transfer?.status]);
 
-  if (!open) return null;
-
   const inTransfer = transfer !== null;
-  const settled = transfer ? TERMINAL.includes(transfer.status) : false;
+  const settled = lost || (transfer ? TERMINAL.includes(transfer.status) : false);
+
+  // Closing never cancels (Cancel does): a transfer still in flight is handed to the
+  // background watcher, which reports how it ends.
+  const handleClose = (): void => {
+    const id = transferIdRef.current;
+    if (id && transfer && !settled && transfer.status !== 'pin-required') {
+      watchLocalSendTransfer(id, transfer.deviceAlias);
+    }
+    onClose();
+  };
+
+  if (!open) return null;
 
   return (
     <Modal
       isOpen
-      onClose={onClose}
+      onClose={handleClose}
       ariaLabelledBy="localsend-title"
       contentClassName={styles.modal}
       overlayClassName={styles.overlay}
@@ -227,7 +238,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
         titleId="localsend-title"
         icon={<i className="fas fa-share-nodes" aria-hidden="true" />}
         title="Share to device"
-        onClose={onClose}
+        onClose={handleClose}
       />
 
       {!enabled && (
@@ -246,7 +257,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
             <button
               type="button"
               className={styles.linkButton}
-              onClick={() => void loadDevices(true)}
+              onClick={() => void rescan()}
               disabled={loadingDevices}
             >
               <i className="fas fa-rotate" aria-hidden="true" /> Rescan
@@ -283,6 +294,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
                 if (e.key === 'Enter') void handleProbe();
               }}
               placeholder="Add by IP (e.g. 192.168.1.42)"
+              aria-label="Device IP address"
               inputMode="decimal"
             />
             <button
@@ -309,6 +321,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   placeholder="PIN"
+                  aria-label={`PIN for ${transfer.deviceAlias}`}
                   // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                   autoFocus
                 />
@@ -324,33 +337,45 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
             </>
           ) : (
             <>
-              <p className={styles.transferHead}>
-                {transfer.status === 'pending' && `Waiting for ${transfer.deviceAlias} to accept…`}
-                {transfer.status === 'sending' && `Sending to ${transfer.deviceAlias}…`}
-                {transfer.status === 'completed' && `Sent to ${transfer.deviceAlias} ✓`}
-                {transfer.status === 'declined' && `${transfer.deviceAlias} declined`}
-                {transfer.status === 'failed' && `Failed: ${transfer.error || 'transfer error'}`}
-                {transfer.status === 'canceled' && 'Canceled'}
+              <p className={styles.transferHead} role="status" aria-live="polite">
+                {lost
+                  ? lostTrackMessage(transfer.deviceAlias)
+                  : <>
+                      {transfer.status === 'pending' && `Waiting for ${transfer.deviceAlias} to accept…`}
+                      {transfer.status === 'sending' && `Sending to ${transfer.deviceAlias}…`}
+                      {transfer.status === 'completed' && `Sent to ${transfer.deviceAlias} ✓`}
+                      {transfer.status === 'declined' && `${transfer.deviceAlias} declined`}
+                      {transfer.status === 'failed' && `Failed: ${transfer.error || 'transfer error'}`}
+                      {transfer.status === 'canceled' && 'Canceled'}
+                    </>}
               </p>
               <ul className={styles.fileList}>
-                {transfer.files.map((f, i) => (
-                  <li key={i} className={styles.fileRow}>
-                    <span className={styles.fileName}>{f.name}</span>
-                    <span className={styles.progressTrack}>
+                {transfer.files.map((f, i) => {
+                  const pct = f.totalBytes
+                    ? Math.min(100, Math.round((f.sentBytes / f.totalBytes) * 100))
+                    : f.status === 'completed'
+                      ? 100
+                      : 0;
+                  return (
+                    <li key={i} className={styles.fileRow}>
+                      <span className={styles.fileName}>{f.name}</span>
                       <span
-                        className={styles.progressBar}
-                        style={{
-                          width: f.totalBytes
-                            ? `${Math.min(100, Math.round((f.sentBytes / f.totalBytes) * 100))}%`
-                            : f.status === 'completed'
-                              ? '100%'
-                              : '0%',
-                        }}
-                      />
-                    </span>
-                  </li>
-                ))}
+                        className={styles.progressTrack}
+                        role="progressbar"
+                        aria-label={f.name}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={pct}
+                      >
+                        <span className={styles.progressBar} style={{ width: `${pct}%` }} />
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
+              {!settled && (
+                <p className={styles.subtle}>Closing this window doesn't stop the transfer — you'll be told how it ends.</p>
+              )}
             </>
           )}
 
@@ -361,7 +386,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
               </button>
             )}
             {(settled || transfer.status === 'pin-required') && (
-              <button type="button" className={styles.toolButton} onClick={onClose}>
+              <button type="button" className={styles.toolButton} onClick={handleClose}>
                 Close
               </button>
             )}
@@ -371,7 +396,7 @@ const LocalSendShareModal = ({ open, sources, onClose }: Props) => {
 
       {(!enabled || (!inTransfer && enabled)) && (
         <div className={styles.footer}>
-          <button type="button" className={styles.toolButton} onClick={onClose}>
+          <button type="button" className={styles.toolButton} onClick={handleClose}>
             Close
           </button>
         </div>

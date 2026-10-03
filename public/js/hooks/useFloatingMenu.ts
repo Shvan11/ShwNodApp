@@ -47,17 +47,18 @@ export function useFloatingMenu(
 ): { position: MenuAnchor; onKeyDown: (e: KeyboardEvent<HTMLElement>) => void } {
     const [position, setPosition] = useState<MenuAnchor>(anchor);
 
+    // Keyed on the coordinates, not the object: a caller may pass an inline `{ x, y }`.
+    const { x: ax, y: ay } = anchor;
     useLayoutEffect(() => {
         const el = menuRef.current;
         if (!el) return;
         const rect = el.getBoundingClientRect();
         const maxX = window.innerWidth - rect.width - EDGE_PX;
         const maxY = window.innerHeight - rect.height - EDGE_PX;
-        setPosition({
-            x: Math.max(EDGE_PX, Math.min(anchor.x, maxX)),
-            y: Math.max(EDGE_PX, Math.min(anchor.y, maxY)),
-        });
-    }, [menuRef, anchor]);
+        const x = Math.max(EDGE_PX, Math.min(ax, maxX));
+        const y = Math.max(EDGE_PX, Math.min(ay, maxY));
+        setPosition((p) => (p.x === x && p.y === y ? p : { x, y }));
+    }, [menuRef, ax, ay]);
 
     // Focus in on open, back out on close.
     useEffect(() => {

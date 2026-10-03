@@ -27,46 +27,38 @@ const isMobileDevice = typeof navigator !== 'undefined'
             && window.matchMedia('(pointer: coarse)').matches));
 export const nativeSharePreferred = canNativeShare && isMobileDevice;
 
-// Sync conversion from data URI to Blob — preserves the user gesture chain
-// through navigator.share().
-export function dataURItoBlob(dataURI: string): Blob {
-    const [header, data] = dataURI.split(',');
-    const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
-    const binary = atob(data);
-    const array = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-    return new Blob([array], { type: mime });
-}
-
 export function useCompareShare(engine: ComparisonEngine | null, personId?: number | null) {
     const toast = useToast();
     const isSharingRef = useRef(false);
     const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
     const [staging, setStaging] = useState(false);
 
+    // A JPEG (see ComparisonEngine#exportBlob — the PNG was 30–45 MB, FE-F13-6).
     const buildExportFileName = (): string => {
         const ts = formatISODate();
-        return personId ? `comparison_${personId}_${ts}.png` : `comparison_${ts}.png`;
+        return personId ? `comparison_${personId}_${ts}.jpg` : `comparison_${ts}.jpg`;
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!engine) return;
         try {
-            const dataURI = engine.toDataURL();
+            const url = URL.createObjectURL(await engine.exportBlob());
             const a = document.createElement('a');
-            a.href = dataURI;
+            a.href = url;
             a.download = buildExportFileName();
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 10_000);
             toast.success('Comparison saved');
         } catch (err) {
             toast.error('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'));
         }
     };
 
-    // IMPORTANT: Must be synchronous until navigator.share() to preserve user gesture.
-    const handleNativeShare = (engineInstance: ComparisonEngine) => {
+    // The JPEG encode is asynchronous but short (the canvas is capped at 4,096 px), well
+    // inside the browser's transient-activation window for navigator.share().
+    const handleNativeShare = async (engineInstance: ComparisonEngine) => {
         if (isSharingRef.current) return;
         if (!canNativeShare) {
             toast.warning('Sharing is not supported on this device');
@@ -74,25 +66,16 @@ export function useCompareShare(engine: ComparisonEngine | null, personId?: numb
         }
         isSharingRef.current = true;
         try {
-            const dataURI = engineInstance.toDataURL();
-            const blob = dataURItoBlob(dataURI);
-            const file = new File([blob], buildExportFileName(), { type: 'image/png' });
+            const blob = await engineInstance.exportBlob();
+            const file = new File([blob], buildExportFileName(), { type: 'image/jpeg' });
             if (!navigator.canShare({ files: [file] })) {
                 toast.warning('Cannot share this file type');
-                isSharingRef.current = false;
                 return;
             }
-            navigator.share({ files: [file] })
-                .catch((err: Error) => {
-                    if (err.name !== 'AbortError') {
-                        toast.error('Failed to share comparison');
-                    }
-                })
-                .finally(() => {
-                    isSharingRef.current = false;
-                });
+            await navigator.share({ files: [file] });
         } catch (err) {
-            toast.error('Failed to share: ' + (err instanceof Error ? err.message : 'Unknown error'));
+            if ((err as Error)?.name !== 'AbortError') toast.error('Failed to share comparison');
+        } finally {
             isSharingRef.current = false;
         }
     };
@@ -106,7 +89,7 @@ export function useCompareShare(engine: ComparisonEngine | null, personId?: numb
             return;
         }
         if (nativeSharePreferred) {
-            handleNativeShare(engine);
+            await handleNativeShare(engine);
             return;
         }
         if (!personId) {
@@ -115,16 +98,19 @@ export function useCompareShare(engine: ComparisonEngine | null, personId?: numb
         }
         try {
             setStaging(true);
-            const blob = dataURItoBlob(engine.toDataURL());
+            const blob = await engine.exportBlob();
             const fileName = buildExportFileName();
             const fd = new FormData();
             fd.append('image', blob, fileName);
             fd.append('personId', String(personId));
             fd.append('displayName', fileName);
+            // An upload, not an API call: off the LAN, the funnel's 30 s default cut it
+            // ("Request timed out after 30000ms" at 10 Mbit/s — FE-F13-6). The server
+            // side grants the long tier too.
             const staged = await postFormData<shareContract.StageResponse>(
                 '/api/share/stage',
                 fd,
-                { schema: shareContract.stage.response },
+                { schema: shareContract.stage.response, timeoutMs: 120_000 },
             );
             setShareSources([{ source: 'staged', personId, ref: staged.ref, displayName: staged.displayName }]);
         } catch (err) {

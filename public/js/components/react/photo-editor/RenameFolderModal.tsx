@@ -6,20 +6,31 @@
  * Only the patient's top-level folders are offered: the rename keeps a folder in its parent
  * (`renameEntry`), and the timepoint folder must live at the patient root, so a nested folder
  * couldn't become the root timepoint folder anyway.
+ *
+ * Folders that already BELONG to something — another session's originals, or one the app
+ * reads by name (`OPG`, `OPGIMG`, `CBCT`) — are listed apart, under a warning, and renaming
+ * one asks first. The dialog used to offer them like any other, and renaming one silently
+ * detached it from its owner: that session lost *Restore original*, or the X-ray card went
+ * empty (FE-F14-5). The server refuses the same renames unless confirmed (`force`).
  */
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Modal from '../Modal';
 import ModalHeader from '../ModalHeader';
 import { useToast } from '@/contexts/ToastContext';
-import { postJSON, type HttpError } from '@/core/http';
+import { useConfirm } from '@/contexts/ConfirmContext';
+import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { patientFilesQuery } from '@/query/queries';
-import { qk } from '@/query/keys';
-import type { FileListing, FileEntry } from '@/types/api.types';
+import { invalidatePatientPhotos } from '@/query/photos';
+import { folderOwner, type FolderOwner } from '@shared/photo-session-folder';
+import type { TimepointRow } from '@shared/contracts/patient.contract';
+import type { FileEntry } from '@/types/api.types';
 import styles from './RenameFolderModal.module.css';
 
 interface Props {
   personId: number;
+  /** The patient's sessions — to tell their folders apart. */
+  sessions: TimepointRow[];
   /** The timepoint's folder name (e.g. `Initial_01-06-2026`) the chosen folder is renamed to. */
   targetName: string;
   onClose: () => void;
@@ -27,40 +38,82 @@ interface Props {
   onRenamed: (newName: string) => void;
 }
 
-const RenameFolderModal = ({ personId, targetName, onClose, onRenamed }: Props) => {
+interface Candidate {
+  entry: FileEntry;
+  owner: FolderOwner;
+}
+
+const ownerText = (owner: FolderOwner): string =>
+  owner?.kind === 'session'
+    ? `the originals of the photo session “${owner.name}” (${owner.date})`
+    : 'read by the app under this name (X-rays)';
+
+const RenameFolderModal = ({ personId, sessions, targetName, onClose, onRenamed }: Props) => {
   const toast = useToast();
-  const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Top-level patient folders (path=''), minus the timepoint folder if it already exists.
+  // Top-level patient folders (path=''), minus the timepoint folder itself.
   const { data, isLoading: loading, isError } = useQuery(patientFilesQuery(personId, ''));
-  const folders = useMemo<FileEntry[]>(() => {
-    const listing = data as FileListing | undefined;
-    return (listing?.entries ?? []).filter((e) => e.type === 'dir' && e.name !== targetName);
-  }, [data, targetName]);
+  const candidates: Candidate[] = (data?.entries ?? [])
+    .filter((e) => e.type === 'dir' && e.name.toLowerCase() !== targetName.toLowerCase())
+    .map((entry) => ({ entry, owner: folderOwner(entry.name, sessions) }));
+  const free = candidates.filter((c) => c.owner === null);
+  const owned = candidates.filter((c) => c.owner !== null);
   useEffect(() => {
     if (isError) toast.error('Failed to load folders');
   }, [isError, toast]);
 
   const handleRename = async (): Promise<void> => {
-    if (!selected || busy) return;
+    const choice = candidates.find((c) => c.entry.relPath === selected);
+    if (!choice || busy) return;
+    if (choice.owner) {
+      const ok = await confirm(
+        `“${choice.entry.name}” holds ${ownerText(choice.owner)}. Renaming it to “${targetName}” takes it away from there.`,
+        { title: 'Rename a folder that is in use?', confirmText: 'Rename anyway', danger: true }
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     try {
-      await postJSON(`/api/patients/${personId}/files/rename`, { path: selected, newName: targetName });
-      void queryClient.invalidateQueries({ queryKey: qk.patient.files(personId, '') });
-      toast.success(`Renamed “${selected}” to “${targetName}”`);
+      await postJSON(`/api/patients/${personId}/files/rename`, {
+        path: choice.entry.relPath,
+        newName: targetName,
+        ...(choice.owner ? { force: true } : {}),
+      });
+      void invalidatePatientPhotos(personId);
+      toast.success(`Renamed “${choice.entry.name}” to “${targetName}”`);
       onRenamed(targetName);
     } catch (err) {
-      if ((err as HttpError).status === 409) {
-        toast.error(`A folder named “${targetName}” already exists — remove or merge it first.`);
-      } else {
-        toast.error(`Rename failed: ${err instanceof Error ? err.message : 'unknown error'}`);
-      }
+      const status = (err as HttpError).status;
+      toast.error(
+        status === 409
+          ? httpErrorMessage(err, `A folder named “${targetName}” already exists — remove or merge it first.`)
+          : `Rename failed: ${httpErrorMessage(err, 'unknown error')}`
+      );
     } finally {
       setBusy(false);
     }
   };
+
+  const row = (c: Candidate) => (
+    <li key={c.entry.relPath}>
+      <button
+        type="button"
+        className={`${styles.folderRow} ${selected === c.entry.relPath ? styles.selected : ''}`}
+        onClick={() => setSelected(c.entry.relPath)}
+        aria-pressed={selected === c.entry.relPath}
+      >
+        <i className={`fas ${c.owner ? 'fa-folder-closed' : 'fa-folder'}`} aria-hidden="true" />
+        <span className={styles.folderName} title={c.entry.name}>
+          {c.entry.name}
+          {c.owner && <small className={styles.ownerNote}>{ownerText(c.owner)}</small>}
+        </span>
+        {selected === c.entry.relPath && <i className="fas fa-check" aria-hidden="true" />}
+      </button>
+    </li>
+  );
 
   return (
     <Modal isOpen onClose={onClose} contentClassName={styles.dialog} ariaLabelledBy="rename-folder-title">
@@ -74,26 +127,25 @@ const RenameFolderModal = ({ personId, targetName, onClose, onRenamed }: Props) 
 
         {loading ? (
           <div className={styles.note}>Loading folders…</div>
-        ) : folders.length === 0 ? (
+        ) : candidates.length === 0 ? (
           <div className={styles.note}>No other folders in the patient directory.</div>
         ) : (
-          <ul className={styles.list}>
-            {folders.map((f) => (
-              <li key={f.relPath}>
-                <button
-                  type="button"
-                  className={`${styles.folderRow} ${selected === f.relPath ? styles.selected : ''}`}
-                  onClick={() => setSelected(f.relPath)}
-                >
-                  <i className="fas fa-folder" aria-hidden="true" />
-                  <span className={styles.folderName} title={f.name}>
-                    {f.name}
-                  </span>
-                  {selected === f.relPath && <i className="fas fa-check" aria-hidden="true" />}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            {free.length > 0 ? (
+              <ul className={styles.list}>{free.map(row)}</ul>
+            ) : (
+              <div className={styles.note}>No unused folders — every folder here belongs to something.</div>
+            )}
+            {owned.length > 0 && (
+              <>
+                <p className={styles.ownedHeading}>
+                  <i className="fas fa-triangle-exclamation" aria-hidden="true" /> In use — renaming one takes it
+                  away from its owner
+                </p>
+                <ul className={styles.list}>{owned.map(row)}</ul>
+              </>
+            )}
+          </>
         )}
       </div>
 

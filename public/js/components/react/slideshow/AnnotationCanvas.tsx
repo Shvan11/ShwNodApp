@@ -7,14 +7,21 @@
  * Strokes live only in a ref (no persistence). The player remounts this via a
  * per-slide `key`, so navigating to another slide (or toggling annotate off)
  * naturally discards everything — no reset effect needed.
+ *
+ * Points are stored as FRACTIONS OF THE DISPLAYED PHOTO (`getPhotoRect`), not as
+ * screen pixels: the photo is `object-fit: contain`, so a framing toggle (Reel 9:16)
+ * or turning a tablet moves and scales it, and ink stored in pixels stayed where it
+ * was while the circled point moved away (FE-F15-6). Each pointer draws its own
+ * stroke — two fingers, or a palm beside a stylus, used to zigzag into one.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import styles from './AnnotationCanvas.module.css';
 
+/** A point as fractions (0..1) of the photo rectangle. */
 interface Point {
-  x: number;
-  y: number;
+  u: number;
+  v: number;
 }
 interface Stroke {
   color: string;
@@ -22,24 +29,53 @@ interface Stroke {
   points: Point[];
 }
 
-const COLORS = ['#ff3b30', '#ffd60a', '#34c759', '#0a84ff', '#ffffff'];
+interface Props {
+  /** The displayed photo's rectangle (viewport coordinates), or null. */
+  getPhotoRect: () => DOMRect | null;
+  /** An element whose resizes move the photo (the player's frame). */
+  observe: HTMLElement | null;
+}
+
+const COLORS: ReadonlyArray<{ value: string; name: string }> = [
+  { value: '#ff3b30', name: 'Red' },
+  { value: '#ffd60a', name: 'Yellow' },
+  { value: '#34c759', name: 'Green' },
+  { value: '#0a84ff', name: 'Blue' },
+  { value: '#ffffff', name: 'White' },
+];
 const WIDTHS = [3, 6, 12];
 
-const AnnotationCanvas = () => {
+const AnnotationCanvas = ({ getPhotoRect, observe }: Props) => {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokesRef = useRef<Stroke[]>([]);
-  const activeRef = useRef<Stroke | null>(null);
+  const activeRef = useRef(new Map<number, Stroke>());
+  const getRectRef = useRef(getPhotoRect);
+  useEffect(() => {
+    getRectRef.current = getPhotoRect;
+  });
 
-  const [color, setColor] = useState(COLORS[0]);
+  const [color, setColor] = useState(COLORS[0].value);
   const [width, setWidth] = useState(WIDTHS[1]);
   const [count, setCount] = useState(0); // stroke count → undo/clear enabled state
 
-  // Repaint every stored stroke. Reads only refs + window, so it's stable.
+  /** The photo's rectangle in canvas coordinates (falls back to the whole canvas). */
+  const photoBox = useCallback((): { x: number; y: number; w: number; h: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const c = canvas.getBoundingClientRect();
+    const r = getRectRef.current();
+    if (!r || r.width === 0 || r.height === 0) return { x: 0, y: 0, w: c.width, h: c.height };
+    return { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height };
+  }, []);
+
+  // Repaint every stored stroke against the photo's CURRENT rectangle.
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
+    const box = photoBox();
+    if (!canvas || !ctx || !box) return;
+    const at = (p: Point) => ({ x: box.x + p.u * box.w, y: box.y + p.v * box.h });
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -51,18 +87,22 @@ const AnnotationCanvas = () => {
       ctx.fillStyle = s.color;
       ctx.lineWidth = s.width;
       if (s.points.length === 1) {
-        const p = s.points[0];
+        const p = at(s.points[0]);
         ctx.beginPath();
         ctx.arc(p.x, p.y, s.width / 2, 0, Math.PI * 2);
         ctx.fill();
         continue;
       }
       ctx.beginPath();
-      ctx.moveTo(s.points[0].x, s.points[0].y);
-      for (let i = 1; i < s.points.length; i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+      const p0 = at(s.points[0]);
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < s.points.length; i++) {
+        const p = at(s.points[i]);
+        ctx.lineTo(p.x, p.y);
+      }
       ctx.stroke();
     }
-  }, []);
+  }, [photoBox]);
 
   // Size the canvas backing store to the wrapper (DPR-aware); redraw on resize.
   useEffect(() => {
@@ -79,13 +119,19 @@ const AnnotationCanvas = () => {
       draw();
     });
     ro.observe(wrap);
+    // The frame resizes on a framing toggle while the stage does not: repaint then too.
+    if (observe) ro.observe(observe);
     return () => ro.disconnect();
-  }, [draw]);
+  }, [draw, observe]);
 
   const pointFromEvent = (e: ReactPointerEvent<HTMLCanvasElement>): Point => {
+    const box = photoBox();
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (!box || !rect || box.w === 0 || box.h === 0) return { u: 0, v: 0 };
+    return {
+      u: (e.clientX - rect.left - box.x) / box.w,
+      v: (e.clientY - rect.top - box.y) / box.h,
+    };
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>): void => {
@@ -94,22 +140,22 @@ const AnnotationCanvas = () => {
     canvasRef.current?.setPointerCapture(e.pointerId);
     const penScale = e.pointerType === 'pen' && e.pressure > 0 ? 0.5 + e.pressure : 1;
     const stroke: Stroke = { color, width: width * penScale, points: [pointFromEvent(e)] };
-    activeRef.current = stroke;
+    activeRef.current.set(e.pointerId, stroke);
     strokesRef.current.push(stroke);
     draw();
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLCanvasElement>): void => {
-    const stroke = activeRef.current;
+    const stroke = activeRef.current.get(e.pointerId);
     if (!stroke) return;
     stroke.points.push(pointFromEvent(e));
     draw();
   };
 
   const onPointerUp = (e: ReactPointerEvent<HTMLCanvasElement>): void => {
-    if (!activeRef.current) return;
-    activeRef.current = null;
-    canvasRef.current?.releasePointerCapture(e.pointerId);
+    if (!activeRef.current.has(e.pointerId)) return;
+    activeRef.current.delete(e.pointerId);
+    if (canvasRef.current?.hasPointerCapture(e.pointerId)) canvasRef.current.releasePointerCapture(e.pointerId);
     setCount(strokesRef.current.length);
   };
 
@@ -137,13 +183,14 @@ const AnnotationCanvas = () => {
       <div className={styles.toolbar} role="toolbar" aria-label="Annotation tools">
         {COLORS.map((c) => (
           <button
-            key={c}
+            key={c.value}
             type="button"
-            className={`${styles.swatch} ${color === c ? styles.swatchActive : ''}`}
-            style={{ background: c }}
-            aria-label={`Color ${c}`}
-            aria-pressed={color === c}
-            onClick={() => setColor(c)}
+            className={`${styles.swatch} ${color === c.value ? styles.swatchActive : ''}`}
+            style={{ background: c.value }}
+            aria-label={`${c.name} ink`}
+            title={c.name}
+            aria-pressed={color === c.value}
+            onClick={() => setColor(c.value)}
           />
         ))}
         <span className={styles.divider} />

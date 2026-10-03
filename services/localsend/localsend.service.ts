@@ -29,6 +29,7 @@ import https from 'https';
 import fetch from 'node-fetch';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
+import { describeFetchError, isAbortError } from '../../utils/fetch-timeout.js';
 import { resolveShareRef } from '../files/share-ref.js';
 import type {
   LocalSendDevice,
@@ -50,6 +51,29 @@ const INTERFACE_SYNC_MS = 20 * 1000;
 // Bounds the prepare-upload wait — the receiver's Accept dialog can sit open.
 const PREPARE_TIMEOUT_MS = 90 * 1000;
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * User copy for a request to a LocalSend device that never got an HTTP answer (FE-F14-7).
+ * The raw rejection reads "The operation was aborted." for a timeout and
+ * "request to https://…:53317/… failed, reason: connect ECONNREFUSED …" for a refusal,
+ * and both reached the user verbatim; a receiver that simply never tapped *Accept* read as
+ * if someone had cancelled. Every network failure in this service now comes through here,
+ * which is what localsend.routes.ts's leak-rule exemption relies on.
+ *
+ * @param who the device's alias, or the IP being probed
+ * @param waitingFor what a timeout means at this step
+ */
+function describeUnreachable(err: unknown, who: string, timeoutMs: number, waitingFor: string): string {
+  if (isAbortError(err)) {
+    return `${who} ${waitingFor} (${describeFetchError(err, timeoutMs)}). Is LocalSend open on it, and is it on the clinic network?`;
+  }
+  const code = (err as { code?: unknown })?.code;
+  if (code === 'ECONNREFUSED') return `${who} refused the connection. Is LocalSend open on it?`;
+  if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH' || code === 'ETIMEDOUT') {
+    return `${who} can't be reached. Is it switched on and on the clinic network?`;
+  }
+  return `Couldn't reach ${who}${typeof code === 'string' ? ` (${code})` : ''}. Is LocalSend open on it?`;
+}
 // Finished transfers are pruned this long after they settle.
 const TRANSFER_TTL_MS = 10 * 60 * 1000;
 
@@ -358,11 +382,23 @@ class LocalSendService {
     // probe-by-IP silently hit a dead port — and probe-by-IP is the fallback that exists precisely
     // for the segmented LANs and WSL2 dev boxes multicast can't reach.
     const url = `https://${host}:${this.cfg.port}/api/localsend/v2/info`;
-    const res = await this.timedFetch(url, { agent: this.httpsAgent }, 8000);
-    if (!res.ok) {
-      throw new Error(`Device at ${ip} did not respond (HTTP ${res.status})`);
+    const PROBE_TIMEOUT_MS = 8000;
+    let info: AnnouncePayload;
+    try {
+      const res = await this.timedFetch(url, { agent: this.httpsAgent }, PROBE_TIMEOUT_MS);
+      if (!res.ok) {
+        throw new Error(`The device at ${ip} answered, but not as LocalSend (HTTP ${res.status})`);
+      }
+      info = (await res.json()) as AnnouncePayload;
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('The device at ')) throw err;
+      if (err instanceof SyntaxError || (err as { type?: unknown })?.type === 'invalid-json') {
+        throw new Error(`The device at ${ip} answered, but not as LocalSend`, { cause: err });
+      }
+      throw new Error(describeUnreachable(err, `The device at ${ip}`, PROBE_TIMEOUT_MS, "didn't answer"), {
+        cause: err,
+      });
     }
-    const info = (await res.json()) as AnnouncePayload;
     const dev: LocalSendDevice = {
       fingerprint: info.fingerprint || `ip:${ip}`,
       alias: info.alias || ip,
@@ -491,17 +527,28 @@ class LocalSendService {
     });
 
     const prepUrl = base + '/prepare-upload' + (pin ? `?pin=${encodeURIComponent(pin)}` : '');
-    const prepRes = await this.timedFetch(
-      prepUrl,
-      {
-        method: 'POST',
-        agent,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ info: this.selfInfo(), files: fileMap }),
-      },
-      PREPARE_TIMEOUT_MS,
-      transfer.abort.signal
-    );
+    let prepRes: Awaited<ReturnType<typeof fetch>>;
+    try {
+      prepRes = await this.timedFetch(
+        prepUrl,
+        {
+          method: 'POST',
+          agent,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ info: this.selfInfo(), files: fileMap }),
+        },
+        PREPARE_TIMEOUT_MS,
+        transfer.abort.signal
+      );
+    } catch (err) {
+      if (transfer.canceled) return;
+      // prepare-upload blocks on the receiver's Accept prompt, so a timeout HERE
+      // usually means nobody tapped Accept — not that anything was cancelled.
+      throw new Error(
+        describeUnreachable(err, dev.alias, PREPARE_TIMEOUT_MS, "didn't accept the files — nobody tapped Accept, or it went to sleep"),
+        { cause: err }
+      );
+    }
 
     if (transfer.canceled) return;
 
@@ -604,7 +651,12 @@ class LocalSendService {
         counter.destroy();
         if (transfer.canceled) return; // cancel() already settled the record
         f.status = 'failed';
-        throw err;
+        // An HTTP-status failure above is already user copy; a transport failure is not.
+        if (err instanceof Error && err.message.startsWith('upload of ')) throw err;
+        throw new Error(
+          describeUnreachable(err, dev.alias, UPLOAD_TIMEOUT_MS, `stopped taking "${f.name}"`),
+          { cause: err }
+        );
       }
       f.status = 'completed';
       f.sentBytes = f.totalBytes;

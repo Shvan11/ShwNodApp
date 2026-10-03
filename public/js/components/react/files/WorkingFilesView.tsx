@@ -9,9 +9,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import type { FileEntry, FileListing } from '@/types/api.types';
 import { workingFilesQuery } from '@/query/queries';
-import { buildWorkingContentUrl, errorMessage } from './fileHelpers';
+import { buildWorkingContentUrl } from './fileHelpers';
+import { httpErrorMessage } from '@/core/http';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
 import explorer from './FileExplorer.module.css';
@@ -32,11 +32,11 @@ const WorkingFilesView = ({ personId }: Props) => {
     enabled: !!personId,
   });
   const loading = !!personId && isLoading;
-  const error = queryError ? errorMessage(queryError, 'Failed to load working files') : null;
+  const error = queryError ? httpErrorMessage(queryError, 'Failed to load working files') : null;
 
   // Stable order: by filename (timepoint then view), numeric-aware.
   const sorted = useMemo(() => {
-    const entries = ((data as FileListing | undefined)?.entries ?? []) as FileEntry[];
+    const entries = data?.entries ?? [];
     return [...entries].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [data]);
 

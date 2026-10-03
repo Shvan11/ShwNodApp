@@ -1,11 +1,10 @@
 /**
  * Types + constants for the native photo editor (Phase 4).
- * The view-code↔label mapping is reused from the slideshow module (single source
- * of truth); the slot order matches GridComponent + services/imaging getImageSizes.
+ * The view-code↔label mapping is `shared/photo-views.ts#VIEW_LABELS`; the slot order
+ * matches GridComponent + services/imaging getImageSizes.
  */
 import type { PhotoViewCode, SlotRenderSpec } from '@/types/api.types';
-import { VIEW_CODES, parseViewTag } from '@shared/photo-views';
-import { PHOTO_TYPE_LABELS } from '../slideshow/photoTypes';
+import { VIEW_CODES, parseViewTag, viewLabel } from '@shared/photo-views';
 
 export type { PhotoViewCode, SlotRenderSpec };
 
@@ -23,7 +22,7 @@ export const GRID_CELLS: GridCell[] = [
 export { VIEW_CODES };
 
 export function labelForView(view: PhotoViewCode): string {
-  return PHOTO_TYPE_LABELS[view] ?? view.toUpperCase();
+  return viewLabel(view);
 }
 
 /**
@@ -34,7 +33,7 @@ export function labelForView(view: PhotoViewCode): string {
  */
 export const parseOriginalViewTag = parseViewTag;
 
-export interface OutputDims {
+interface OutputDims {
   width: number;
   height: number;
 }
@@ -79,7 +78,7 @@ export const ZOOM_MAX = 3;
 export const ZOOM_SPEED = 0.1;
 
 /** Occlusal views (Upper/Lower) are shot through a mirror → default to a flip. */
-export function defaultFlipV(view: PhotoViewCode): boolean {
+function defaultFlipV(view: PhotoViewCode): boolean {
   return view === 'i23' || view === 'i24';
 }
 
@@ -94,7 +93,7 @@ export function defaultFlipV(view: PhotoViewCode): boolean {
  *   occlusal (Upper/Lower)      → one vertical midline (dental midline reference).
  *   lower three (Right/Center/Left) → one horizontal bisecting line (occlusal-plane reference).
  */
-export interface SlotGridLines {
+interface SlotGridLines {
   /** Horizontal lines as fractions of crop-area height (top→bottom). */
   horizontal: number[];
   /** Vertical lines as fractions of crop-area width (left→right). */

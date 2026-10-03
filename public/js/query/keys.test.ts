@@ -20,6 +20,13 @@ describe('qk query-key factory', () => {
     expect(isPrefix(all, qk.patient.timepoints(7))).toBe(true);
   });
 
+  it('patient.galleryAll is a prefix of every session gallery, and work.root of every work key', () => {
+    expect(isPrefix(qk.patient.galleryAll(7), qk.patient.gallery(7, 0))).toBe(true);
+    expect(isPrefix(qk.patient.galleryAll(7), qk.patient.gallery(7, '3'))).toBe(true);
+    expect(isPrefix(qk.work.root(), qk.work.details(5))).toBe(true);
+    expect(isPrefix(qk.work.root(), qk.work.diagnosis(5))).toBe(true);
+  });
+
   it('keeps patient.info and patient.full distinct (different endpoints)', () => {
     expect(qk.patient.info(7)).not.toEqual(qk.patient.full(7));
   });

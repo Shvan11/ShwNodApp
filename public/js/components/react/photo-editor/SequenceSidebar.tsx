@@ -4,23 +4,27 @@
  * endpoints. Each thumbnail is an HTML5-native drag source carrying its relPath.
  *
  * Step 1 of the photo workflow lives here: get the original camera photos into the
- * timepoint folder so they appear below as drag sources. The "Upload" button:
- *   - On Chromium (File System Access): a multi-select picker that defaults to the remembered
- *     memory-card folder and MOVES the chosen photos — deletes each original from the card
- *     after the upload succeeds. The card folder (useImportFolder) is both the default picker
- *     location and the read-write grant we delete under.
- *   - Elsewhere: falls back to a plain file-input that COPIES (originals stay put), so upload
- *     still works on non-Chromium browsers.
+ * timepoint folder so they appear below as drag sources. Two buttons, named for what
+ * they do (FE-F14-10 — one "Upload" button used to DELETE the picked photos from
+ * the remembered folder, said only in its tooltip):
+ *   - "Move from card" (Chromium, File System Access): a multi-select picker that defaults to
+ *     the remembered memory-card folder and MOVES the chosen photos — deletes each original
+ *     from the card after the upload succeeds. It asks once before the first move.
+ *   - "Upload (copy)": a plain file input; the originals stay where they are.
+ * A photo can be dragged onto a slot, or clicked (Enter) and then a slot clicked — the
+ * keyboard path (FE-F14-13a).
  * (Step 2 — framing + Save → working/ — happens in the slot grid.)
  */
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import styles from './SequenceSidebar.module.css';
 import { useToast } from '../../../contexts/ToastContext';
-import { postFormData, postJSON, type HttpError } from '@/core/http';
+import { useConfirm } from '../../../contexts/ConfirmContext';
+import { postFormData, postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { patientFilesQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
-import type { FileListing } from '@/types/api.types';
+import type { FileEntry } from '@/types/api.types';
+import type { TimepointRow } from '@shared/contracts/patient.contract';
 import { ensurePermission, showFilePicker } from '@/core/fileSystemAccess';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import RenameFolderModal from './RenameFolderModal';
@@ -30,24 +34,39 @@ const IMAGE_ACCEPT: Record<string, string[]> = {
   'image/*': ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.gif', '.bmp', '.tif', '.tiff'],
 };
 
-interface FileEntryLite {
-  name: string;
+/** A photo picked by click/keyboard, waiting for the slot to place it in. */
+export interface ArmedPhoto {
   relPath: string;
-  type: string;
-  category: string;
+  name: string;
 }
+
+/** Set once the user has confirmed that "Move from card" deletes from the card. */
+const MOVE_CONFIRMED_KEY = 'pe:moveFromCardConfirmed';
 
 interface Props {
   personId: number;
+  /** The patient's photo sessions — RenameFolderModal tells their folders apart. */
+  sessions: TimepointRow[];
   defaultFolder: string;
   /** relPaths already dropped into a slot — hidden from the list while in use. */
   usedRelPaths: Set<string>;
   /** Bumped by the parent to force a re-list (e.g. after a view's original is untagged). */
   refreshSignal?: number;
+  armed: ArmedPhoto | null;
+  onArm: (photo: ArmedPhoto | null) => void;
 }
 
-const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal = 0 }: Props) => {
+const SequenceSidebar = ({
+  personId,
+  sessions,
+  defaultFolder,
+  usedRelPaths,
+  refreshSignal = 0,
+  armed,
+  onArm,
+}: Props) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [folder, setFolder] = useState<string>(defaultFolder);
   const [uploading, setUploading] = useState(false);
@@ -61,20 +80,18 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
   // Top-level folders for the picker (path=''). Best-effort: a failure just leaves
   // the picker empty.
   const foldersQ = useQuery(patientFilesQuery(personId, ''));
-  const folders = useMemo<string[]>(() => {
-    const listing = foldersQ.data as FileListing | undefined;
-    return (listing?.entries ?? []).filter((e) => e.type === 'dir').map((e) => e.name);
-  }, [foldersQ.data]);
+  const folders = useMemo<string[]>(
+    () => (foldersQ.data?.entries ?? []).filter((e) => e.type === 'dir').map((e) => e.name),
+    [foldersQ.data]
+  );
 
   // Images in the selected folder. A 404 means "not created yet" (folderExists=false);
   // retry is off so that empty state shows immediately instead of after 2 retries.
   const filesQ = useQuery({ ...patientFilesQuery(personId, folder), retry: false });
-  const files = useMemo<FileEntryLite[]>(() => {
-    const listing = filesQ.data as FileListing | undefined;
-    return ((listing?.entries ?? []) as FileEntryLite[]).filter(
-      (e) => e.type === 'file' && e.category === 'image'
-    );
-  }, [filesQ.data]);
+  const files = useMemo<FileEntry[]>(
+    () => (filesQ.data?.entries ?? []).filter((e) => e.type === 'file' && e.category === 'image'),
+    [filesQ.data]
+  );
   const loading = filesQ.isFetching;
   // 404 = folder doesn't exist yet; any other status (or success) counts as "exists".
   const folderStatus = (filesQ.error as HttpError | null)?.status;
@@ -136,7 +153,8 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
       void reloadFiles();
       toast.success(`Uploaded ${list.length} photo${list.length === 1 ? '' : 's'}`);
     } catch (err) {
-      toast.error(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+      // The server's reason, not the funnel's "HTTP Error: 403 Forbidden" (FE-F14-9).
+      toast.error(`Upload failed: ${httpErrorMessage(err, 'unknown error')}`);
     } finally {
       setUploading(false);
     }
@@ -153,6 +171,26 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
     if (!target) {
       toast.warning('Pick or create a folder first.');
       return;
+    }
+
+    // Moving deletes from the card — say so plainly once, before the first move.
+    let confirmed = false;
+    try {
+      confirmed = localStorage.getItem(MOVE_CONFIRMED_KEY) === '1';
+    } catch {
+      /* storage unavailable: ask every time */
+    }
+    if (!confirmed) {
+      const ok = await confirm(
+        'Move from card uploads the photos you pick and then DELETES them from the memory-card folder. Use "Upload (copy)" to keep the originals where they are.',
+        { title: 'Move photos off the card?', confirmText: 'Move', cancelText: 'Cancel' }
+      );
+      if (!ok) return;
+      try {
+        localStorage.setItem(MOVE_CONFIRMED_KEY, '1');
+      } catch {
+        /* ignore */
+      }
     }
 
     // The remembered card folder is both the default picker location and the read-write grant
@@ -222,25 +260,14 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
         await importFolder.clear();
         toast.error('That folder is no longer available — please choose the card folder again.');
       } else {
-        toast.error(`Move failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+        toast.error(`Move failed: ${httpErrorMessage(err, 'unknown error')}`);
       }
     } finally {
       setMoving(false);
     }
   };
 
-  // One "Upload": on Chromium it moves the chosen photos off the card (deletes originals);
-  // elsewhere it falls back to the plain file-input copy so upload still works.
-  const handleUpload = (): void => {
-    if (uploading || moving) return;
-    if (importFolder.supported) {
-      void handleMoveFromCard();
-    } else {
-      fileInputRef.current?.click();
-    }
-  };
-
-  const onDragStart = (e: DragEvent<HTMLImageElement>, f: FileEntryLite): void => {
+  const onDragStart = (e: DragEvent<HTMLElement>, f: FileEntry): void => {
     e.dataTransfer.setData('text/plain', JSON.stringify({ relPath: f.relPath, name: f.name }));
     e.dataTransfer.effectAllowed = 'copy';
   };
@@ -253,14 +280,25 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
       <div className={styles.header}>
         <span className={styles.title}>Sequence Files</span>
         <div className={styles.actions}>
+          {importFolder.supported && (
+            <button
+              type="button"
+              className={styles.actionBtn}
+              onClick={() => void handleMoveFromCard()}
+              disabled={uploading || moving}
+              title="Upload photos from the memory card into the selected folder, then delete them from the card"
+            >
+              <i className="fas fa-sd-card" aria-hidden="true" /> {moving ? 'Moving…' : 'Move from card'}
+            </button>
+          )}
           <button
             type="button"
             className={styles.actionBtn}
-            onClick={handleUpload}
+            onClick={() => fileInputRef.current?.click()}
             disabled={uploading || moving}
-            title="Upload the patient's photos into the selected folder — moved off the memory card (originals removed after upload)"
+            title="Upload copies of photos into the selected folder — the originals stay where they are"
           >
-            <i className="fas fa-upload" aria-hidden="true" /> {uploading || moving ? 'Uploading…' : 'Upload'}
+            <i className="fas fa-upload" aria-hidden="true" /> {uploading ? 'Uploading…' : 'Upload (copy)'}
           </button>
           <button
             type="button"
@@ -272,7 +310,12 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
             <i className="fas fa-folder-tree" aria-hidden="true" /> Rename folder
           </button>
         </div>
-        <select className={styles.folderSelect} value={folder} onChange={(e) => setFolder(e.target.value)}>
+        <select
+          className={styles.folderSelect}
+          value={folder}
+          onChange={(e) => setFolder(e.target.value)}
+          aria-label="Folder to show"
+        >
           {!folders.includes(folder) && <option value={folder}>{folder || '(root)'}</option>}
           {folders.map((d) => (
             <option key={d} value={d}>
@@ -298,29 +341,44 @@ const SequenceSidebar = ({ personId, defaultFolder, usedRelPaths, refreshSignal 
         <div className={styles.note}>All photos placed.</div>
       ) : (
         <div className={styles.list}>
-          {visibleFiles.map((f) => (
-            <figure key={f.relPath} className={styles.thumb}>
-              <img
-                src={`/api/patients/${personId}/files/content?path=${encodeURIComponent(f.relPath)}&thumb=240`}
-                alt={f.name}
-                draggable
-                onDragStart={(e) => onDragStart(e, f)}
-                loading="lazy"
-                className={styles.thumbImg}
-              />
-              <figcaption className={styles.thumbName} title={f.name}>
-                {f.name}
-              </figcaption>
-            </figure>
-          ))}
+          {visibleFiles.map((f) => {
+            const isArmed = armed?.relPath === f.relPath;
+            return (
+              <figure key={f.relPath} className={`${styles.thumb} ${isArmed ? styles.thumbArmed : ''}`}>
+                <button
+                  type="button"
+                  className={styles.thumbButton}
+                  draggable
+                  onDragStart={(e) => onDragStart(e, f)}
+                  onClick={() => onArm(isArmed ? null : { relPath: f.relPath, name: f.name })}
+                  aria-pressed={isArmed}
+                  aria-label={`${f.name} — pick, then choose a slot`}
+                >
+                  <img
+                    src={`/api/patients/${personId}/files/content?path=${encodeURIComponent(f.relPath)}&thumb=240`}
+                    alt=""
+                    draggable={false}
+                    loading="lazy"
+                    className={styles.thumbImg}
+                  />
+                </button>
+                <figcaption className={styles.thumbName} title={f.name}>
+                  {f.name}
+                </figcaption>
+              </figure>
+            );
+          })}
         </div>
       )}
 
-      <div className={styles.hint}>Drag a photo onto a slot →</div>
+      <div className={styles.hint} aria-live="polite">
+        {armed ? `Now click a slot to place “${armed.name}” (Esc cancels)` : 'Drag a photo onto a slot — or click it, then a slot →'}
+      </div>
 
       {showRename && defaultFolder && (
         <RenameFolderModal
           personId={personId}
+          sessions={sessions}
           targetName={defaultFolder}
           onClose={() => setShowRename(false)}
           onRenamed={(name) => {

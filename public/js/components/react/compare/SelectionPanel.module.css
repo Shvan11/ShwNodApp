@@ -202,3 +202,32 @@
     opacity: 0;
     pointer-events: none;
 }
+
+/* The radio is hidden, so the chip shows its keyboard focus (FE-F13-14a). */
+.chip:has(.chipInput:focus-visible) {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.loadError {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--error-50);
+    color: var(--error-color);
+    font-size: var(--font-size-sm);
+}
+
+.retryButton {
+    flex: none;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border: var(--border-width-thin) solid currentColor;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}

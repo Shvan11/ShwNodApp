@@ -165,6 +165,13 @@ export default [
           ].join(', '),
           message:
             'Raw `(err as Error).message` must not reach the client. `sendError` only dev-gates an `Error` passed as `details` — a hand-built `{ error: err.message }` object, or a message string with it interpolated, is sent verbatim in production. Pass the error object itself: `ErrorResponses.internalError(res, \'<fixed message>\', error as Error)`. Forwarding a typed domain error\'s curated `err.message` is fine — read it off the typed error, without the `as Error` cast.'
+        },
+        {
+          // FE-F12-1: a bare `multer({...})` decodes upload names as latin1, so an
+          // Arabic file name lands on disk as mojibake. `createUpload` pins UTF-8.
+          selector: "CallExpression[callee.name='multer']",
+          message:
+            'Build multer instances with `createUpload()` from middleware/upload.ts — it pins `defParamCharset: \'utf8\'`, without which a non-ASCII upload name is saved garbled (FE-F12-1).'
         }
       ]
     }

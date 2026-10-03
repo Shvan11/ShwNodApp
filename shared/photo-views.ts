@@ -24,6 +24,24 @@ export const VIEW_CODES = ['i10', 'i12', 'i13', 'i23', 'i24', 'i20', 'i22', 'i21
 
 export type PhotoViewCode = (typeof VIEW_CODES)[number];
 
+/** Each view's short label — the one table the grid, editor, Compare, slideshow and
+ *  the save watcher read (it used to exist three times — audit FE-F15-12). */
+export const VIEW_LABELS: Readonly<Record<PhotoViewCode, string>> = {
+  i10: 'Profile',
+  i12: 'Rest',
+  i13: 'Smile',
+  i23: 'Upper',
+  i24: 'Lower',
+  i20: 'Right',
+  i22: 'Center',
+  i21: 'Left',
+};
+
+/** Label for a view code; an unknown code is shown as itself. */
+export function viewLabel(view: string): string {
+  return (VIEW_LABELS as Record<string, string>)[view] ?? view.toUpperCase();
+}
+
 /** `{viewCode}-{originalName}` — code prefix, hyphen, no spaces. */
 export const VIEW_TAG_RE = /^(i10|i12|i13|i20|i21|i22|i23|i24)-(.+)$/;
 

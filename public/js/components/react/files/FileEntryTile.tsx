@@ -5,6 +5,11 @@
  * In selection mode the whole tile becomes a checkbox: clicking toggles
  * selection instead of opening/previewing, and the per-entry action buttons are
  * hidden (bulk actions live in the explorer's selection bar).
+ *
+ * The keyboard/screen-reader control is the NAME button (a checkbox in selection
+ * mode); the tile's own click is a mouse convenience. The tile used to be a
+ * `role="button"` wrapping its own Download/Share/Rename/Delete buttons — nested
+ * interactive controls whose accessible name ran them all together (FE-F12-13a).
  */
 import { useState, type MouseEvent } from 'react';
 import type { FileEntry } from '@/types/api.types';
@@ -90,19 +95,11 @@ const FileEntryTile = ({
     selectMode && selected ? (view === 'grid' ? styles.tileSelected : styles.rowSelected) : '';
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- mouse convenience: the whole tile is a click target; the name button below is the keyboard/AT control
     <div
       className={`${view === 'grid' ? styles.tile : styles.row} ${selectedClass}`.trim()}
       onClick={activate}
       onDoubleClick={selectMode ? undefined : () => onOpen(entry)}
-      role={selectMode ? 'checkbox' : 'button'}
-      aria-checked={selectMode ? !!selected : undefined}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          activate();
-        }
-      }}
       title={label}
     >
       {selectMode && (
@@ -117,7 +114,19 @@ const FileEntryTile = ({
       <div className={styles.entryVisual}>{visual}</div>
 
       <div className={styles.entryInfo}>
-        <span className={styles.entryName}>{label}</span>
+        <button
+          type="button"
+          className={styles.entryName}
+          onClick={(e) => {
+            e.stopPropagation();
+            activate();
+          }}
+          role={selectMode ? 'checkbox' : undefined}
+          aria-checked={selectMode ? !!selected : undefined}
+          aria-label={selectMode ? label : `${isDir ? 'Open folder' : 'Preview'} ${label}`}
+        >
+          {label}
+        </button>
         {meta && <span className={styles.entryMeta}>{meta}</span>}
       </div>
 

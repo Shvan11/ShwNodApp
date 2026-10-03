@@ -14,7 +14,7 @@
 import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import { authorize } from '../../middleware/auth.js';
-import { FINANCE_ROLES } from '../../shared/auth/roles.js';
+import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import * as patientContract from '../../shared/contracts/patient.contract.js';
@@ -146,10 +146,14 @@ router.post(
 /**
  * GET /api/patients/:personId/photos/visibility
  * List photos currently marked private for this patient.
+ *
+ * All three staff roles, read and write: the photo grid shows these marks to
+ * everyone, and a doctor's grid read every photo as visible when this 403'd
+ * (FE-F12-4). Owner decision 2026-10-01 (FE-F12-6).
  */
 router.get(
   '/patients/:personId/photos/visibility',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   async (req: Request<{ personId: string }>, res: Response): Promise<void> => {
     try {
       const personId = parseInt(req.params.personId, 10);
@@ -174,7 +178,7 @@ router.get(
  */
 router.post(
   '/patients/:personId/photos/visibility',
-  authorize(FINANCE_ROLES),
+  authorize(CLINICAL_ROLES),
   validate({ params: personIdParams, body: patientContract.photoVisibility.body }),
   async (
     req: Request<{ personId: string }, unknown, patientContract.PhotoVisibilityBody>,

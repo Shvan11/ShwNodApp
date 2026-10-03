@@ -103,38 +103,6 @@
     font-size: 0.9rem;
 }
 
-.dateDesc {
-    font-size: 0.75rem;
-    opacity: 0.8;
-    margin-top: 2px;
-}
-
-/* Checkbox */
-.checkboxGroup {
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.checkboxLabel {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    cursor: pointer;
-    font-weight: normal;
-}
-
-.checkboxLabel input[type="checkbox"] {
-    width: 1.125rem;
-    height: 1.125rem;
-    cursor: pointer;
-    accent-color: var(--primary-color);
-}
-
-.checkboxLabel span {
-    color: var(--text-primary);
-    font-size: 0.9rem;
-}
-
 /* Import folder (memory-card source) */
 .importFolder {
     margin-bottom: 1.25rem;

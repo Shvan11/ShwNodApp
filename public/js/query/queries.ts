@@ -36,6 +36,7 @@ import * as settingsContract from '@shared/contracts/settings.contract';
 import * as brandingContract from '@shared/contracts/branding.contract';
 import * as tvDisplayContract from '@shared/contracts/tv-display.contract';
 import * as telegramContract from '@shared/contracts/telegram.contract';
+import * as localsendContract from '@shared/contracts/localsend.contract';
 import * as integrationsContract from '@shared/contracts/integrations.contract';
 import * as threeshapeContract from '@shared/contracts/threeshape.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
@@ -900,17 +901,6 @@ export const galleryQuery = (id: Id, tpCode: Id) =>
       ),
   });
 
-/** GET /api/patients/:id/timepoints/:tpCode/images — one timepoint's compare images. */
-export const timepointImagesQuery = (id: Id, tpCode: Id) =>
-  queryOptions({
-    queryKey: qk.patient.timepointImages(id, tpCode),
-    queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof patientContract.timepointImages.response>>(
-        `/api/patients/${id}/timepoints/${tpCode}/images`,
-        { signal, schema: patientContract.timepointImages.response }
-      ),
-  });
-
 /** GET /api/patients/:id/files?path=&flat= — patient file-explorer listing for a folder. */
 export const patientFilesQuery = (id: Id, path = '', flat = false) =>
   queryOptions({
@@ -1411,6 +1401,22 @@ export const telegramStatusQuery = () =>
         signal,
         schema: telegramContract.status.response,
       }),
+  });
+
+/**
+ * GET /api/localsend/devices — the devices the server already knows. The server
+ * announces every 5 s and keeps what it hears for 5 min, so a plain read lists them
+ * at once; `?rescan=1` (the dialog's Rescan) also solicits fresh announcements.
+ */
+export const localsendDevicesQuery = () =>
+  queryOptions({
+    queryKey: qk.localsend.devices(),
+    queryFn: ({ signal }) =>
+      fetchJSON<localsendContract.DevicesResponse>('/api/localsend/devices', {
+        signal,
+        schema: localsendContract.devices.response,
+      }),
+    staleTime: 0,
   });
 
 /** GET /api/telegram/send/:jobId — live progress of a Telegram share job (polled). */

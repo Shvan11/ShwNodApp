@@ -87,16 +87,21 @@ re-editing (`shared/photo-views.ts` + `services/imaging/photo-original-tags.ts`)
 
 ## 3. Reads & serving
 
-- **Timepoint tabs / lists** — `getTimePoints()` / `getTimePointImgs()`
-  (`services/database/queries/timepoint-queries.ts`) read the local tables. Used by
-  the staff grid, Navigation, Compare, slideshow, the patient portal
-  (`routes/portal.ts`), and the chair display.
+- **Timepoint tabs / lists** — `getTimePoints()`
+  (`services/database/queries/timepoint-queries.ts`) reads the local table, ordered by
+  date then code. Used by the staff grid, Navigation, Compare, slideshow and the
+  patient portal (`routes/portal.ts`).
 - **View images** — served at **`/DolImgs/{personId}0{tpCode}.i{viewCode}`**
   (`express.static(workingDir())` in `index.ts`; the `/DolImgs` mount name is
-  historical). `getImageSizes()` (`services/imaging/index.ts`) probes the 8 fixed
-  filenames on disk — no DB lookup — and returns each view's pixel size plus an
-  `mtime` cache-bust token (an edited slot re-renders to the SAME filename, so the
-  gallery appends `?v={mtime}` to dodge the browser cache).
+  historical). `getImageSizes()` (`services/imaging/index.ts`, the gallery endpoint)
+  probes the 8 fixed filenames on disk — lower case first, then the Dolphin-era upper
+  case — with no DB lookup, and returns each view's real name, pixel size and an
+  `mtime` cache-bust token. **Every reader takes names and versions from it** (grid,
+  editor, Compare, slideshow, the Works card, the chair kiosk): an edited slot
+  re-renders to the SAME filename and `/DolImgs` is served `immutable`, so a URL
+  without `?v={mtime}` shows a stale render for up to a year, and a rebuilt name
+  404s on a case-sensitive volume (audit FE-F13-1/-5/-8). The DB's
+  `time_point_images` rows are not a file list.
 - **"Has final photos" patient filter** — `patient.routes.ts` runs an `EXISTS`
   against `time_points`.
 

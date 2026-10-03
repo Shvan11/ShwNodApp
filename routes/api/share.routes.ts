@@ -10,6 +10,8 @@
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
+import { createUpload, uploadErrorMessage } from '../../middleware/upload.js';
+import { timeouts } from '../../middleware/timeout.js';
 import { z } from 'zod';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendData } from '../../utils/error-response.js';
@@ -23,7 +25,7 @@ const router = Router();
 
 // Memory storage — the buffer is written to the staging dir by the service. 60MB
 // covers a full-resolution two-image montage; multipart sidesteps the 10MB JSON cap.
-const upload = multer({
+const upload = createUpload({
   storage: multer.memoryStorage(),
   limits: { fileSize: 60 * 1024 * 1024, files: 1 },
 });
@@ -33,7 +35,7 @@ const upload = multer({
 function uploadImage(req: Request, res: Response, next: NextFunction): void {
   upload.single('image')(req, res, (err: unknown) => {
     if (err) {
-      ErrorResponses.badRequest(res, err instanceof Error ? err.message : 'Upload failed');
+      ErrorResponses.badRequest(res, uploadErrorMessage(err, 'The image is too large to share (60 MB max).') ?? 'Upload failed');
       return;
     }
     next();
@@ -44,6 +46,9 @@ function uploadImage(req: Request, res: Response, next: NextFunction): void {
 router.post(
   '/stage',
   authorize(CLINICAL_ROLES),
+  // An image upload: off the LAN it outlasts the global 30 s request timeout (the
+  // client grants it 120 s too — FE-F13-6).
+  timeouts.long,
   uploadImage,
   validate({ body: stage.body }),
   async (req: Request<object, object, z.infer<typeof stage.body>>, res: Response): Promise<void> => {

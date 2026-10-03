@@ -38,10 +38,19 @@ interface SendJob extends telegram.ProgressResponse {
 }
 
 const sendJobs = new Map<string, SendJob>();
-/** Hold a finished job this long so the final poll lands, then drop it. */
-const JOB_TTL_MS = 60_000;
-/** Absolute backstop so a stalled job can never leak its entry forever. */
-const JOB_MAX_AGE_MS = 30 * 60_000;
+/**
+ * Hold a finished job this long so the final poll lands, then drop it. Generous on
+ * purpose: React Query pauses a hidden tab's polling, so a user who switched away
+ * during a long upload comes back minutes after it finished — at 60 s they found a
+ * 404 and a dialog stuck at its last percentage (FE-F14-6).
+ */
+const JOB_TTL_MS = 15 * 60_000;
+/**
+ * Absolute backstop so a stalled job can never leak its entry forever. Well past any
+ * real upload: at 30 min it also deleted RUNNING big-file sends out from under their
+ * poller (FE-F14-6).
+ */
+const JOB_MAX_AGE_MS = 6 * 60 * 60_000;
 
 /** Run the send loop for a job, updating it in place as each file uploads. */
 async function runSendJob(
