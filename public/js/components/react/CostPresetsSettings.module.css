@@ -48,6 +48,11 @@
     gap: var(--spacing-lg);
 }
 
+/* No form column for a role that can only read the presets. */
+.presetsContentReadOnly {
+    grid-template-columns: 1fr;
+}
+
 /* Form Card */
 .presetFormCard {
     background: var(--background-primary);
@@ -75,8 +80,7 @@
     font-size: var(--font-size-sm);
 }
 
-.formGroup input,
-.formGroup select {
+.formGroup input {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-color);
@@ -85,8 +89,7 @@
     transition: border-color var(--transition-fast);
 }
 
-.formGroup input:focus,
-.formGroup select:focus {
+.formGroup input:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: var(--shadow-focus);

@@ -6,7 +6,7 @@
  * next to it in the same tables.
  */
 import { describe, expect, it } from 'vitest';
-import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../public/js/config/expenseCategories.js';
+import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../shared/expense-categories.js';
 import {
   DOCTOR_POSITION,
   SEEDED_EXPENSE_CATEGORY_IDS,

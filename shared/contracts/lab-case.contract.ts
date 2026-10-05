@@ -194,6 +194,10 @@ export const advanceLabCase = {
     toStatus: z.enum(LAB_STAGES),
     occurredAt: optionalDateString,
     note: z.string().optional(),
+    // The new due date for this lab trip, written in the same transaction as the
+    // move (it was a second PATCH: when that failed, the toast said the advance had
+    // failed although the case had moved — FE-F20-7).
+    dueDate: optionalDateString,
   }),
   response: labCaseRow,
 } as const;

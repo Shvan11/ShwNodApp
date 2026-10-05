@@ -96,6 +96,12 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
   if (!item) return null;
 
   const totalCost = quantity * unitCost;
+  // The cost the item will carry: the weighted average of the stock on hand and
+  // this delivery, rounded like the server (owner decision 2026-10-04, FE-F19-9).
+  const newCost =
+    item.current_stock > 0 && quantity > 0
+      ? Math.round((item.current_stock * item.cost_price + quantity * unitCost) / (item.current_stock + quantity))
+      : unitCost;
 
   return (
     <Modal
@@ -138,7 +144,7 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
 
               <div className={styles.formGroup}>
                 <label htmlFor="restock-unit-cost">
-                  Unit Cost (IQD) <span className={styles.required}>*</span>
+                  Unit Cost of this delivery (IQD) <span className={styles.required}>*</span>
                 </label>
                 <input
                   type="text"
@@ -159,6 +165,11 @@ export default function RestockModal({ isOpen, item, onClose, onSave }: RestockM
                 {formatNumber(totalCost)} IQD
               </span>
             </div>
+            <p className={styles.costHint}>
+              The item's cost becomes the average of the stock on hand and this delivery:{' '}
+              <strong>{formatNumber(newCost)} IQD</strong>
+              {newCost !== item.cost_price && <> (now {formatNumber(item.cost_price)} IQD)</>}. Profit on later sales uses it.
+            </p>
           </div>
 
           <div className={styles.modalFooter}>

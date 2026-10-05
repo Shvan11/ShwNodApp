@@ -99,7 +99,13 @@ router.get('/initial-state', async (req: Request, res: Response): Promise<void> 
     }
 
     const isClientReady = stateDump.clientReady || clientStatus.active;
-    const finished = stateDump.finishedSending;
+    // The current (or last) reminder batch, so a tab that opens /send mid-batch
+    // — a reload, a second tab, a return from another page — joins it instead of
+    // offering Start over a running send (FE-F16-2). `active` is the service's own
+    // one-batch guard; a batch the process lost (a crash) never reads as running.
+    const batch = messageState.batchProgress;
+    const sendingProgress = { ...batch, active: whatsapp.isBatchSending() };
+    const finished = batch.finished;
 
     // Two distinct "no QR yet" situations, so the auth page never shows a
     // forever-empty QR box: `needsRelink` = session poisoned, manual re-link
@@ -115,9 +121,9 @@ router.get('/initial-state', async (req: Request, res: Response): Promise<void> 
 
     let html: string;
     if (isClientReady) {
-      html = finished
-        ? `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Finished</p>`
-        : `<p>${stateDump.sentMessages} Messages Sent!</p><p>${stateDump.failedMessages} Messages Failed!</p><p>Sending...</p>`;
+      html = !batch.started
+        ? '<p>WhatsApp client is ready</p>'
+        : `<p>${batch.sent} Messages Sent!</p><p>${batch.failed} Messages Failed!</p><p>${finished ? 'Finished' : 'Sending...'}</p>`;
     } else if (needsRelink) {
       html = '<p>WhatsApp session expired — please re-link the device.</p>';
     } else if (messageState.qr && messageState.activeQRViewers > 0) {
@@ -159,8 +165,9 @@ router.get('/initial-state', async (req: Request, res: Response): Promise<void> 
       // on every page load for every role — only the QR itself is withheld.
       qr: mayPair ? qrDataUrl : null,
       stats: stateDump,
-      sentMessages: stateDump.sentMessages || 0,
-      failedMessages: stateDump.failedMessages || 0,
+      sendingProgress,
+      sentMessages: batch.sent,
+      failedMessages: batch.failed,
       timestamp: Date.now()
     });
   } catch (error) {
@@ -176,21 +183,36 @@ router.get('/initial-state', async (req: Request, res: Response): Promise<void> 
 /**
  * Restart WhatsApp client
  * POST /restart (mounted at /api/wa)
- * Safely closes the existing client and creates a new one
+ * Safely closes the existing client and creates a new one.
+ *
+ * FIRE-AND-FORGET, like /refresh-qr below and for the same reason: the restart's
+ * init settles on ready, or at SESSION_RESTORATION_TIMEOUT (120 s) /
+ * FRESH_AUTH_TIMEOUT (90 s), and in QR mode only a scan resolves it — all past the
+ * 30 s request timeout. Awaiting it here made every slow restore, and every
+ * restart from an unpaired state, report "Restart failed" over a restart that was
+ * still running and whose QR was already on screen (FE-F16-3). The outcome
+ * reaches the page over `GET /api/sse/whatsapp` (ready, QR, or needs_relink).
  */
 router.post(
   '/restart',
   authorize(FINANCE_ROLES),
-  async (_req: Request, res: Response): Promise<void> => {
+  (_req: Request, res: Response): void => {
     try {
       log.info('Restarting WhatsApp client');
-
-      const success = await whatsapp.restart();
-
       res.json({
         success: true,
         message: 'WhatsApp client restart initiated',
-        result: success ? 'restart_initiated' : 'restart_failed'
+        result: 'restart_initiated',
+        timestamp: Date.now()
+      });
+
+      setImmediate(async () => {
+        try {
+          const ready = await whatsapp.restart();
+          log.info(ready ? 'WhatsApp restart completed (ready)' : 'WhatsApp restart completed (waiting for QR scan)');
+        } catch (error) {
+          log.error('WhatsApp restart failed:', (error as Error).message);
+        }
       });
     } catch (error) {
       log.error('Error restarting WhatsApp client:', error);

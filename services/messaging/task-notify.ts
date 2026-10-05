@@ -11,6 +11,7 @@ import whatsapp from './whatsapp.js';
 import PhoneFormatter from '../../utils/phone-formatter.js';
 import { getEmployeeContact } from '../database/queries/employee-queries.js';
 import { log } from '../../utils/logger.js';
+import { getClinicDisplayName } from '../settings/clinic-identity.js';
 
 export async function notifyTaskAssignment(
   employeeId: number,
@@ -42,7 +43,7 @@ export async function notifyTaskAssignment(
       return;
     }
 
-    const message = `Shwan Orthodontics
+    const message = `${await getClinicDisplayName()}
 
 A new task has been assigned to you:
 ${taskDetails}`;

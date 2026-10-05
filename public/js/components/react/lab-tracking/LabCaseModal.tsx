@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Modal from '../Modal';
 import ModalHeader from '../ModalHeader';
@@ -6,7 +6,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { useConfirm } from '@/contexts/ConfirmContext';
 import { useLookupManager } from '@/hooks/useLookupManager';
 import { httpErrorMessage } from '@/core/http';
-import { formatLocaleDateTime } from '@/utils/formatters';
+import { formatLocaleDate, formatLocaleDateTime } from '@/utils/formatters';
 import { qk } from '@/query/keys';
 import { labsQuery } from '@/query/queries';
 import { MATERIAL_OPTIONS } from '@/config/workTypeConfig';
@@ -38,6 +38,11 @@ interface LabCaseModalProps {
 type ActionMode = null | 'advance' | 'remake' | 'edit' | 'cancel';
 
 const fmtDateTime = (value: string): string => formatLocaleDateTime(value) || value;
+const fmtDate = (value: string): string => formatLocaleDate(value) || value;
+
+/** Index of a stage in the pipeline (-1 for `cancelled`). */
+const stageIndex = (stage: string): number => LAB_STAGE_META.findIndex((m) => m.key === stage);
+const READY_IDX = stageIndex('ready');
 
 const isLabStage = (stage: string): stage is LabStage =>
     LAB_STAGE_META.some((m) => m.key === stage);
@@ -76,9 +81,26 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
     });
     const createMut = useCreateLabCase();
 
-    const handleCreate = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
-        e.preventDefault();
+    // One write at a time, its failure toasted with the server's message.
+    // `disabled={mut.isPending}` lands a render too late: a double click sent two
+    // requests, and the second was refused and toasted an error right after the
+    // success (FE-F20-7d).
+    const busyRef = useRef(false);
+    const runWrite = async (failure: string, run: () => Promise<void>): Promise<void> => {
+        if (busyRef.current) return;
+        busyRef.current = true;
         try {
+            await run();
+        } catch (err) {
+            toast.error(httpErrorMessage(err, failure));
+        } finally {
+            busyRef.current = false;
+        }
+    };
+
+    const handleCreate = (e: FormEvent<HTMLFormElement>): void => {
+        e.preventDefault();
+        void runWrite('Failed to start lab flow', async () => {
             await createMut.mutateAsync({
                 workId,
                 workItemId,
@@ -91,13 +113,11 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
             });
             toast.success('Lab flow started');
             onClose();
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to start lab flow'));
-        }
+        });
     };
 
     // ---- TRACK MODE ---------------------------------------------------------
-    const { data, isLoading, isError, dataUpdatedAt } = useLabCase(isCreate ? null : labCaseId);
+    const { data, isLoading, isError, dataUpdatedAt, refetch, isFetching } = useLabCase(isCreate ? null : labCaseId);
     const [mode, setMode] = useState<ActionMode>(null);
 
     const [advanceTo, setAdvanceTo] = useState<LabStage | ''>('');
@@ -123,11 +143,18 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
     const caseRow: LabCaseBoardRow | undefined = data?.case;
     const events = data?.events ?? [];
     const currentStatus = caseRow && isLabStage(caseRow.status) ? caseRow.status : null;
-    const currentIdx = currentStatus ? LAB_STAGE_META.findIndex((m) => m.key === currentStatus) : -1;
+    const currentIdx = currentStatus ? stageIndex(currentStatus) : -1;
     const isTerminal = caseRow?.status === 'delivered' || caseRow?.status === 'cancelled';
 
     const laterStages = useMemo(
         () => (currentIdx === -1 ? [] : LAB_STAGE_META.slice(currentIdx + 1)),
+        [currentIdx]
+    );
+    // A remake sends the case BACK: only earlier stages are offered (the server
+    // refuses the current one and later ones — FE-F20-7a). A delivered case can be
+    // sent back too; the service has always accepted it (FE-F20-6).
+    const earlierStages = useMemo(
+        () => (currentIdx <= 0 ? [] : LAB_STAGE_META.slice(0, currentIdx)),
         [currentIdx]
     );
 
@@ -166,10 +193,12 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
 
     const closeAction = (): void => setMode(null);
 
-    const submitAdvance = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    const submitAdvance = (e: FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (!caseRow || !currentStatus || !advanceTo) return;
-        try {
+        void runWrite('Failed to advance case', async () => {
+            // The new due date rides on the advance, in its transaction: as a second
+            // PATCH, its failure was reported as a failed advance (FE-F20-7c).
             await advanceMut.mutateAsync({
                 id: caseRow.id,
                 workId,
@@ -177,31 +206,32 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                 toStatus: advanceTo,
                 occurredAt: advanceOccurredAt || undefined,
                 note: advanceNote || undefined,
+                dueDate: advanceDueDate && locationOf(advanceTo) === 'lab' ? advanceDueDate : undefined,
             });
-            if (advanceDueDate) {
-                await updateMut.mutateAsync({ id: caseRow.id, workId, dueDate: advanceDueDate });
-            }
             toast.success('Case advanced');
             closeAction();
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to advance case'));
-        }
+        });
     };
 
-    const submitDeliver = async (): Promise<void> => {
+    const submitDeliver = (): void => {
         if (!caseRow || !currentStatus) return;
-        try {
+        void runWrite('Failed to mark delivered', async () => {
+            // Deliver sits beside Advance on every open case and skips every stage
+            // between, and a delivered case leaves the board — so before Ready to
+            // Cement, ask (FE-F20-6).
+            if (currentIdx < READY_IDX && !(await confirm(
+                `This case is at ${labelForStage(currentStatus, caseRow.material)}, before ${labelForStage('ready')}. Mark it delivered now?`,
+                { title: 'Deliver Lab Case', confirmText: 'Deliver' }
+            ))) return;
             await advanceMut.mutateAsync({ id: caseRow.id, workId, fromStatus: currentStatus, toStatus: 'delivered' });
             toast.success('Case delivered');
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to mark delivered'));
-        }
+        });
     };
 
-    const submitRemake = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    const submitRemake = (e: FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (!caseRow || !remakeTo || !remakeReason.trim()) return;
-        try {
+        void runWrite('Failed to send case back', async () => {
             await remakeMut.mutateAsync({
                 id: caseRow.id,
                 workId,
@@ -211,14 +241,12 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
             });
             toast.success('Case sent back for remake');
             closeAction();
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to send case back'));
-        }
+        });
     };
 
-    const toggleHold = async (): Promise<void> => {
+    const toggleHold = (): void => {
         if (!caseRow) return;
-        try {
+        void runWrite('Failed to update hold status', async () => {
             if (caseRow.is_on_hold) {
                 await resumeMut.mutateAsync({ id: caseRow.id, workId });
                 toast.success('Case resumed');
@@ -226,50 +254,44 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                 await holdMut.mutateAsync({ id: caseRow.id, workId });
                 toast.success('Case put on hold');
             }
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to update hold status'));
-        }
+        });
     };
 
-    const submitEdit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    const submitEdit = (e: FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (!caseRow) return;
-        try {
+        void runWrite('Failed to update case', async () => {
             await updateMut.mutateAsync({
                 id: caseRow.id,
                 workId,
                 labId: editDraft.labId ? Number(editDraft.labId) : '',
                 dueDate: editDraft.dueDate || '',
                 isRush: editDraft.isRush,
-                note: editDraft.note || undefined,
+                // Sent as typed: `''` clears the note. `undefined` means "unchanged",
+                // so an emptied note was never cleared (FE-F20-7b).
+                note: editDraft.note.trim(),
             });
             toast.success('Case updated');
             closeAction();
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to update case'));
-        }
+        });
     };
 
-    const submitCancel = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    const submitCancel = (e: FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (!caseRow) return;
-        if (!(await confirm('Cancel this lab case? It can be restarted later.', { title: 'Cancel Lab Case', danger: true, confirmText: 'Cancel Case' }))) return;
-        try {
+        void runWrite('Failed to cancel case', async () => {
+            if (!(await confirm('Cancel this lab case? It can be restarted later.', { title: 'Cancel Lab Case', danger: true, confirmText: 'Cancel Case' }))) return;
             await cancelMut.mutateAsync({ id: caseRow.id, workId, note: cancelNote || undefined });
             toast.success('Case cancelled');
             closeAction();
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to cancel case'));
-        }
+        });
     };
 
-    const submitRestart = async (): Promise<void> => {
-        try {
+    const submitRestart = (): void => {
+        void runWrite('Failed to restart lab flow', async () => {
             await reactivateMut.mutateAsync({ workId, workItemId });
             toast.success('Lab flow restarted');
-        } catch (err) {
-            toast.error(httpErrorMessage(err, 'Failed to restart lab flow'));
-        }
+        });
     };
 
     const titleId = 'lab-case-modal-title';
@@ -379,7 +401,14 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
             ) : isLoading ? (
                 <div className={styles.body}><p className={styles.empty}>Loading…</p></div>
             ) : isError || !caseRow ? (
-                <div className={styles.body}><p className={styles.empty}>Failed to load this case.</p></div>
+                <div className={styles.body}>
+                    <p className={styles.empty}>
+                        Failed to load this case.{' '}
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => void refetch()} disabled={isFetching}>
+                            {isFetching ? 'Retrying…' : 'Retry'}
+                        </button>
+                    </p>
+                </div>
             ) : (
                 <>
                     <div className={styles.body}>
@@ -395,13 +424,13 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                         <div className={styles.metaGrid}>
                             <div><span className={styles.metaLabel}>Lab</span><span>{caseRow.lab_name ?? '—'}</span></div>
                             <div><span className={styles.metaLabel}>Material</span><span>{caseRow.material ?? '—'}</span></div>
-                            <div><span className={styles.metaLabel}>Due</span><span>{caseRow.due_date ?? '—'}</span></div>
+                            <div><span className={styles.metaLabel}>Due</span><span>{caseRow.due_date ? fmtDate(caseRow.due_date) : '—'}</span></div>
                             <div><span className={styles.metaLabel}>Sent</span><span>{fmtDateTime(caseRow.sent_at)}</span></div>
                         </div>
 
                         {caseRow.status === 'cancelled' ? (
                             <div className={styles.footer}>
-                                <button type="button" className="btn btn-primary" onClick={() => void submitRestart()} disabled={reactivateMut.isPending}>
+                                <button type="button" className="btn btn-primary" onClick={submitRestart} disabled={reactivateMut.isPending}>
                                     {reactivateMut.isPending ? 'Restarting…' : 'Restart Lab Flow'}
                                 </button>
                             </div>
@@ -412,18 +441,18 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                                         <i className="fas fa-arrow-right" /> Advance
                                     </button>
                                 )}
-                                {!isTerminal && (
+                                {earlierStages.length > 0 && (
                                     <button type="button" className="btn btn-sm btn-secondary" onClick={openRemake}>
                                         <i className="fas fa-rotate-left" /> Send back (remake)
                                     </button>
                                 )}
                                 {!isTerminal && (
-                                    <button type="button" className="btn btn-sm btn-success" onClick={() => void submitDeliver()} disabled={advanceMut.isPending}>
+                                    <button type="button" className="btn btn-sm btn-success" onClick={submitDeliver} disabled={advanceMut.isPending}>
                                         <i className="fas fa-check" /> Deliver
                                     </button>
                                 )}
                                 {!isTerminal && (
-                                    <button type="button" className="btn btn-sm btn-secondary" onClick={() => void toggleHold()} disabled={holdMut.isPending || resumeMut.isPending}>
+                                    <button type="button" className="btn btn-sm btn-secondary" onClick={toggleHold} disabled={holdMut.isPending || resumeMut.isPending}>
                                         <i className={caseRow.is_on_hold ? 'fas fa-play' : 'fas fa-pause'} /> {caseRow.is_on_hold ? 'Resume' : 'Hold'}
                                     </button>
                                 )}
@@ -471,7 +500,7 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                                     <label htmlFor="rmk-to" className={styles.label}>Send back to</label>
                                     <select id="rmk-to" className={styles.input} value={remakeTo} onChange={(e) => setRemakeTo(e.target.value as LabStage)}>
                                         <option value="">Select stage</option>
-                                        {LAB_STAGE_META.filter((m) => m.key !== 'delivered').map((m) => (
+                                        {earlierStages.map((m) => (
                                             <option key={m.key} value={m.key}>{labelForStage(m.key, caseRow.material)}</option>
                                         ))}
                                     </select>

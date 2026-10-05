@@ -8,7 +8,6 @@
  * Gotcha: `aligner_notes.is_read` DEFAULTs TRUE, so the doctor portal must send
  * `is_read: false` explicitly when it writes (RLS enforces it there).
  */
-import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 
@@ -172,21 +171,23 @@ export async function updateNote(noteId: number, noteText: string): Promise<void
 }
 
 /**
- * Toggle note read status
+ * SET (not toggle) the read state of some notes. Idempotent: it was a toggle, so two
+ * tabs — or React's dev double-render — opening the same set flipped a note back to
+ * unread (FE-F17-12). Only rows whose state actually changes are written, so a
+ * repeat costs nothing and forward-syncs nothing. Returns how many changed.
  */
-export async function toggleNoteReadStatus(noteId: number): Promise<void> {
+export async function setNotesReadStatus(noteIds: readonly number[], isRead: boolean): Promise<number> {
+  if (noteIds.length === 0) return 0;
   try {
-    // Single statement — atomic on its own, and the flip is computed in SQL from the stored value,
-    // so there is no read-then-write for a transaction to protect. (See updateNote.)
-    await getKysely()
+    const result = await getKysely()
       .updateTable('aligner_notes')
-      .set((eb) => ({
-        is_read: sql<boolean>`case when ${eb.ref('is_read')} = true then false else true end`,
-      }))
-      .where('note_id', '=', noteId)
-      .execute();
+      .set({ is_read: isRead })
+      .where('note_id', 'in', [...noteIds])
+      .where('is_read', '<>', isRead)
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows ?? 0);
   } catch (err) {
-    log.error('Failed to toggle note read status', {
+    log.error('Failed to set note read status', {
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;

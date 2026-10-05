@@ -1,167 +1,67 @@
-import React, { useState, useEffect, useRef, MouseEvent } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
+import { lookupFeedKeys } from '@/query/lookupFeeds';
 import { adminLookupItemsQuery } from '@/query/queries';
-import LookupEditorModal from './LookupEditorModal';
+import { formatLocaleDate } from '../../utils/formatters';
+import type { LookupColumn } from '@shared/contracts/lookup-admin.contract';
+import LookupEditorModal, { type LookupFormData, type LookupItem } from './LookupEditorModal';
 
-// Types
-interface ReferenceConfig {
-    table: string;
-    idColumn: string;
-    displayColumn: string;
-}
-
-interface ColumnConfig {
-    name: string;
-    label: string;
-    type: string;
-    required?: boolean;
-    maxLength?: number;
-    reference?: ReferenceConfig;
-}
-
-interface LookupItem {
-    [key: string]: string | number | boolean | null;
-}
-
-interface Position {
-    top: number;
-    left: number;
-}
-
-interface DeleteConfirmPopoverProps {
-    anchorEl: HTMLElement;
-    itemName: string;
-    onCancel: () => void;
-    onConfirm: () => void;
+export interface LookupEditorLabels {
+    /** Toolbar button. Default "Add New". */
+    add?: string;
+    /** Search placeholder. Default "Search <tableName>...". */
+    search?: string;
+    /** Empty-table text. Default "No items found". */
+    empty?: string;
+    /** Plural noun in the footer count. Default "items". */
+    noun?: string;
 }
 
 interface LookupEditorProps {
     tableKey: string;
     tableName: string;
-    columns: ColumnConfig[];
+    columns: LookupColumn[];
     idColumn: string;
+    /** Rows the code names by id: no Delete is offered (the server refuses one too). */
+    protectedIds?: readonly number[];
     /**
      * Fired after any successful create/update/delete. Lets a host (e.g. the
-     * right-click LookupManagerModal) refresh whatever dropdown feed consumes this
-     * table — the editor already invalidates its own `qk.adminLookups.table` key.
+     * right-click LookupManagerModal) refresh whatever else it owns — the editor
+     * already refreshes its own table and the feeds in `lookupFeedKeys`.
      */
     onChanged?: () => void;
+    /**
+     * Runs after the form validates and before the write is sent; resolve `false`
+     * to keep the form open without saving. HolidayEditor checks the day's
+     * appointments here.
+     */
+    beforeSave?: (data: LookupFormData, editingItem: LookupItem | null) => Promise<boolean>;
+    /** Second line of the delete question. Default "This cannot be undone." */
+    deleteNote?: string;
+    labels?: LookupEditorLabels;
 }
-
-// Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
-// read at the call site).
-const calculatePosition = (rect: DOMRect): Position => {
-    const padding = 8;
-    // Clamp against the width the popover will ACTUALLY render at: the stylesheet
-    // caps it with `max-width: calc(100vw - 16px)`, so on a narrow viewport the
-    // box is narrower than the 280px design width. Positioning against the design
-    // width instead used to push it off-screen, which the stylesheet then had to
-    // drag back with `left: … !important` — this keeps one source of truth.
-    const popoverWidth = Math.min(280, window.innerWidth - padding * 2);
-    const popoverHeight = 160;
-
-    let left = rect.left - popoverWidth - padding;
-    let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
-
-    if (left < padding) {
-        left = rect.right + padding;
-    }
-
-    if (left + popoverWidth > window.innerWidth - padding) {
-        left = rect.left + (rect.width / 2) - (popoverWidth / 2);
-        top = rect.top - popoverHeight - padding;
-    }
-
-    top = Math.max(padding, Math.min(top, window.innerHeight - popoverHeight - padding));
-    left = Math.max(padding, Math.min(left, window.innerWidth - popoverWidth - padding));
-
-    return { top, left };
-};
-
-/**
- * Positioned delete confirmation popover
- * Appears next to the delete button instead of center screen
- */
-const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({ anchorEl, itemName, onCancel, onConfirm }) => {
-    // Seed by measuring the anchor during render (it's the button that opened this
-    // popover, already in the DOM). Positioning on the first render avoids a
-    // post-paint reposition flicker and keeps the only synchronous setState out of
-    // the effect (react-hooks/set-state-in-effect).
-    const [position, setPosition] = useState<Position | null>(() => calculatePosition(anchorEl.getBoundingClientRect()));
-
-    // Re-seed during render if the anchor element changes (adjust-state-during-render).
-    const [seededAnchor, setSeededAnchor] = useState(anchorEl);
-    if (anchorEl !== seededAnchor) {
-        setSeededAnchor(anchorEl);
-        setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
-    }
-
-    // Keep the popover pinned to the anchor as the viewport changes. setState lives
-    // in the event callback, never synchronously in the effect body.
-    useEffect(() => {
-        const updatePosition = (): void => setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
-        window.addEventListener('resize', updatePosition);
-        window.addEventListener('scroll', updatePosition, true);
-
-        return () => {
-            window.removeEventListener('resize', updatePosition);
-            window.removeEventListener('scroll', updatePosition, true);
-        };
-    }, [anchorEl]);
-
-    // Close on escape key
-    useEffect(() => {
-        const handleEscape = (e: KeyboardEvent): void => {
-            if (e.key === 'Escape') onCancel();
-        };
-        document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
-    }, [onCancel]);
-
-    if (!position) return null;
-
-    return createPortal(
-        <>
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss */}
-            <div className="popover-backdrop" onClick={onCancel} />
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss */}
-            <div
-                className="delete-confirm-popover"
-                style={{ top: position.top, left: position.left }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="popover-header">
-                    <i className="fas fa-exclamation-triangle text-warning"></i>
-                    <span>Confirm Delete</span>
-                </div>
-                <div className="popover-body">
-                    <p>Delete <strong>{itemName}</strong>?</p>
-                    <p className="text-muted">This cannot be undone.</p>
-                </div>
-                <div className="popover-actions">
-                    <button type="button" className="btn btn-sm btn-secondary" onClick={onCancel}>
-                        Cancel
-                    </button>
-                    <button type="button" className="btn btn-sm btn-danger" onClick={onConfirm}>
-                        <i className="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            </div>
-        </>,
-        document.body
-    );
-};
 
 /**
  * Reusable component for editing any lookup table
  * Displays items in a table with search, add, edit, and delete functionality
  */
-const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, columns, idColumn, onChanged }) => {
+const LookupEditor: React.FC<LookupEditorProps> = ({
+    tableKey,
+    tableName,
+    columns,
+    idColumn,
+    protectedIds = [],
+    onChanged,
+    beforeSave,
+    deleteNote = 'This cannot be undone.',
+    labels = {},
+}) => {
     const toast = useToast();
+    const confirm = useConfirm();
     const queryClient = useQueryClient();
     const { data: itemsData, isLoading: loading, isError, error: itemsError } =
         useQuery(adminLookupItemsQuery(tableKey));
@@ -172,76 +72,78 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [editingItem, setEditingItem] = useState<LookupItem | null>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
-    const [deleteConfirm, setDeleteConfirm] = useState<LookupItem | null>(null);
-    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-    const [deleteAnchorEl, setDeleteAnchorEl] = useState<HTMLElement | null>(null);
-    const addButtonRef = useRef<HTMLButtonElement>(null);
+    // One delete at a time: a second click on the confirm used to send a second
+    // DELETE, whose 404 toasted an error after the success (FE-F21-10).
+    const deletingRef = useRef(false);
 
     // Surface a load failure once (the list query itself retries transient errors).
     useEffect(() => {
         if (isError) toast.error(httpErrorMessage(itemsError, `Failed to load ${tableName}`));
     }, [isError, itemsError, tableName, toast]);
 
-    const handleAdd = (e: MouseEvent<HTMLButtonElement>): void => {
+    // The column a row is named by in the delete question: the first one that
+    // holds text (a holiday's first column is its date).
+    const nameColumn = columns.find(c => c.type !== 'date' && c.type !== 'bit') ?? columns[0];
+
+    const refreshAfterWrite = (): void => {
+        void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
+        // …and every form that reads this table, not only this editor (FE-F21-11).
+        lookupFeedKeys(tableKey).forEach(queryKey => {
+            void queryClient.invalidateQueries({ queryKey });
+        });
+        onChanged?.();
+    };
+
+    const handleAdd = (): void => {
         setEditingItem(null);
-        setAnchorEl(e.currentTarget);
         setModalOpen(true);
     };
 
-    const handleEdit = (item: LookupItem, e: MouseEvent<HTMLButtonElement>): void => {
+    const handleEdit = (item: LookupItem): void => {
         setEditingItem(item);
-        setAnchorEl(e.currentTarget);
         setModalOpen(true);
-    };
-
-    const handleDeleteClick = (item: LookupItem, e: MouseEvent<HTMLButtonElement>): void => {
-        setDeleteAnchorEl(e.currentTarget);
-        setDeleteConfirm(item);
-    };
-
-    const handleDeleteCancel = (): void => {
-        setDeleteConfirm(null);
-        setDeleteAnchorEl(null);
     };
 
     const handleModalClose = (): void => {
         setModalOpen(false);
-        setAnchorEl(null);
     };
 
-    const handleDeleteConfirm = async (): Promise<void> => {
-        if (!deleteConfirm) return;
+    const handleDelete = async (item: LookupItem): Promise<void> => {
+        if (deletingRef.current) return;
+        const name = nameColumn ? String(item[nameColumn.name] ?? '') : '';
+        const ok = await confirm(`Delete ${name || 'this item'}? ${deleteNote}`, {
+            title: 'Confirm Delete',
+            danger: true,
+            confirmText: 'Delete',
+        });
+        if (!ok) return;
 
-        const itemId = deleteConfirm[idColumn];
-
+        deletingRef.current = true;
         try {
-            await deleteJSON(`/api/admin/lookups/${tableKey}/${itemId}`);
+            await deleteJSON(`/api/admin/lookups/${tableKey}/${String(item[idColumn])}`);
             toast.success('Item deleted successfully');
-            void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
-            onChanged?.();
+            refreshAfterWrite();
         } catch (err) {
+            // A row in use comes back 409 with the reason ("Cannot delete: 2,442 works use this item.").
             toast.error(httpErrorMessage(err, 'Failed to delete item'));
         } finally {
-            setDeleteConfirm(null);
-            setDeleteAnchorEl(null);
+            deletingRef.current = false;
         }
     };
 
-    const handleSave = async (data: Record<string, any>): Promise<void> => {
+    const handleSave = async (data: LookupFormData): Promise<void> => {
+        if (beforeSave && !(await beforeSave(data, editingItem))) return;
         try {
             const isEdit = !!editingItem;
-            const itemId = isEdit ? editingItem[idColumn] : null;
             const url = isEdit
-                ? `/api/admin/lookups/${tableKey}/${itemId}`
+                ? `/api/admin/lookups/${tableKey}/${String(editingItem[idColumn])}`
                 : `/api/admin/lookups/${tableKey}`;
 
             await (isEdit ? putJSON(url, data) : postJSON(url, data));
 
             toast.success(isEdit ? 'Item updated successfully' : 'Item created successfully');
             setModalOpen(false);
-            setAnchorEl(null);
-            void queryClient.invalidateQueries({ queryKey: qk.adminLookups.table(tableKey) });
-            onChanged?.();
+            refreshAfterWrite();
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to save item'));
         }
@@ -260,38 +162,35 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
     });
 
     // Get display value for a cell
-    const getCellValue = (item: LookupItem, column: ColumnConfig): React.ReactNode => {
+    const getCellValue = (item: LookupItem, column: LookupColumn): React.ReactNode => {
         if (column.type === 'reference') {
             const display = item[`${column.name}_display`];
             return display === null || display === undefined || display === '' ? '-' : String(display);
         }
         const value = item[column.name];
         if (value === null || value === undefined) return '-';
+        if (column.type === 'date') {
+            return formatLocaleDate(String(value), { year: 'numeric', month: 'short', day: 'numeric' }) || '-';
+        }
         if (column.type === 'bit') {
             return value ? (
-                <i className="fas fa-check text-success"></i>
+                <i className="fas fa-check text-success" aria-label="Yes"></i>
             ) : (
-                <i className="fas fa-times text-muted"></i>
+                <i className="fas fa-times text-muted" aria-label="No"></i>
             );
         }
         return String(value);
-    };
-
-    // Get the primary display column (first column usually)
-    const getDisplayValue = (item: LookupItem): string => {
-        if (columns.length === 0) return 'Item';
-        const displayCol = columns[0];
-        return String(item[displayCol.name] || 'Unnamed');
     };
 
     return (
         <div className="lookup-editor">
             <div className="lookup-editor-toolbar">
                 <div className="search-box">
-                    <i className="fas fa-search"></i>
+                    <i className="fas fa-search" aria-hidden="true"></i>
                     <input
                         type="text"
-                        placeholder={`Search ${tableName}...`}
+                        placeholder={labels.search ?? `Search ${tableName}...`}
+                        aria-label={labels.search ?? `Search ${tableName}`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -300,17 +199,14 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                             className="search-clear"
                             onClick={() => setSearchTerm('')}
                             type="button"
+                            aria-label="Clear search"
                         >
-                            <i className="fas fa-times"></i>
+                            <i className="fas fa-times" aria-hidden="true"></i>
                         </button>
                     )}
                 </div>
-                <button
-                    ref={addButtonRef}
-                    className="btn btn-primary btn-sm"
-                    onClick={handleAdd}
-                >
-                    <i className="fas fa-plus"></i> Add New
+                <button type="button" className="btn btn-primary btn-sm" onClick={handleAdd}>
+                    <i className="fas fa-plus"></i> {labels.add ?? 'Add New'}
                 </button>
             </div>
 
@@ -343,49 +239,57 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                                         ) : (
                                             <>
                                                 <i className="fas fa-inbox"></i>
-                                                <span>No items found</span>
+                                                <span>{labels.empty ?? 'No items found'}</span>
                                             </>
                                         )}
                                     </td>
                                 </tr>
                             ) : (
-                                filteredItems.map((item, idx) => (
-                                    <tr key={String(item[idColumn] || idx)}>
-                                        <td className="id-cell">{item[idColumn]}</td>
-                                        {columns.map(col => (
-                                            <td key={col.name}>{getCellValue(item, col)}</td>
-                                        ))}
-                                        <td className="actions-cell">
-                                            <button
-                                                className="btn-icon btn-edit"
-                                                onClick={(e) => handleEdit(item, e)}
-                                                title="Edit"
-                                            >
-                                                <i className="fas fa-edit"></i>
-                                            </button>
-                                            <button
-                                                className="btn-icon btn-delete"
-                                                onClick={(e) => handleDeleteClick(item, e)}
-                                                title="Delete"
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
+                                filteredItems.map((item) => {
+                                    const id = item[idColumn];
+                                    const isProtected = protectedIds.includes(Number(id));
+                                    return (
+                                        <tr key={String(id)}>
+                                            <td className="id-cell">{String(id)}</td>
+                                            {columns.map(col => (
+                                                <td key={col.name}>{getCellValue(item, col)}</td>
+                                            ))}
+                                            <td className="actions-cell">
+                                                <button
+                                                    type="button"
+                                                    className="btn-icon btn-edit"
+                                                    onClick={() => handleEdit(item)}
+                                                    title="Edit"
+                                                    aria-label="Edit"
+                                                >
+                                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-icon btn-delete"
+                                                    onClick={() => handleDelete(item)}
+                                                    disabled={isProtected}
+                                                    title={isProtected ? 'Used by the app — it can be renamed but not deleted' : 'Delete'}
+                                                    aria-label="Delete"
+                                                >
+                                                    <i className="fas fa-trash" aria-hidden="true"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
 
                     <div className="lookup-table-footer">
                         <span className="item-count">
-                            {filteredItems.length} of {items.length} items
+                            {filteredItems.length} of {items.length} {labels.noun ?? 'items'}
                         </span>
                     </div>
                 </div>
             )}
 
-            {/* Edit/Add Modal */}
             <LookupEditorModal
                 isOpen={modalOpen}
                 onClose={handleModalClose}
@@ -393,19 +297,7 @@ const LookupEditor: React.FC<LookupEditorProps> = ({ tableKey, tableName, column
                 columns={columns}
                 editingItem={editingItem}
                 tableName={tableName}
-                idColumn={idColumn}
-                anchorEl={anchorEl}
             />
-
-            {/* Delete Confirmation Popover */}
-            {deleteConfirm && deleteAnchorEl && (
-                <DeleteConfirmPopover
-                    anchorEl={deleteAnchorEl}
-                    itemName={getDisplayValue(deleteConfirm)}
-                    onCancel={handleDeleteCancel}
-                    onConfirm={handleDeleteConfirm}
-                />
-            )}
         </div>
     );
 };

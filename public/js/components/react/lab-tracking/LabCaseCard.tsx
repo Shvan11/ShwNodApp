@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import cn from 'classnames';
 import { LAB_STAGE_META, type LabCaseBoardRow, type LabStage } from '@shared/contracts/lab-case.contract';
 import { labelForStage } from '@/config/labStages';
-import { useAdvanceLabCase, useUpdateLabCase } from '@/hooks/useLabCases';
+import { useAdvanceLabCase } from '@/hooks/useLabCases';
 import { useToast } from '@/contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
 import { toLocalDateString } from '@/utils/calendarDate';
+import { formatLocaleDate } from '@/utils/formatters';
 import styles from './LabCaseCard.module.css';
 
 interface LabCaseCardProps {
@@ -37,7 +38,9 @@ function isOverdue(dueDate: string | null, status: string): boolean {
 const LabCaseCard = ({ labCase, onOpen }: LabCaseCardProps) => {
     const toast = useToast();
     const advanceMut = useAdvanceLabCase();
-    const updateMut = useUpdateLabCase();
+    // A double click on Confirm sent two advances; the second was refused and
+    // toasted an error after the success (FE-F20-7d).
+    const submittingRef = useRef(false);
 
     const currentIdx = LAB_STAGE_META.findIndex((m) => m.key === labCase.status);
     const nextStage = currentIdx >= 0 ? LAB_STAGE_META[currentIdx + 1] : undefined;
@@ -58,29 +61,44 @@ const LabCaseCard = ({ labCase, onOpen }: LabCaseCardProps) => {
     const targetLocation = target ? LAB_STAGE_META.find((m) => m.key === target)?.location : undefined;
 
     const submitQuick = async (): Promise<void> => {
-        if (!target || !isLabStageStatus(labCase.status)) return;
+        if (!target || !isLabStageStatus(labCase.status) || submittingRef.current) return;
+        submittingRef.current = true;
         try {
+            // The due date rides on the advance (one transaction — FE-F20-7c).
             await advanceMut.mutateAsync({
                 id: labCase.id,
                 workId: labCase.work_id,
                 fromStatus: labCase.status,
                 toStatus: target,
                 note: note || undefined,
+                dueDate: dueDate && targetLocation === 'lab' ? dueDate : undefined,
             });
-            if (dueDate) {
-                await updateMut.mutateAsync({ id: labCase.id, workId: labCase.work_id, dueDate });
-            }
             toast.success('Case advanced');
             setQuickOpen(false);
         } catch (err) {
             toast.error(httpErrorMessage(err, 'Failed to advance case'));
+        } finally {
+            submittingRef.current = false;
         }
     };
 
     return (
         <div className={cn(styles.card, overdue && styles.overdue)}>
-            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- card click-through to the full modal; the Advance button below stops propagation */}
-            <div className={styles.cardBody} onClick={() => onOpen(labCase)}>
+            {/* The card body opens the case. It is a keyboard stop of its own (it had
+                no tab stop, so the board could not open a case without a mouse —
+                FE-F20-8c); the Advance button is its sibling, not a child. */}
+            <div
+                className={styles.cardBody}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpen(labCase)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onOpen(labCase);
+                    }
+                }}
+            >
                 <div className={styles.cardTop}>
                     <span className={styles.patientName}>{labCase.patient_name}</span>
                     {labCase.is_rush && <span className={styles.rushBadge}>Rush</span>}
@@ -98,7 +116,7 @@ const LabCaseCard = ({ labCase, onOpen }: LabCaseCardProps) => {
                     <span className={styles.aging}>{daysSince(labCase.status_changed_at)}d in stage</span>
                     {labCase.due_date && (
                         <span className={cn(styles.due, overdue && styles.dueOverdue)}>
-                            {overdue ? 'Overdue: ' : 'Due '}{labCase.due_date}
+                            {overdue ? 'Overdue: ' : 'Due '}{formatLocaleDate(labCase.due_date) || labCase.due_date}
                         </span>
                     )}
                 </div>

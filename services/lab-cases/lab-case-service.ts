@@ -180,6 +180,7 @@ export async function advanceLabCase(id: number, body: AdvanceLabCaseBody, req: 
   }
 
   const occurredAt = body.occurredAt || null;
+  const dueDate = body.dueDate || null;
   const isDelivered = body.toStatus === 'delivered';
 
   return withPgTransaction(async (trx: Transaction<Database>) => {
@@ -200,6 +201,7 @@ export async function advanceLabCase(id: number, body: AdvanceLabCaseBody, req: 
       UPDATE lab_cases
       SET status = ${body.toStatus},
           is_on_hold = false,
+          due_date = COALESCE(${dueDate}::date, due_date),
           status_changed_at = COALESCE(${occurredAt}, LOCALTIMESTAMP),
           delivered_at = CASE WHEN ${isDelivered} THEN COALESCE(${occurredAt}, LOCALTIMESTAMP) ELSE delivered_at END,
           delivered_by = CASE WHEN ${isDelivered} THEN ${createdBy} ELSE delivered_by END
@@ -263,7 +265,12 @@ export async function remakeLabCase(id: number, body: RemakeLabCaseBody, req: Wi
       SET status = ${toStatus},
           is_on_hold = false,
           remake_count = remake_count + 1,
-          status_changed_at = COALESCE(${occurredAt}, LOCALTIMESTAMP)
+          status_changed_at = COALESCE(${occurredAt}, LOCALTIMESTAMP),
+          -- A remake always lands BEFORE 'delivered' (assertRemakeTarget), so a
+          -- delivered case sent back is no longer delivered: clear the whole delivery
+          -- record, as a reactivation does (createLabCase).
+          delivered_at = NULL,
+          delivered_by = NULL
       WHERE id = ${id}
       RETURNING ${COLS}
     `.execute(trx);

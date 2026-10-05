@@ -33,7 +33,8 @@ export const createTemplate = {
     is_active: z.boolean().optional(),
     is_system: z.boolean().optional(),
     parent_template_id: z.number().optional(),
-    created_by: z.string().optional(),
+    // No `created_by`: the server records the session's user (the client sent the
+    // literal 'user', so every template read "Created by: user").
   }),
   // POST /api/templates → 201 { success, message, data: { template_id } } (funnel
   // unwraps `data`). The consumer reads the new id.
@@ -59,8 +60,9 @@ export const updateTemplate = {
     is_default: z.boolean().optional(),
     is_active: z.boolean().optional(),
     is_system: z.boolean().optional(),
-    template_file_path: z.string().nullable().optional(),
-    modified_by: z.string().optional(),
+    // No `template_file_path` and no `modified_by`: the file path is assigned by the
+    // server when the designer saves (a client-set path read and wrote files outside
+    // data/templates — audit FE-F20-1), and the editor is the session's user.
   }),
 } as const;
 export type UpdateTemplateBody = z.infer<typeof updateTemplate.body>;

@@ -2,20 +2,11 @@
  * Template Card Component
  * Displays a single template with actions
  */
+import type { DocumentTemplateRow } from '@shared/contracts/template.contract';
 import { formatLocaleDate } from '../../utils/formatters';
 
-interface Template {
-    template_id: number;
-    template_name: string;
-    template_file_path: string | null;
-    description: string | null;
-    document_type_id: number;
-    last_used_date: string | null;
-    created_by: string | null;
-    is_default: boolean;
-    is_active: boolean;
-    is_system: boolean;
-}
+// The contract's row, not a hand-written copy cast into place (FE-F20-11).
+type Template = DocumentTemplateRow;
 
 interface TemplateStyles {
     readonly [key: string]: string;

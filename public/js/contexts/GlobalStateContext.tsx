@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchJSON } from '@/core/http';
-import { authMeQuery } from '@/query/queries';
-import * as whatsappContract from '@shared/contracts/whatsapp.contract';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { authMeQuery, whatsappInitialStateQuery } from '@/query/queries';
+import { qk } from '@/query/keys';
 import sseWhatsapp from '../services/sse-whatsapp';
 
 /**
@@ -114,11 +113,12 @@ function AuthUserProvider({ children }: GlobalStateProviderProps): React.ReactEl
  * feature hook.
  */
 function WhatsAppStatusProvider({ children }: GlobalStateProviderProps): React.ReactElement {
+  const queryClient = useQueryClient();
   const [whatsappClientReady, setWhatsappClientReady] = useState(false);
   const [whatsappQrCode, setWhatsappQrCode] = useState<string | null>(null);
 
-  // Mirror WhatsApp client state from the shared SSE channel, AND reconcile it
-  // against the authoritative server snapshot every time the transport opens.
+  // Reconcile against the authoritative server snapshot every time the transport
+  // opens, as well as on mount.
   //
   // `whatsapp_client_ready` is a one-shot event: the broadcaster fires it once
   // when the client becomes ready and never replays it to streams that connect
@@ -127,10 +127,33 @@ function WhatsAppStatusProvider({ children }: GlobalStateProviderProps): React.R
   // later) therefore never sees it, leaving `whatsappClientReady` stuck `false`
   // even though the server is connected. That is the split brain it produced —
   // the Send page and the per-patient SendMessage gate read this flag and show
-  // "Authentication Required" / block sending, while the Auth page (which GETs
-  // /api/wa/initial-state itself) shows connected. Reconciling from REST on
-  // every open — initial connect and every reconnect — closes the whole
-  // missed-event category for every consumer at once.
+  // "Authentication Required" / block sending, while the Auth page shows
+  // connected. Reconciling from REST on every open — initial connect and every
+  // reconnect — closes the whole missed-event category for every consumer.
+  //
+  // The snapshot is one shared query (`whatsappInitialStateQuery`) that the send
+  // and auth pages read too, so a page load no longer GETs it three times
+  // (FE-F16-16). It is applied once per successful fetch (keyed on
+  // `dataUpdatedAt`); on a failed read the last known state stands, and the live
+  // SSE events below remain the fallback.
+  const { data: snapshot, dataUpdatedAt } = useQuery(whatsappInitialStateQuery());
+  const [appliedAt, setAppliedAt] = useState(0);
+  if (snapshot && dataUpdatedAt !== appliedAt) {
+    setAppliedAt(dataUpdatedAt);
+    if (snapshot.clientReady) {
+      setWhatsappClientReady(true);
+      setWhatsappQrCode(null);
+    } else {
+      setWhatsappClientReady(false);
+      // Seed the QR from the snapshot too. The live `whatsapp_qr_updated` event
+      // is one-shot: a tab whose SSE stream opens *after* the client already
+      // emitted its QR (the normal case — boot emits within ~3s, long before the
+      // auth page loads) never sees it, leaving the page stuck on "Generating QR
+      // Code…" despite a valid QR being available here.
+      if (snapshot.qr) setWhatsappQrCode(snapshot.qr);
+    }
+  }
+
   useEffect(() => {
     const handleWhatsAppReady = (data: unknown): void => {
       const typed = data as WhatsAppReadyData | null;
@@ -149,27 +172,12 @@ function WhatsAppStatusProvider({ children }: GlobalStateProviderProps): React.R
       if (typed.clientReady === false) setWhatsappClientReady(false);
     };
 
-    // Authoritative reconcile. On REST failure keep the last known state — the
-    // live SSE events above remain the fallback — rather than forcing `false`.
+    // After every open, a snapshot taken AFTER it: a read already in flight began
+    // before the stream existed (on a page load they start together), so an event
+    // fired between that read and the open would be missed. Cancel it, then re-read.
     const reconcileFromRest = (): void => {
-      fetchJSON<{ clientReady?: boolean; qr?: string }>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
-        .then((data) => {
-          if (!data) return;
-          if (data.clientReady) {
-            setWhatsappClientReady(true);
-            setWhatsappQrCode(null);
-          } else {
-            setWhatsappClientReady(false);
-            // Seed the QR from the snapshot too. The live `whatsapp_qr_updated`
-            // event is one-shot: a tab whose SSE stream opens *after* the client
-            // already emitted its QR (the normal case — boot emits within ~3s,
-            // long before the auth page loads) never sees it, leaving the page
-            // stuck on "Generating QR Code…" despite a valid QR being available
-            // here. Same missed-event gap the clientReady reconcile above closes.
-            if (data.qr) setWhatsappQrCode(data.qr);
-          }
-        })
-        .catch(() => { /* keep last known state; live events still update it */ });
+      const queryKey = qk.whatsapp.initialState();
+      void queryClient.cancelQueries({ queryKey }).then(() => queryClient.invalidateQueries({ queryKey }));
     };
 
     sseWhatsapp.on('whatsapp_client_ready', handleWhatsAppReady);
@@ -177,9 +185,6 @@ function WhatsAppStatusProvider({ children }: GlobalStateProviderProps): React.R
     sseWhatsapp.on('connected', reconcileFromRest);
 
     void sseWhatsapp.ensureConnected().catch(() => { /* hook will surface errors */ });
-    // If the stream was already open before we subscribed, `connected` won't
-    // fire for us — reconcile once now to cover that path.
-    if (sseWhatsapp.getFreshness() === 'fresh') reconcileFromRest();
 
     return () => {
       sseWhatsapp.off('whatsapp_client_ready', handleWhatsAppReady);
@@ -187,7 +192,7 @@ function WhatsAppStatusProvider({ children }: GlobalStateProviderProps): React.R
       sseWhatsapp.off('connected', reconcileFromRest);
       sseWhatsapp.release();
     };
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo<WhatsAppStatus>(
     () => ({ clientReady: whatsappClientReady, qrCode: whatsappQrCode }),

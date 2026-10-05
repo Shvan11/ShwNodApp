@@ -128,6 +128,14 @@ function toListRow(r: BaseSelectRow): AnnouncementListRow {
  * Management list, newest first. Default hides expired rows; the management
  * screen opts back in with includeExpired (rendered greyed there).
  */
+/**
+ * The most rows the "Show expired" history returns. Two auto announcements are
+ * written per batch and none is ever purged (143 in under three months here), so a
+ * busy center's full history grows into the hundreds of thousands — downloaded and
+ * rendered whole (FE-F18-13). The live list (not expired) is naturally small.
+ */
+export const ANNOUNCEMENT_HISTORY_LIMIT = 300;
+
 export async function listAnnouncements(includeExpired: boolean): Promise<AnnouncementListRow[]> {
   try {
     const rows = await baseSelect()
@@ -136,6 +144,7 @@ export async function listAnnouncements(includeExpired: boolean): Promise<Announ
           eb.or([eb('a.expires_at', 'is', null), eb('a.expires_at', '>', sql<Date>`LOCALTIMESTAMP`)])
         )
       )
+      .$if(includeExpired, (qb) => qb.limit(ANNOUNCEMENT_HISTORY_LIMIT))
       .orderBy('a.created_at', 'desc')
       .execute();
     return rows.map(toListRow);
@@ -183,11 +192,24 @@ export async function createAnnouncement(
   return (await getAnnouncementById(inserted.announcement_id))!;
 }
 
-/** Full-replace edit (PUT semantics). Returns undefined when the id is gone. */
+/**
+ * Full-replace edit (PUT semantics) of a MANUAL announcement. Returns undefined when
+ * the id is gone, and 'auto' for a system announcement: those are written and
+ * removed by the batch status changes, and only the client used to stop an edit of
+ * one (F18's found-along-the-way).
+ */
 export async function updateAnnouncement(
   announcementId: number,
   input: AnnouncementInput
-): Promise<AnnouncementListRow | undefined> {
+): Promise<AnnouncementListRow | 'auto' | undefined> {
+  const existing = await getKysely()
+    .selectFrom('doctor_announcements')
+    .select('auto_event')
+    .where('announcement_id', '=', announcementId)
+    .executeTakeFirst();
+  if (!existing) return undefined;
+  if (existing.auto_event != null) return 'auto';
+
   const updated = await getKysely()
     .updateTable('doctor_announcements')
     .set({
@@ -201,6 +223,7 @@ export async function updateAnnouncement(
       expires_at: expiryTimestamp(input.expiresAt),
     })
     .where('announcement_id', '=', announcementId)
+    .where('auto_event', 'is', null)
     .returning('announcement_id')
     .executeTakeFirst();
   if (!updated) return undefined;
@@ -243,6 +266,10 @@ export async function insertBatchAutoAnnouncement(
   trx: PgTransaction,
   opts: { batchId: number; setId: number; batchSequence: number; event: AnnouncementAutoEvent }
 ): Promise<void> {
+  // An install with no doctor portal (no mirror) has no one to show these to; they
+  // only piled up, two per batch, forever (FE-F18-12).
+  if (!process.env.SUPABASE_FAILOVER_DB_URL) return;
+
   const ctx = await trx
     .selectFrom('aligner_sets as s')
     .innerJoin('works as w', 'w.work_id', 's.work_id')

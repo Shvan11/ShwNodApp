@@ -2,6 +2,8 @@
  * AlignerLayout - Layout wrapper for aligner section with persistent mode toggle
  */
 import { Outlet, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { alignerFeaturesQuery } from '@/query/queries';
 
 // Aligner section CSS - shared/common styles remain global
 import '../../css/components/aligner-common.css';
@@ -16,18 +18,20 @@ import AlignerModeToggle, { type AlignerMode } from '../components/react/Aligner
  */
 function AlignerLayout() {
   const location = useLocation();
+  // Archform tab only where an Archform path is set (owner decision, FE-F18-4). While
+  // the read is pending the tab stays hidden rather than flashing in and out.
+  const { data: features } = useQuery(alignerFeaturesQuery());
 
-  // Determine active mode based on current route
-  const getActiveMode = (): AlignerMode => {
-    if (location.pathname.includes('/archform-match')) {
-      return 'archform-match';
-    } else if (location.pathname.includes('/search')) {
-      return 'search';
-    } else if (location.pathname.includes('/all-sets')) {
-      return 'all-sets';
-    } else {
-      return 'doctors';
-    }
+  // The list route on screen. A patient's sets page and Announcements are reached
+  // from several lists, so they mark none — they used to claim "Browse by Doctor"
+  // even when the user came from Search or All Sets (FE-F18-14).
+  const getActiveMode = (): AlignerMode | null => {
+    const path = location.pathname.replace(/\/+$/, '');
+    if (path === '/aligner/archform-match') return 'archform-match';
+    if (path === '/aligner/search') return 'search';
+    if (path === '/aligner/all-sets') return 'all-sets';
+    if (path === '/aligner' || /^\/aligner\/doctor\/[^/]+$/.test(path)) return 'doctors';
+    return null;
   };
 
   const activeMode = getActiveMode();
@@ -41,7 +45,7 @@ function AlignerLayout() {
 
   return (
     <div className={containerClass}>
-      <AlignerModeToggle activeMode={activeMode} sticky={!viewportLocked} />
+      <AlignerModeToggle activeMode={activeMode} sticky={!viewportLocked} showArchform={features?.archform ?? false} />
       <Outlet />
     </div>
   );

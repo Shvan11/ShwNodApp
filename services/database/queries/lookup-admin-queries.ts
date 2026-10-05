@@ -20,8 +20,11 @@
  *    (foreign_key_violation) → `ReferentialError`.
  */
 import { sql, type RawBuilder } from 'kysely';
-import { getKysely } from '../kysely.js';
+import { getKysely, withPgTransaction } from '../kysely.js';
 import { isForeignKeyViolation } from '../../../utils/pg-errors.js';
+import { WORK_TYPE_IDS, XRAY_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
+import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../../shared/expense-categories.js';
+import { RECEIPT_DOCUMENT_TYPE_ID } from '../../templates/template-files.js';
 
 // type definitions
 interface ReferenceConfig {
@@ -50,6 +53,36 @@ export class ReferentialError extends Error {
   }
 }
 
+/** The delete named a row that doesn't exist (it used to answer "deleted"). */
+export class LookupItemNotFoundError extends Error {
+  constructor() {
+    super('Item not found');
+    this.name = 'LookupItemNotFoundError';
+  }
+}
+
+/**
+ * Rows the CODE names by id: deleting one breaks a feature even while nothing uses it
+ * yet (a fresh install). Renaming stays allowed — every reader keys on the id.
+ */
+interface ProtectedRows {
+  ids: readonly number[];
+  /** Completes "Cannot delete: …" for the 409. */
+  reason: string;
+}
+
+/**
+ * A column elsewhere that stores this table's id WITHOUT a foreign key, so the delete's
+ * FK-violation catch can't see it. `works.type_of_work` is the one that mattered: one
+ * confirm deleted a work type 2,442 live works carried (audit FE-F21-2).
+ */
+interface SoftReference {
+  table: string;
+  column: string;
+  /** Plural noun for the 409: "2,442 works use this item". */
+  noun: string;
+}
+
 interface LookupTableConfig {
   tableName: string;
   idColumn: string;
@@ -58,6 +91,8 @@ interface LookupTableConfig {
   icon: string;
   idType: 'int' | 'uniqueidentifier';
   columns: ColumnConfig[];
+  protectedRows?: ProtectedRows;
+  softReferences?: readonly SoftReference[];
 }
 
 interface LookupTableInfo {
@@ -66,6 +101,8 @@ interface LookupTableInfo {
   icon: string;
   idColumn: string;
   columns: ColumnConfig[];
+  /** Ids the editor offers no Delete for (the server refuses them anyway). */
+  protectedIds: number[];
 }
 
 type LookupItem = Record<string, unknown>;
@@ -85,6 +122,13 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     columns: [
       { name: 'work_type', label: 'Work type', type: 'varchar', maxLength: 50, required: true },
     ],
+    // Owner decision (RF1, 2026-10-05): a type in use can't be deleted, nor the four
+    // intake creates on its own; any other unused type can.
+    protectedRows: {
+      ids: [...XRAY_WORK_TYPE_IDS, WORK_TYPE_IDS.CONSULT],
+      reason: 'the app creates works of this type itself (X-ray / Consult intake).',
+    },
+    softReferences: [{ table: 'works', column: 'type_of_work', noun: 'works' }],
   },
   tblKeyWord: {
     tableName: 'keywords',
@@ -220,6 +264,10 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
       { name: 'is_active', label: 'Active', type: 'bit', required: false },
       { name: 'sort_order', label: 'Sort Order', type: 'int', required: false },
     ],
+    protectedRows: {
+      ids: [RECEIPT_DOCUMENT_TYPE_ID],
+      reason: 'receipts are printed from this document type.',
+    },
   },
   tblImplantManufacturer: {
     tableName: 'implant_manufacturers',
@@ -237,6 +285,7 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
         required: true,
       },
     ],
+    softReferences: [{ table: 'work_items', column: 'implant_manufacturer_id', noun: 'work items' }],
   },
   tblHolidays: {
     tableName: 'tblHolidays',
@@ -275,6 +324,10 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
       // CLAUDE.md i18n / RTL → "DB-stored lookup values"). Generic CRUD picks it up.
       { name: 'category_name_ar', label: 'category Name (Arabic)', type: 'nvarchar', maxLength: 50, required: false },
     ],
+    protectedRows: {
+      ids: [EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY],
+      reason: 'the expense form picks an employee or a lab under this category.',
+    },
   },
   tblExpenseSubcategories: {
     tableName: 'expense_subcategories',
@@ -362,6 +415,7 @@ export function getLookupTableConfigs(): LookupTableInfo[] {
     icon: config.icon,
     idColumn: config.idColumn,
     columns: config.columns,
+    protectedIds: [...(config.protectedRows?.ids ?? [])],
   }));
 }
 
@@ -494,14 +548,38 @@ export async function deleteLookupItem(tableKey: string, id: string | number): P
     throw new Error(`Invalid lookup table: ${tableKey}`);
   }
 
-  const db = getKysely();
-  const query = sql`
-    DELETE FROM ${sql.id(pgTableName(config.tableName))}
-    WHERE ${sql.id(config.idColumn)} = ${id}
-  `;
+  const { protectedRows, softReferences = [] } = config;
+  if (protectedRows && protectedRows.ids.includes(Number(id))) {
+    throw new ReferentialError(`Cannot delete: ${protectedRows.reason}`);
+  }
+
+  const table = sql.id(pgTableName(config.tableName));
+  const idCol = sql.id(config.idColumn);
 
   try {
-    await query.execute(db);
+    await withPgTransaction(async (trx) => {
+      // Lock the row first, so a reference counted below can't be the last one
+      // checked before a concurrent write adds another. (Columns with no FK can't
+      // be fully closed against that race without one; this narrows it to the
+      // instant between a write's own read and its insert.)
+      const locked = await sql`SELECT 1 FROM ${table} WHERE ${idCol} = ${id} FOR UPDATE`.execute(trx);
+      if (locked.rows.length === 0) throw new LookupItemNotFoundError();
+
+      for (const ref of softReferences) {
+        const { rows } = await sql<{ n: number }>`
+          SELECT count(*)::int AS n FROM ${sql.id(ref.table)} WHERE ${sql.id(ref.column)} = ${id}
+        `.execute(trx);
+        const n = rows[0]?.n ?? 0;
+        if (n > 0) {
+          const one = n === 1;
+          throw new ReferentialError(
+            `Cannot delete: ${n.toLocaleString('en-US')} ${one ? ref.noun.replace(/s$/, '') : ref.noun} ${one ? 'uses' : 'use'} this item.`
+          );
+        }
+      }
+
+      await sql`DELETE FROM ${table} WHERE ${idCol} = ${id}`.execute(trx);
+    });
   } catch (err) {
     // PG foreign_key_violation (SQLSTATE 23503).
     if (isForeignKeyViolation(err)) {

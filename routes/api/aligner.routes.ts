@@ -31,7 +31,7 @@ import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-respons
 import { authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
-import { isForeignKeyViolation } from '../../utils/pg-errors.js';
+import { isForeignKeyViolation, isUniqueViolation } from '../../utils/pg-errors.js';
 import { log } from '../../utils/logger.js';
 
 // Request/response contract (shared with the client via @shared). The boundary
@@ -53,6 +53,8 @@ import * as alignerPatientService from '../../services/business/AlignerPatientSe
 import * as alignerPaymentService from '../../services/business/AlignerPaymentService.js';
 import * as alignerSetService from '../../services/business/AlignerSetService.js';
 import { AlignerValidationError } from '../../services/business/AlignerErrors.js';
+import { isArchformConfigured } from '../../services/archform/archform-db.js';
+import { findFirstSmiles } from '../../services/files/working-files.service.js';
 
 const router = Router();
 
@@ -65,6 +67,31 @@ type AlignerQueryParams = contract.AlignerQueryParams;
 // ============================================================================
 // ALIGNER DOCTORS QUERIES
 // ============================================================================
+
+/** Each list row with its first-session Smile file name (one directory read per list). */
+async function withFirstSmiles(patients: contract.AlignerPatient[]): Promise<contract.AlignerPatient[]> {
+  const smiles = await findFirstSmiles(patients.map((p) => p.person_id));
+  return patients.map((p) => ({ ...p, smile_file: smiles.get(p.person_id) ?? null }));
+}
+
+/**
+ * Which optional integrations this install uses (Archform, the doctor portal), so
+ * the aligner navigation offers only those (FE-F18-4 / FE-F18-12).
+ */
+router.get(
+  '/aligner/features',
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      sendData(res, contract.alignerFeatures.response, {
+        archform: await isArchformConfigured(),
+        portal: !!process.env.SUPABASE_FAILOVER_DB_URL,
+      });
+    } catch (error) {
+      log.error('Error reading aligner features:', error);
+      ErrorResponses.internalError(res, 'Failed to read aligner features', error as Error);
+    }
+  }
+);
 
 /**
  * Get all aligner doctors with unread notes count
@@ -96,12 +123,25 @@ router.get(
  */
 router.get(
   '/aligner/all-sets',
-  async (_req: Request, res: Response): Promise<void> => {
+  validate({ query: contract.allSets.query }),
+  async (req: Request<unknown, unknown, unknown, contract.AllSetsQuery>, res: Response): Promise<void> => {
     try {
-      log.info('Fetching all aligner sets from v_allsets');
-      const sets = await alignerSetQueries.getAllAlignerSets();
+      const opts = {
+        includeInactive: req.query.inactive === '1',
+        includeFinished: req.query.finished === '1',
+      };
+      const [sets, hidden] = await Promise.all([
+        alignerSetQueries.getAllAlignerSets(opts),
+        alignerSetQueries.countHiddenAlignerSets(opts),
+      ]);
 
-      sendData(res, contract.allSets.response, { sets: sets || [] });
+      sendData(res, contract.allSets.response, {
+        sets,
+        hidden: {
+          inactive: opts.includeInactive ? 0 : hidden.inactive,
+          finished: opts.includeFinished ? 0 : hidden.finished,
+        },
+      });
     } catch (error) {
       log.error('Error fetching all aligner sets:', error);
       ErrorResponses.internalError(
@@ -121,11 +161,11 @@ router.get(
   async (_req: Request, res: Response): Promise<void> => {
     try {
       log.info('Fetching all aligner patients');
-      const patients = await alignerPatientQueries.getAllAlignerPatients();
+      const patients = await withFirstSmiles(await alignerPatientQueries.getAllAlignerPatients());
 
       sendData(res, contract.allPatients.response, {
-        patients: patients || [],
-        count: patients ? patients.length : 0
+        patients,
+        count: patients.length
       });
     } catch (error) {
       log.error('Error fetching all aligner patients:', error);
@@ -156,11 +196,11 @@ router.get(
       }
 
       log.info(`Fetching all patients for doctor id: ${doctorId}`);
-      const patients = await alignerPatientQueries.getAlignerPatientsByDoctor(parseInt(doctorId, 10));
+      const patients = await withFirstSmiles(await alignerPatientQueries.getAlignerPatientsByDoctor(parseInt(doctorId, 10)));
 
       sendData(res, contract.patientsByDoctor.response, {
-        patients: patients || [],
-        count: patients ? patients.length : 0
+        patients,
+        count: patients.length
       });
     } catch (error) {
       log.error('Error fetching patients by doctor:', error);
@@ -306,6 +346,32 @@ router.get(
 // ALIGNER SETS CRUD OPERATIONS
 // ============================================================================
 
+/** Set prices are front-desk/admin (FE-F17-9); the routes stay CLINICAL_ROLES for everything else. */
+function setActor(req: Request<unknown, unknown, unknown> | Request<{ setId: string }, unknown, unknown>): alignerSetService.SetActor {
+  const role = req.session?.userRole;
+  return { mayPrice: !!role && (FINANCE_ROLES as readonly string[]).includes(role) };
+}
+
+/**
+ * The set-write refusals that are not a plain 400: pricing by a role that may not
+ * (403), and a set number the work already has (409). The unique index
+ * `uq_setsequence_workid` used to surface as "500 Failed to update aligner set"
+ * (FE-F17-13). Returns true when it answered.
+ */
+function respondToSetWriteError(res: Response, error: unknown): boolean {
+  if (error instanceof AlignerValidationError && error.code === 'SET_COST_NOT_ALLOWED') {
+    ErrorResponses.forbidden(res, error.message, { code: error.code });
+    return true;
+  }
+  if (isUniqueViolation(error, 'uq_setsequence_workid')) {
+    ErrorResponses.conflict(res, 'This treatment already has a set with that number. Pick another set number.', {
+      code: 'DUPLICATE_SET_SEQUENCE',
+    });
+    return true;
+  }
+  return false;
+}
+
 /**
  * Create a new aligner set
  */
@@ -318,10 +384,11 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const newSetId = await alignerSetService.validateAndCreateSet(req.body);
+      const newSetId = await alignerSetService.validateAndCreateSet(req.body, setActor(req));
 
       sendData(res, contract.createSet.response, { setId: newSetId }, 'Aligner set created successfully');
     } catch (error) {
+      if (respondToSetWriteError(res, error)) return;
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, {
           code: error.code,
@@ -354,10 +421,11 @@ router.put(
     try {
       const { setId } = req.params;
 
-      await alignerSetService.validateAndUpdateSet(setId, req.body);
+      await alignerSetService.validateAndUpdateSet(setId, req.body, setActor(req));
 
       sendSuccess(res, null, 'Aligner set updated successfully');
     } catch (error) {
+      if (respondToSetWriteError(res, error)) return;
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, { code: error.code });
         return;

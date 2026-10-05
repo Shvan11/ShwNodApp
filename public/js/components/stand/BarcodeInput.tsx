@@ -1,8 +1,10 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, type KeyboardEvent, type RefObject } from 'react';
 import styles from './BarcodeInput.module.css';
 
 interface BarcodeInputProps {
   onScan: (barcode: string) => void;
+  /** The till refocuses this box after an add and after a sale, so the next scan lands here. */
+  inputRef: RefObject<HTMLInputElement | null>;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -12,49 +14,38 @@ interface BarcodeInputProps {
  *
  * Captures barcode scanner output (USB scanners emulate keyboard input
  * and send Enter at the end). Also supports manual typing.
- * Autofocuses on mount and clears after each scan.
+ * Autofocuses on mount and clears after each scan. A scan made while the focus is
+ * elsewhere on the till is caught by `useScannerCapture` (FE-F19-6).
  */
-const BarcodeInput: React.FC<BarcodeInputProps> = ({
+export default function BarcodeInput({
   onScan,
+  inputRef,
   placeholder = 'Scan barcode or type manually...',
   disabled = false,
-}) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+}: BarcodeInputProps) {
   const [value, setValue] = useState('');
 
   useEffect(() => {
-    if (!disabled && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [disabled]);
+    if (!disabled) inputRef.current?.focus();
+  }, [disabled, inputRef]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const trimmed = value.trim();
-        if (trimmed) {
-          onScan(trimmed);
-          setValue('');
-        }
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const trimmed = value.trim();
+      if (trimmed) {
+        onScan(trimmed);
+        setValue('');
       }
-    },
-    [value, onScan]
-  );
-
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setValue(e.target.value);
-    },
-    []
-  );
+    }
+  };
 
   return (
     <input
       ref={inputRef}
       type="text"
       value={value}
-      onChange={handleChange}
+      onChange={(e) => setValue(e.target.value)}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
       disabled={disabled}
@@ -63,6 +54,4 @@ const BarcodeInput: React.FC<BarcodeInputProps> = ({
       className={styles.input}
     />
   );
-};
-
-export default React.memo(BarcodeInput);
+}

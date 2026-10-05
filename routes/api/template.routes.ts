@@ -23,8 +23,16 @@ import {
   generateReceiptHTML,
   generateNoWorkReceiptHTML
 } from '../../services/templates/receipt-service.js';
+import {
+  resolveTemplateFile,
+  templateFilePathFor,
+  templatesDir,
+  TemplatePathError,
+} from '../../services/templates/template-files.js';
 import { promises as fs } from 'fs';
-import path from 'path';
+
+/** The signed-in user's name for the template audit columns. */
+const sessionUser = (req: Request): string => req.session?.username ?? 'unknown';
 
 const router = Router();
 
@@ -161,9 +169,7 @@ router.post(
     res: Response
   ): Promise<void> => {
     try {
-      const templateData = req.body;
-
-      const templateId = await templateQueries.createTemplate(templateData);
+      const templateId = await templateQueries.createTemplate({ ...req.body, created_by: sessionUser(req as Request) });
 
       sendData(
         res,
@@ -213,7 +219,10 @@ router.put(
         return;
       }
 
-      await templateQueries.updateTemplate(parseInt(templateId, 10), templateData);
+      await templateQueries.updateTemplate(parseInt(templateId, 10), {
+        ...templateData,
+        modified_by: sessionUser(req as Request),
+      });
 
       sendSuccess(res, null, 'Template updated successfully');
     } catch (error) {
@@ -283,26 +292,34 @@ router.post(
         return;
       }
 
-      // Generate file path if not exists
-      let filePath = template.template_file_path;
-      if (!filePath) {
-        // Create filename from template name
-        const fileName = template.template_name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        filePath = `data/templates/${fileName}.html`;
-
-        // Update database with file path
-        await templateQueries.updateTemplate(parseInt(templateId, 10), {
-          template_file_path: filePath,
-          modified_by: 'designer'
-        });
+      // The file is the server's to choose (FE-F20-1). A template keeps its own file;
+      // one with none yet, one whose stored path escapes data/templates, or one that
+      // SHARES its file with another template (the old name-only naming made that
+      // happen — FE-F20-2) gets a fresh `<slug>-<id>.html`.
+      const id = parseInt(templateId, 10);
+      const stored = template.template_file_path;
+      let filePath = '';
+      let fullPath: string | null = null;
+      if (stored && !(await templateQueries.isTemplateFileShared(stored, id))) {
+        try {
+          fullPath = resolveTemplateFile(stored);
+          filePath = stored;
+        } catch (e) {
+          if (!(e instanceof TemplatePathError)) throw e;
+          log.warn('Template had a path outside data/templates — reassigned', { templateId: id, stored });
+        }
+      }
+      if (!fullPath) {
+        filePath = templateFilePathFor(id, template.template_name);
+        fullPath = resolveTemplateFile(filePath);
+        await templateQueries.updateTemplate(id, { template_file_path: filePath, modified_by: sessionUser(req as Request) });
       }
 
-      // Save HTML to file
-      const fullPath = path.join(process.cwd(), filePath);
-      await fs.writeFile(fullPath, html, 'utf-8');
+      // Same-directory temp file + rename, so a reader never sees a half-written template.
+      await fs.mkdir(templatesDir(), { recursive: true });
+      const tmp = `${fullPath}.tmp-${process.pid}-${Date.now()}`;
+      await fs.writeFile(tmp, html, 'utf-8');
+      await fs.rename(tmp, fullPath);
 
       sendData(
         res,
@@ -346,7 +363,14 @@ router.get(
         return;
       }
 
-      const fullPath = path.join(process.cwd(), template.template_file_path);
+      let fullPath: string;
+      try {
+        fullPath = resolveTemplateFile(template.template_file_path);
+      } catch (e) {
+        if (!(e instanceof TemplatePathError)) throw e;
+        sendError(res, 404, 'Template file not found');
+        return;
+      }
       const html = await fs.readFile(fullPath, 'utf-8');
 
       res.setHeader('Cache-Control', 'no-store');

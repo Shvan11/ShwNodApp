@@ -83,6 +83,12 @@
   margin: 0;
 }
 
+.summaryCard .cardNote {
+  margin: var(--spacing-xs) 0 0;
+  font-size: var(--font-size-xs);
+  opacity: 0.85;
+}
+
 .revenueCard {
   background: linear-gradient(135deg, var(--info-color) 0%, var(--blue-700) 100%);
 }

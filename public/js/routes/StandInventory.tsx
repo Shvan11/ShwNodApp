@@ -1,26 +1,6 @@
 import { useState, useEffect } from 'react';
-import {
-  useStandItems,
-  useStandItemMutations,
-} from '../hooks/useStand';
-import type { StandItem, StandItemFilters, StandItemCreateData } from '../hooks/useStand';
-
-const MODAL_STATE_KEY = 'standInventory.modalState';
-
-interface PersistedModalState {
-  isOpen: boolean;
-  item: StandItem | null;
-}
-
-function loadModalState(): PersistedModalState {
-  try {
-    const saved = sessionStorage.getItem(MODAL_STATE_KEY);
-    if (saved) return JSON.parse(saved) as PersistedModalState;
-  } catch {
-    // ignore malformed storage
-  }
-  return { isOpen: false, item: null };
-}
+import { useStandItems, useStandItemMutations } from '../hooks/useStand';
+import type { StandItem, StandItemFilters, CreateItemBody, UpdateItemBody } from '../hooks/useStand';
 import ItemTable from '../components/stand/ItemTable';
 import ItemFilters from '../components/stand/ItemFilters';
 import ItemFormModal from '../components/stand/ItemFormModal';
@@ -30,31 +10,64 @@ import RestockModal from '../components/stand/RestockModal';
 import StockAdjustModal from '../components/stand/StockAdjustModal';
 import StockMovementsModal from '../components/stand/StockMovementsModal';
 import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { useAuthUser } from '../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { httpErrorMessage } from '@/core/http';
+import { formatNumber } from '../utils/formatters';
 import styles from './StandInventory.module.css';
+
+const MODAL_STATE_KEY = 'standInventory.modalState';
+
+interface PersistedModalState {
+  isOpen: boolean;
+  item: StandItem | null;
+}
+
+/**
+ * The item form survives a RELOAD (a phone's camera can kill the tab mid-entry),
+ * so its open state is kept in `sessionStorage`. Leaving the page is not a reload:
+ * the flag is cleared on unmount, or an empty form reopened on every later visit
+ * (FE-F19-13). A reload runs no cleanup, so the restore still works.
+ */
+function loadModalState(): PersistedModalState {
+  try {
+    const saved = sessionStorage.getItem(MODAL_STATE_KEY);
+    if (saved) return JSON.parse(saved) as PersistedModalState;
+  } catch {
+    // ignore malformed storage
+  }
+  return { isOpen: false, item: null };
+}
 
 export default function StandInventory() {
   const toast = useToast();
+  const confirm = useConfirm();
+  const user = useAuthUser();
+  // Delete, Adjust, Reactivate and the category manager are admin-only on the
+  // server; front desk used to be offered them and get a 403 (FE-F19-7).
+  const canAdmin = roleCaps(user?.role as UserRole | undefined).adminWrites;
 
   // Filters
   const [filters, setFilters] = useState<StandItemFilters>({});
   const [appliedFilters, setAppliedFilters] = useState<StandItemFilters>({});
 
   // Data
-  const { items, loading, error, refetch } = useStandItems(appliedFilters);
+  const { items, asOf, loading, error, refetch } = useStandItems(appliedFilters);
 
   // Mutations
   const {
     createItem,
     updateItem,
     deleteItem,
+    reactivateItem,
     restockItem,
     adjustStock,
     loading: mutationLoading,
   } = useStandItemMutations();
 
   // Modal state (restored from sessionStorage so camera/refresh doesn't lose work)
-  const initialModalState = loadModalState();
+  const [initialModalState] = useState(loadModalState);
   const [formItem, setFormItem] = useState<StandItem | null>(initialModalState.item);
   const [isFormOpen, setIsFormOpen] = useState(initialModalState.isOpen);
 
@@ -68,6 +81,8 @@ export default function StandInventory() {
       sessionStorage.removeItem(MODAL_STATE_KEY);
     }
   }, [isFormOpen, formItem]);
+
+  useEffect(() => () => sessionStorage.removeItem(MODAL_STATE_KEY), []);
 
   const [deleteTarget, setDeleteTarget] = useState<StandItem | null>(null);
   const [restockTarget, setRestockTarget] = useState<StandItem | null>(null);
@@ -98,19 +113,33 @@ export default function StandInventory() {
     setIsFormOpen(true);
   };
 
-  const handleSaveItem = async (data: StandItemCreateData) => {
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setFormItem(null);
+  };
+
+  const handleCreateItem = async (data: CreateItemBody) => {
     try {
-      if (formItem) {
-        await updateItem(formItem.item_id, data);
-        toast.success('Item updated successfully');
-      } else {
-        await createItem(data);
-        toast.success('Item created successfully');
-      }
-      setIsFormOpen(false);
-      setFormItem(null);
+      await createItem(data);
+      toast.success('Item created successfully');
+      closeForm();
     } catch (err) {
-      toast.error(httpErrorMessage(err, formItem ? 'Failed to update item' : 'Failed to create item'));
+      toast.error(httpErrorMessage(err, 'Failed to create item'));
+    }
+  };
+
+  const handleUpdateItem = async (changes: UpdateItemBody) => {
+    if (!formItem) return;
+    if (Object.keys(changes).length === 0) {
+      closeForm();
+      return;
+    }
+    try {
+      await updateItem(formItem.item_id, changes);
+      toast.success('Item updated successfully');
+      closeForm();
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to update item'));
     }
   };
 
@@ -125,11 +154,25 @@ export default function StandInventory() {
     }
   };
 
+  const handleReactivate = async (item: StandItem) => {
+    const ok = await confirm(`Bring "${item.item_name}" back into the active inventory and the till?`, {
+      title: 'Reactivate Item',
+      confirmText: 'Reactivate',
+    });
+    if (!ok) return;
+    try {
+      await reactivateItem(item.item_id);
+      toast.success(`"${item.item_name}" is active again`);
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Failed to reactivate item'));
+    }
+  };
+
   const handleConfirmRestock = async (quantity: number, unitCost: number) => {
     if (!restockTarget) return;
     try {
-      await restockItem(restockTarget.item_id, quantity, unitCost);
-      toast.success('Item restocked successfully');
+      const { costPrice } = await restockItem(restockTarget.item_id, quantity, unitCost);
+      toast.success(`Restocked — cost is now ${formatNumber(costPrice)} IQD (average)`);
       setRestockTarget(null);
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to restock item'));
@@ -152,17 +195,12 @@ export default function StandInventory() {
       <div className={styles.pageHeader}>
         <h1>Stand Inventory</h1>
         <div className={styles.headerActions}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setIsCategoryManagerOpen(true)}
-          >
-            Manage Categories
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleAddItem}
-            disabled={mutationLoading}
-          >
+          {canAdmin && (
+            <button className="btn btn-secondary" onClick={() => setIsCategoryManagerOpen(true)}>
+              Manage Categories
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={handleAddItem} disabled={mutationLoading}>
             Add New Item
           </button>
         </div>
@@ -182,21 +220,27 @@ export default function StandInventory() {
         </div>
       )}
 
-      <ItemTable
-        items={items}
-        loading={loading}
-        onEdit={handleEditItem}
-        onDelete={(item) => setDeleteTarget(item)}
-        onRestock={(item) => setRestockTarget(item)}
-        onAdjust={(item) => setAdjustTarget(item)}
-        onMovements={(item) => setMovementsTarget(item)}
-      />
+      {!error && (
+        <ItemTable
+          items={items}
+          asOf={asOf}
+          loading={loading}
+          canAdmin={canAdmin}
+          onEdit={handleEditItem}
+          onDelete={(item) => setDeleteTarget(item)}
+          onReactivate={(item) => void handleReactivate(item)}
+          onRestock={(item) => setRestockTarget(item)}
+          onAdjust={(item) => setAdjustTarget(item)}
+          onMovements={(item) => setMovementsTarget(item)}
+        />
+      )}
 
       <ItemFormModal
         isOpen={isFormOpen}
         item={formItem}
-        onClose={() => { setIsFormOpen(false); setFormItem(null); }}
-        onSave={handleSaveItem}
+        onClose={closeForm}
+        onCreate={handleCreateItem}
+        onUpdate={handleUpdateItem}
       />
 
       <DeleteItemModal
@@ -226,10 +270,12 @@ export default function StandInventory() {
         onClose={() => setMovementsTarget(null)}
       />
 
-      <CategoryManagerModal
-        isOpen={isCategoryManagerOpen}
-        onClose={() => setIsCategoryManagerOpen(false)}
-      />
+      {canAdmin && (
+        <CategoryManagerModal
+          isOpen={isCategoryManagerOpen}
+          onClose={() => setIsCategoryManagerOpen(false)}
+        />
+      )}
     </div>
   );
 }

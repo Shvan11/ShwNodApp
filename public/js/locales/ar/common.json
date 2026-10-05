@@ -61,6 +61,7 @@
     "editValues": "تعديل القيم",
     "manage": "إدارة {{name}}",
     "manageValues": "إدارة القيم",
-    "loading": "جارٍ التحميل…"
+    "loading": "جارٍ التحميل…",
+    "loadFailed": "تعذّر تحميل هذه القائمة."
   }
 }

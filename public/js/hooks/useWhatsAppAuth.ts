@@ -1,22 +1,22 @@
 /**
  * WhatsApp Authentication Hook
  * Manages WhatsApp client authentication state via the shared SSE channel
- * and the REST initial-state endpoint.
+ * and the shared `/api/wa/initial-state` query.
  */
 
-import { useReducer, useEffect, useRef, useCallback } from 'react';
+import { useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useWhatsAppStatus } from '../contexts/GlobalStateContext';
 import { useToast } from '../contexts/ToastContext';
 import sseWhatsapp from '../services/sse-whatsapp';
-import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
-import * as whatsappContract from '@shared/contracts/whatsapp.contract';
+import { postJSON, httpErrorMessage } from '@/core/http';
+import { whatsappInitialStateQuery } from '@/query/queries';
 import {
   AUTH_STATES,
   authReducer,
   initialAuthModel,
   type AuthState,
-  type InitialStateResponse,
 } from './whatsappAuthMachine';
 
 export { AUTH_STATES, type AuthState };
@@ -27,6 +27,8 @@ const CONFIG = {
   QR_REFRESH_DELAY_MS: 30000,
   /** How long CHECKING_SESSION waits for a QR before assuming one is coming. */
   CHECK_SESSION_SETTLE_MS: 3000,
+  /** How long the "connected" screen shows before going back where the user came from. */
+  REDIRECT_DELAY_MS: 2000,
 } as const;
 
 /**
@@ -47,6 +49,10 @@ export interface UseWhatsAppAuthReturn {
   clientReady: boolean;
   qrCode: string | null;
   error: string | null;
+  /** The page's own SSE stream is down and being retried. */
+  streamDown: boolean;
+  /** Where the page is about to go after a successful pairing: a path, 'close' (popup), or null (stays). */
+  afterPairing: string | null;
   actions: WhatsAppAuthActions;
 }
 
@@ -60,7 +66,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // ONE state machine (hooks/whatsappAuthMachine.ts) owns authState + error;
   // every writer below is an event dispatched into it (audit FE-F3-5).
   const [model, dispatch] = useReducer(authReducer, undefined, () => initialAuthModel(clientReady, qrCode));
-  const { authState, error } = model;
+  const { authState, error, streamDown } = model;
 
   // Feed the status context into the machine — during render, keyed on the
   // machine's own copy, so it's one sync instead of the two that disagreed.
@@ -68,18 +74,30 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     dispatch({ type: 'status', clientReady, qrCode });
   }
 
-  const qrRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Fetch initial state via REST (replaces the WS RPC).
-  const requestInitialState = useCallback(async () => {
-    try {
-      // Flat `{ success, qr, clientReady, … }` (no `data` key) → fetchJSON passthrough.
-      const data = await fetchJSON<InitialStateResponse>('/api/wa/initial-state', { schema: whatsappContract.initialState.response });
-      if (data) dispatch({ type: 'initialState', data });
-    } catch (err) {
-      console.error('[useWhatsAppAuth] initial-state fetch failed', err);
+  // The server snapshot — the same query the status provider and the send page
+  // read (FE-F16-16). Each successful read is one `initialState` event; a failed
+  // read while the page has nothing better to show is an ERROR with Retry, not a
+  // blank (FE-F16-12).
+  const snapshot = useQuery(whatsappInitialStateQuery());
+  const [appliedAt, setAppliedAt] = useState(0);
+  if (snapshot.data && snapshot.dataUpdatedAt !== appliedAt) {
+    setAppliedAt(snapshot.dataUpdatedAt);
+    dispatch({ type: 'initialState', data: snapshot.data });
+  }
+  const [failedAt, setFailedAt] = useState(0);
+  if (snapshot.isError && snapshot.errorUpdatedAt !== failedAt) {
+    setFailedAt(snapshot.errorUpdatedAt);
+    if (authState === AUTH_STATES.INITIALIZING || authState === AUTH_STATES.CONNECTING) {
+      dispatch({ type: 'failed', error: httpErrorMessage(snapshot.error, 'Could not read the WhatsApp status') });
     }
-  }, []);
+  }
+
+  const refetchSnapshot = snapshot.refetch;
+  const requestInitialState = useCallback(() => {
+    void refetchSnapshot();
+  }, [refetchSnapshot]);
+
+  const qrRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // CHECKING_SESSION settles into QR_REQUIRED after a few seconds. An effect
   // keyed on the state, so leaving it early (or unmounting) cancels the timer —
@@ -90,22 +108,16 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     return () => clearTimeout(timer);
   }, [authState]);
 
-  // Subscribe to SSE lifecycle events + prime initial state on mount/reconnect.
+  // Subscribe to SSE lifecycle events. Every (re)open re-reads the snapshot: the
+  // status provider invalidates the shared query on `connected`.
   useEffect(() => {
-    const handleConnected = () => {
-      dispatch({ type: 'transport', event: 'connected' });
-      void requestInitialState();
-    };
-
+    const handleConnected = () => dispatch({ type: 'transport', event: 'connected' });
     const handleConnecting = () => dispatch({ type: 'transport', event: 'connecting' });
-
-    const handleDisconnected = () => dispatch({ type: 'transport', event: 'disconnected' });
-
+    // A dropped stream emits `reconnecting` (the channel is retrying). The page
+    // used to listen for `disconnected`, which only fires when the last consumer
+    // lets go — never while this page holds it (FE-F16-12).
+    const handleReconnecting = () => dispatch({ type: 'transport', event: 'disconnected' });
     const handleError = () => dispatch({ type: 'failed', error: 'SSE connection failed' });
-
-    const handleReconnected = () => {
-      void requestInitialState();
-    };
 
     // React to the WhatsApp client-ready DATA frame (distinct from the SSE
     // transport events above) so a server-side park (needs_relink) or a re-link
@@ -118,38 +130,31 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
 
     sseWhatsapp.on('connecting', handleConnecting);
     sseWhatsapp.on('connected', handleConnected);
-    sseWhatsapp.on('disconnected', handleDisconnected);
+    sseWhatsapp.on('reconnecting', handleReconnecting);
     sseWhatsapp.on('error', handleError);
-    sseWhatsapp.on('reconnected', handleReconnected);
     sseWhatsapp.on('whatsapp_client_ready', handleClientReadyFrame);
 
-    sseWhatsapp
-      .ensureConnected()
-      .then(() => {
-        void requestInitialState();
-      })
-      .catch((err) => {
-        console.error('[useWhatsAppAuth] Failed to open SSE:', err);
-        dispatch({ type: 'failed', error: 'Failed to open SSE connection' });
-      });
+    sseWhatsapp.ensureConnected().catch((err) => {
+      console.error('[useWhatsAppAuth] Failed to open SSE:', err);
+      dispatch({ type: 'failed', error: 'Failed to open SSE connection' });
+    });
 
     return () => {
       sseWhatsapp.off('connecting', handleConnecting);
       sseWhatsapp.off('connected', handleConnected);
-      sseWhatsapp.off('disconnected', handleDisconnected);
+      sseWhatsapp.off('reconnecting', handleReconnecting);
       sseWhatsapp.off('error', handleError);
-      sseWhatsapp.off('reconnected', handleReconnected);
       sseWhatsapp.off('whatsapp_client_ready', handleClientReadyFrame);
       sseWhatsapp.release();
     };
-  }, [requestInitialState]);
+  }, []);
 
   // Start / stop QR refresh timer
   const startQRRefreshTimer = useCallback(() => {
     if (qrRefreshTimerRef.current) clearInterval(qrRefreshTimerRef.current);
     qrRefreshTimerRef.current = setInterval(() => {
       if (authState === AUTH_STATES.QR_REQUIRED) {
-        void requestInitialState();
+        requestInitialState();
       }
     }, CONFIG.QR_REFRESH_DELAY_MS);
   }, [authState, requestInitialState]);
@@ -164,7 +169,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   // Action handlers
   const handleRetry = useCallback(() => {
     dispatch({ type: 'reset' });
-    void requestInitialState();
+    requestInitialState();
   }, [requestInitialState]);
 
   // "Refresh QR Code" — get a genuinely NEW code. The displayed QR is already
@@ -178,9 +183,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     dispatch({ type: 'reset' });
     try {
       await postJSON('/api/wa/refresh-qr', {});
-      setTimeout(() => {
-        void requestInitialState();
-      }, CONFIG.CLIENT_RESTART_DELAY_MS);
+      setTimeout(requestInitialState, CONFIG.CLIENT_RESTART_DELAY_MS);
     } catch (err) {
       console.error('Refresh QR failed:', err);
       const message = httpErrorMessage(err, 'Could not refresh QR code');
@@ -189,16 +192,16 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     }
   }, [requestInitialState, toast]);
 
+  // "Restart Client" — fire-and-forget on the server (FE-F16-3), so the reset
+  // comes FIRST, like Refresh QR and Re-link: the restart's QR / ready / park
+  // arrives over SSE and moves the page on. It used to await the whole restart
+  // behind a 30 s timeout and then drop the restart's live QR for "Restart failed".
   const handleRestart = useCallback(async () => {
     toast.info('Restarting WhatsApp client…');
+    dispatch({ type: 'reset' });
     try {
-      // Non-2xx now throws (route 500s on failure); the success body is success:true.
       await postJSON('/api/wa/restart', {});
-      dispatch({ type: 'reset' });
-      toast.success('WhatsApp client restart initiated');
-      setTimeout(() => {
-        void requestInitialState();
-      }, CONFIG.CLIENT_RESTART_DELAY_MS);
+      setTimeout(requestInitialState, CONFIG.CLIENT_RESTART_DELAY_MS);
     } catch (err) {
       console.error('Restart failed:', err);
       const message = httpErrorMessage(err, 'Restart failed');
@@ -215,9 +218,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     dispatch({ type: 'reset' });
     try {
       await postJSON('/api/wa/unlink', {});
-      setTimeout(() => {
-        void requestInitialState();
-      }, CONFIG.CLIENT_RESTART_DELAY_MS);
+      setTimeout(requestInitialState, CONFIG.CLIENT_RESTART_DELAY_MS);
     } catch (err) {
       console.error('Re-link failed:', err);
       const message = httpErrorMessage(err, 'Could not re-link WhatsApp');
@@ -244,7 +245,7 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && authState === AUTH_STATES.QR_REQUIRED) {
-        void requestInitialState();
+        requestInitialState();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -252,34 +253,36 @@ export const useWhatsAppAuth = (): UseWhatsAppAuthReturn => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState]);
 
-  // Auto-redirect only when the user actually went through QR scan on this
-  // page. If the page mounted with the client already ready, stay so the user
-  // can reach Restart Client / Re-link.
-  const sawQrStateRef = useRef(false);
-  useEffect(() => {
-    if (authState === AUTH_STATES.QR_REQUIRED) {
-      sawQrStateRef.current = true;
-    }
-  }, [authState]);
+  // Leave only when the user actually went through a QR scan on this page. If the
+  // page mounted with the client already ready, stay so the user can reach
+  // Restart Client / Re-link.
+  const [sawQr, setSawQr] = useState(false);
+  if (authState === AUTH_STATES.QR_REQUIRED && !sawQr) setSawQr(true);
+
+  // Opened as a popup by the send-message page (`?popup=1`): close, so the user
+  // is back on the page that asked, instead of this little window navigating to
+  // the whole /send screen (FE-F16-13).
+  const isPopup = new URLSearchParams(location.search).has('popup') && !!window.opener;
+  const returnPath = (location.state as { returnPath?: string } | null)?.returnPath || '/send';
+  const afterPairing =
+    authState === AUTH_STATES.AUTHENTICATED && sawQr ? (isPopup ? 'close' : returnPath) : null;
 
   useEffect(() => {
-    if (authState !== AUTH_STATES.AUTHENTICATED) return;
-    if (!sawQrStateRef.current) return;
-
-    const state = location.state as { returnPath?: string } | null;
-    const returnPath = state?.returnPath || '/send';
-
+    if (!afterPairing) return;
     const timer = setTimeout(() => {
-      navigate(returnPath, { replace: true });
-    }, 2000);
+      if (afterPairing === 'close') window.close();
+      else navigate(afterPairing, { replace: true });
+    }, CONFIG.REDIRECT_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [authState, location.state, navigate]);
+  }, [afterPairing, navigate]);
 
   return {
     authState,
     clientReady,
     qrCode,
     error,
+    streamDown,
+    afterPairing,
     actions: {
       handleRetry,
       handleRefreshQR,

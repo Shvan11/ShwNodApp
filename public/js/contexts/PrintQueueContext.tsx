@@ -18,7 +18,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { buildLabelsFromRanges } from '../utils/aligner-labels';
+import { buildLabelsFromRanges, doctorLabel } from '../utils/aligner-labels';
 
 // Types for the print queue.
 // Sequence bounds are null when the batch has no aligners for that arch —
@@ -190,11 +190,6 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
             }
 
             const labels = buildDefaultLabels(batch);
-            // Format doctor name with "Dr. " prefix if not already present
-            const rawDoctorName = doctor?.name || doctor?.doctorName || '';
-            const formattedDoctorName = rawDoctorName && !rawDoctorName.startsWith('Dr.') && !rawDoctorName.startsWith('Dr ')
-                ? `Dr. ${rawDoctorName}`
-                : rawDoctorName;
 
             const newItem: PrintQueueItem = {
                 id: generateId(),
@@ -203,7 +198,8 @@ export function PrintQueueProvider({ children }: PrintQueueProviderProps) {
                 personId: Number(patient.code || patient.personId || 0),
                 patientName: patient.name || patient.patientName || '',
                 doctorId: doctor?.id || doctor?.doctorId,
-                doctorName: formattedDoctorName,
+                // The shared display rule, as the single-batch dialog uses (FE-F20-10).
+                doctorName: doctorLabel(doctor?.name || doctor?.doctorName),
                 setId: set?.setId,
                 labels,
                 includeLogo: !!doctor?.logoPath,

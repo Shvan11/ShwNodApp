@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { useStandDashboardKPIs, useLowStockItems, useExpiringItems } from '../hooks/useStand';
+import { useStandDashboardKPIs, useLowStockItems, useExpiringItems, useStandItemMutations } from '../hooks/useStand';
 import type { StandItem } from '../hooks/useStand';
 import StandKPICards from '../components/stand/StandKPICards';
 import LowStockPanel from '../components/stand/LowStockPanel';
 import ExpiringItemsPanel from '../components/stand/ExpiringItemsPanel';
 import RestockModal from '../components/stand/RestockModal';
-import { useStandItemMutations } from '../hooks/useStand';
 import { useToast } from '../contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
+import { formatNumber } from '../utils/formatters';
 import { useState, useEffect } from 'react';
 import styles from './Stand.module.css';
 
@@ -15,11 +15,18 @@ export default function Stand() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const { kpis, loading: kpisLoading } = useStandDashboardKPIs();
+  const { kpis, loading: kpisLoading, error: kpisError } = useStandDashboardKPIs();
   const { items: lowStockItems, loading: lowStockLoading, error: lowStockError } = useLowStockItems();
-  const { items: expiringItems, loading: expiringLoading, error: expiringError } = useExpiringItems(30);
+  const {
+    items: expiringItems,
+    asOf: expiringAsOf,
+    loading: expiringLoading,
+    error: expiringError,
+  } = useExpiringItems(30);
 
-  // Surface fetch failures instead of silently showing an empty panel.
+  // Surface fetch failures instead of silently showing an empty panel (the KPI
+  // cards used to just not render — FE-F19-11).
+  useEffect(() => { if (kpisError) toast.error(kpisError); }, [kpisError, toast]);
   useEffect(() => { if (lowStockError) toast.error(lowStockError); }, [lowStockError, toast]);
   useEffect(() => { if (expiringError) toast.error(expiringError); }, [expiringError, toast]);
 
@@ -32,8 +39,8 @@ export default function Stand() {
   const handleRestock = async (quantity: number, unitCost: number) => {
     if (!restockItem) return;
     try {
-      await doRestock(restockItem.item_id, quantity, unitCost);
-      toast.success('Item restocked successfully');
+      const { costPrice } = await doRestock(restockItem.item_id, quantity, unitCost);
+      toast.success(`Restocked — cost is now ${formatNumber(costPrice)} IQD (average)`);
       setRestockItem(null);
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to restock item'));
@@ -58,24 +65,15 @@ export default function Stand() {
         <StandKPICards kpis={kpis} loading={kpisLoading} />
       </div>
 
+      {/* Each panel is its own titled card; they used to sit inside a second card
+          repeating the same heading. */}
       <div className={styles.panelsGrid}>
-        <div className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <h2>Low Stock Items</h2>
-          </div>
-          <LowStockPanel
-            items={lowStockItems}
-            loading={lowStockLoading}
-            onRestock={(item) => setRestockItem(item)}
-          />
-        </div>
-
-        <div className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <h2>Expiring Soon</h2>
-          </div>
-          <ExpiringItemsPanel items={expiringItems} loading={expiringLoading} />
-        </div>
+        <LowStockPanel
+          items={lowStockItems}
+          loading={lowStockLoading}
+          onRestock={(item) => setRestockItem(item)}
+        />
+        <ExpiringItemsPanel items={expiringItems} asOf={expiringAsOf} loading={expiringLoading} />
       </div>
 
       <div className={styles.navCards}>

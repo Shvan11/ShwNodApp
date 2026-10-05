@@ -61,13 +61,9 @@ export function wireWhatsappEvents(wsEmitter: EventEmitter): void {
                   message: '',
                   appointmentId: person.appointmentId
               });
-
-              const stats = messageState.dump();
-              wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_PROGRESS, {
-                  sent: stats.sentMessages,
-                  failed: stats.failedMessages,
-                  finished: stats.finishedSending
-              });
+              // No progress frame here: one-off sends (receipts, confirmations,
+              // re-sends) fire MessageSent too. The batch loop publishes its own
+              // progress (FE-F16-1).
           }
 
           log.info("MessageSent processed successfully");
@@ -93,13 +89,6 @@ export function wireWhatsappEvents(wsEmitter: EventEmitter): void {
                   error: person.error,
                   appointmentId: person.appointmentId
               });
-
-              const stats = messageState.dump();
-              wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_PROGRESS, {
-                  sent: stats.sentMessages,
-                  failed: stats.failedMessages,
-                  finished: stats.finishedSending
-              });
           }
 
           log.info("MessageFailed processed successfully");
@@ -108,23 +97,11 @@ export function wireWhatsappEvents(wsEmitter: EventEmitter): void {
       }
   });
 
-  whatsappService.on('finishedSending', async () => {
+  // The batch's end, with the batch's own counts (the service has already
+  // recorded it — `finishBatch`).
+  whatsappService.on('finishedSending', () => {
       log.info("finishedSending event fired");
-      try {
-          await messageState.setFinishedSending(true);
-
-          if (wsEmitter) {
-              const stats = messageState.dump();
-              wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_FINISHED, {
-                  finished: true,
-                  sent: stats.sentMessages,
-                  failed: stats.failedMessages,
-                  total: stats.sentMessages + stats.failedMessages
-              });
-          }
-      } catch (error) {
-          log.error("Error handling finishedSending event:", { error });
-      }
+      wsEmitter?.emit(InternalEmitterEvents.WHATSAPP_SENDING_FINISHED, messageState.batchProgress);
   });
 
   whatsappService.on('ClientIsReady', async () => {

@@ -16,6 +16,9 @@ import { timestampString } from '../validation.js';
 const appointmentOnDateRow = z.looseObject({
   appointment_id: z.number(),
   app_date: timestampString,
+  // The holiday warning lists who is booked (HolidayEditor, the calendar's holiday modal).
+  patient_name: z.string(),
+  app_detail: z.string().nullable(),
 });
 
 // GET /api/holidays/appointments-on-date?date= → { appointments, count }.
@@ -24,3 +27,4 @@ export const appointmentsOnDate = {
   response: z.object({ appointments: z.array(appointmentOnDateRow), count: z.number() }),
 } as const;
 export type DateQuery = z.infer<typeof appointmentsOnDate.query>;
+export type AppointmentsOnDateResponse = z.infer<typeof appointmentsOnDate.response>;

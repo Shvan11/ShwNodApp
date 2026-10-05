@@ -16,6 +16,7 @@ import { sql } from 'kysely';
 import { getKysely, withPgTransaction } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 import { toIntOr } from './aligner-shared.js';
+import { CLOSED_WORK_STATUSES } from '../../../shared/contracts/aligner.contract.js';
 import { ALIGNER_SET_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
 
 type AlignerSet = {
@@ -126,7 +127,15 @@ interface AlignerSetUpdateData {
  *   - the view itself filters type_of_work IN (19,20,21)
  * No ORDER BY beyond patient_name: AllSetsList sorts client-side, unconditionally.
  */
-export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
+/** What All Sets shows by default — and the opt-ins for history (FE-F18-13). */
+export interface AllSetsOptions {
+  includeInactive: boolean;
+  includeFinished: boolean;
+}
+
+export async function getAllAlignerSets(
+  opts: AllSetsOptions = { includeInactive: true, includeFinished: true }
+): Promise<AlignerSetFromView[]> {
   try {
     const db = getKysely();
 
@@ -185,6 +194,11 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
       .leftJoin('ba', 'ba.aligner_set_id', 's.aligner_set_id')
       // Work types that can carry an aligner set, from the taxonomy SSoT (not a literal 19/20/21).
       .where('w.type_of_work', 'in', ALIGNER_SET_WORK_TYPE_IDS)
+      // The list's default view — active sets of open works — is filtered HERE, not in
+      // the browser: it downloaded every set ever made, the hidden share growing with
+      // the years (FE-F18-13).
+      .$if(!opts.includeInactive, (qb) => qb.where('s.is_active', '=', true))
+      .$if(!opts.includeFinished, (qb) => qb.where('w.status', 'not in', [...CLOSED_WORK_STATUSES]))
       .select((eb) => [
         'w.person_id as person_id',
         'p.patient_name as patient_name',
@@ -235,6 +249,25 @@ export async function getAllAlignerSets(): Promise<AlignerSetFromView[]> {
     });
     throw err;
   }
+}
+
+/**
+ * How many sets All Sets is not showing: inactive ones (when hidden), and those of
+ * finished / discontinued works among the sets it would otherwise show. These are
+ * the counts on its two toggles.
+ */
+export async function countHiddenAlignerSets(opts: AllSetsOptions): Promise<{ inactive: number; finished: number }> {
+  const row = await getKysely()
+    .selectFrom('aligner_sets as s')
+    .innerJoin('works as w', 'w.work_id', 's.work_id')
+    .where('w.type_of_work', 'in', ALIGNER_SET_WORK_TYPE_IDS)
+    .select([
+      sql<number>`count(*) filter (where coalesce(s.is_active, false) = false)`.as('inactive'),
+      sql<number>`count(*) filter (where w.status in (${sql.join([...CLOSED_WORK_STATUSES])})
+        and (${opts.includeInactive} or coalesce(s.is_active, false)))`.as('finished'),
+    ])
+    .executeTakeFirst();
+  return { inactive: Number(row?.inactive ?? 0), finished: Number(row?.finished ?? 0) };
 }
 
 /**
@@ -329,12 +362,13 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
         // All three derive from the single ip.tp paid-to-date join above.
         eb.fn.coalesce(eb.ref('ip.tp'), sql<number>`0`).$castTo<number | null>().as('TotalPaid'),
         sql<number | null>`(${eb.ref('s.set_cost')} - coalesce(${eb.ref('ip.tp')}, 0))`.as('Balance'),
+        // 'Paid' is tested before 'Unpaid', so a set priced at 0 reads Paid, not
+        // Unpaid forever (FE-F17-8).
         sql<string | null>`case
           when ${eb.ref('s.set_cost')} is null then 'No Cost Set'
-          when coalesce(${eb.ref('ip.tp')}, 0) = 0 then 'Unpaid'
-          when coalesce(${eb.ref('ip.tp')}, 0) < ${eb.ref('s.set_cost')} then 'Partial'
           when coalesce(${eb.ref('ip.tp')}, 0) >= ${eb.ref('s.set_cost')} then 'Paid'
-          else 'Unknown' end`.as('PaymentStatus'),
+          when coalesce(${eb.ref('ip.tp')}, 0) = 0 then 'Unpaid'
+          else 'Partial' end`.as('PaymentStatus'),
         eb
           .selectFrom('aligner_notes as n')
           .whereRef('n.aligner_set_id', '=', 's.aligner_set_id')
@@ -387,6 +421,20 @@ export async function getAlignerSetsByWorkId(workId: number): Promise<AlignerSet
 /**
  * Get a single aligner set by id
  */
+/**
+ * The currency a work is billed in (`works.currency`), or null when the work is
+ * missing. Set prices are USD-only (FE-F17-9): a set cost on a work billed in
+ * anything else can never be paid against the set.
+ */
+export async function getWorkCurrency(workId: number): Promise<string | null> {
+  const row = await getKysely()
+    .selectFrom('works')
+    .select('currency')
+    .where('work_id', '=', workId)
+    .executeTakeFirst();
+  return row?.currency ?? null;
+}
+
 export async function getAlignerSetById(setId: number): Promise<AlignerSet | null> {
   try {
     const row = await getKysely()

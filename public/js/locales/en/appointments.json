@@ -117,6 +117,10 @@
     "waSent": "Appointment confirmation sent via WhatsApp!",
     "waFailed": "Failed to send WhatsApp",
     "waError": "WhatsApp error: {{error}}",
+    "waNotConnected": "WhatsApp is not connected, so the confirmation was not sent.",
+    "waNotFound": "The confirmation was not sent: the appointment could not be found.",
+    "waNoPhone": "The confirmation was not sent: the patient has no phone number.",
+    "waInvalidPhone": "The confirmation was not sent: the patient's phone number is not valid.",
     "errorPastSlot": "That time has already passed. Please pick another time.",
     "errorInvalidDoctor": "That doctor cannot be booked. Please pick another doctor.",
     "currentDoctor": "{{name}} (current)"

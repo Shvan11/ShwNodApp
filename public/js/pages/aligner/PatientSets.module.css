@@ -286,3 +286,29 @@
     margin-top: 1.25rem;
   }
 }
+
+/* The set number is the set's disclosure button (FE-F17-4): it looks like the
+   heading it sits in. */
+.setTitleButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.setTitleButton:hover {
+  text-decoration: underline;
+}
+
+.setTitleButton:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Photos sit above the scan files (was an inline style, FE-F17-15). */
+.photosSection {
+  margin-bottom: 1.5rem;
+}

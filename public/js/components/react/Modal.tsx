@@ -143,6 +143,9 @@ function getPortalTarget(): HTMLElement {
  * (`closeOnEscape={!loading}` mid-save) can't let Escape through to close the
  * modal beneath it.
  *
+ * An Escape a control inside the modal already handled (`defaultPrevented`) is
+ * left alone — that keypress closed the control's own menu.
+ *
  * Bubble phase on purpose. A cursor-anchored popover that opens OVER a modal —
  * `LookupContextMenu` — still beats this by listening in the capture phase with
  * `stopImmediatePropagation()`; registering here in capture would run first and
@@ -158,6 +161,10 @@ let escapeListenerAttached = false;
 
 function handleDocumentEscape(event: KeyboardEvent): void {
     if (event.key !== 'Escape') return;
+    // A control inside the modal already used this Escape — a react-select closing
+    // its open menu calls preventDefault. Closing the modal too (or, with an unsaved
+    // guard, asking to discard the form) on the same keypress was wrong (found in RE1).
+    if (event.defaultPrevented) return;
     const top = escapeStack[escapeStack.length - 1];
     if (!top) return;
     event.stopPropagation();

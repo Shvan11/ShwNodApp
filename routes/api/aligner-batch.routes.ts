@@ -86,12 +86,12 @@ router.put(
         req.body
       );
 
-      const data: Record<string, unknown> = {};
-      if (result && result.deactivatedBatch) {
-        data.deactivatedBatch = result.deactivatedBatch;
-      }
-
-      sendData(res, contract.updateBatch.response, data, 'Aligner batch updated successfully');
+      sendData(
+        res,
+        contract.updateBatch.response,
+        result?.deactivatedBatch ? { deactivatedBatch: result.deactivatedBatch } : {},
+        'Aligner batch updated successfully'
+      );
     } catch (error) {
       if (error instanceof AlignerValidationError) {
         ErrorResponses.badRequest(res, error.message, { code: error.code });

@@ -3,7 +3,7 @@
  * Chart.js horizontal bar chart showing the top-selling items by quantity.
  * Follows the same useRef + useEffect pattern as StatisticsComponent.
  */
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import Chart from '../../utils/chartSetup';
 import type { TopItemRow } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
@@ -14,7 +14,7 @@ interface TopItemsChartProps {
   data: TopItemRow[];
 }
 
-const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
+export default function TopItemsChart({ data }: TopItemsChartProps) {
   const { resolvedTheme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
@@ -68,12 +68,6 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
           legend: {
             display: false,
           },
-          title: {
-            display: true,
-            text: 'Top Selling Items',
-            font: { size: 16, weight: 'bold' },
-            padding: { top: 10, bottom: 20 },
-          },
           tooltip: {
             callbacks: {
               label: (context) => {
@@ -124,6 +118,4 @@ const TopItemsChart: React.FC<TopItemsChartProps> = ({ data }) => {
       <canvas ref={canvasRef} />
     </div>
   );
-};
-
-export default React.memo(TopItemsChart);
+}

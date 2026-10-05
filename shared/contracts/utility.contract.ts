@@ -2,8 +2,7 @@
  * API contract — utility endpoints (`/api/google`, `/api/convert-path`).
  *
  * Single source of truth for each endpoint's response shapes, imported by BOTH
- * the Express routes (relative `.js`) and the React app (`@shared` alias). See
- * docs/shared-contract-progress.md.
+ * the Express routes (relative `.js`) and the React app (`@shared` alias).
  *
  * Phase 13 (Wave 2). Group B — response-only (no client `{schema}`). The
  * `/sendtwilio` + `/checktwilio` endpoints are EXCLUDED (`res.send` plain text).
@@ -11,9 +10,8 @@
 import { z } from 'zod';
 import { dateString, optionalDateString } from '../validation.js';
 
-// GET /api/google?source= → contacts[].
-// Intentionally loose: Google Contacts API returns dynamic contact objects;
-// the field set varies by source and contact data completeness.
+// GET /api/google?source= → contacts[]: the server flattens People results to
+// `{ id, text, phone }`, one per phone number, so the rows are a fixed shape.
 export const google = {
   // `refresh=1` bypasses the server-side phone-book cache (the dropdown's Refresh
   // control) — the crawl is otherwise cached for a few minutes per account.
@@ -21,9 +19,19 @@ export const google = {
     source: z.string().optional(),
     refresh: z.coerce.boolean().optional(),
   }),
-  response: z.array(z.unknown()),
+  // One entry per phone number (`services/google-contacts/contacts.ts#PreparedContact`).
+  // Was an array of unknowns, so the two recipient pickers cast it and nothing
+  // checked a row (FE-F16-14).
+  response: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string(),
+      phone: z.string(),
+    })
+  ),
 } as const;
 export type GoogleQuery = z.infer<typeof google.query>;
+export type GoogleContact = z.infer<typeof google.response>[number];
 
 // GET /api/convert-path?path= → { webPath, fullPath }.
 export const convertPath = {

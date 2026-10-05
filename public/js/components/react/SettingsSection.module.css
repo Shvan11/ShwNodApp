@@ -191,41 +191,38 @@
     word-break: break-all;
 }
 
-/* Panel style for the settings info/error modal (shared <Modal> wrapper handles
-   the overlay; this is the inner content panel). */
-.infoModal {
-    background: var(--surface);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+/* System Options → "Other stored values": rows the app doesn't read, read-only. */
+.otherOptions {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-secondary);
 }
 
-/* The global .modal-body / .modal-footer rules in public/css/components/modal.css
-   only ship padding when scoped under .alert-modal, so we provide our own here. */
-.infoModal :global(.modal-body) {
-    padding: 1.5rem;
-    overflow-y: auto;
-    flex: 1;
+.otherOptions summary {
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-secondary);
 }
 
-.infoModal :global(.modal-body) p {
-    margin: 0;
+.otherOptionsList {
+    margin: var(--spacing-sm) 0 0;
+    display: grid;
+    gap: var(--spacing-xs);
+}
+
+.otherOptionsList dt {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.85rem;
     color: var(--text-primary);
-    line-height: 1.5;
 }
 
-.infoModal :global(.modal-footer) {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--gray-200);
-    background: var(--gray-50);
+.otherOptionsList dd {
+    margin: 0 0 var(--spacing-xs);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
 }
 
 .settingDescription code {

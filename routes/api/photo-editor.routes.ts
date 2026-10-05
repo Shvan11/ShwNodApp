@@ -10,6 +10,8 @@
  *  POST /:personId/render      — resolve the timepoint, then render framed slots to
  *                                working/{pid}0{tp}.iNN + record rows in the local clone
  *                                tables IN THE BACKGROUND (202 + SSE on completion).
+ *  GET  /:personId/framing/:tp — each saved view's recorded framing ("Continue editing").
+ *  GET  /:personId/source-size — an original's post-EXIF pixel size (resolution readout).
  */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -37,6 +39,7 @@ import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/p
 import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
 import { listTakenDates } from '../../services/imaging/photo-taken-date.service.js';
+import { readSavedFramings, readSourceSize } from '../../services/imaging/photo-framing.service.js';
 import { FileExplorerError } from '../../services/files/file-explorer.service.js';
 import { toDateOnly, parseLocalDate } from '../../utils/date.js';
 import { log } from '../../utils/logger.js';
@@ -65,6 +68,8 @@ type SlotSpec = {
   output?: { width: number; height: number };
   /** Natural dims of the media the client cropped against (proxy mode); see RenderSlotInput. */
   cropSpace?: { width: number; height: number };
+  /** The editor's framing record (frame % + zoom), embedded in the render; see RenderSlotInput. */
+  framing?: { area?: { x?: number; y?: number; width?: number; height?: number }; zoom?: number };
 };
 
 // --- Boundary schemas ---
@@ -307,7 +312,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
       try {
         const ex = slot?.extract;
         const op = slot?.output;
-        const isFiniteNum = (n: unknown): boolean => typeof n === 'number' && Number.isFinite(n);
+        const isFiniteNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
         const opOk = !!op && [op.width, op.height].every(isFiniteNum);
         const exOk = !ex || [ex.left, ex.top, ex.width, ex.height].every(isFiniteNum);
         if (typeof view !== 'string' || typeof slot?.sourceRelPath !== 'string' || !opOk || !exOk) {
@@ -332,6 +337,23 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           cropSpace = undefined;
         }
 
+        // The framing record is advisory too: it never drives the pixels, it only lets
+        // the editor reopen the view where it was left. A malformed one is dropped (the
+        // view then reopens from scratch) rather than failing the slot.
+        let framing: { area: { x: number; y: number; width: number; height: number }; zoom: number } | undefined;
+        if (slot.framing !== undefined) {
+          const { area: fa, zoom: fz } = slot.framing ?? {};
+          const { x, y, width, height } = fa ?? {};
+          if (
+            isFiniteNum(x) && isFiniteNum(y) && isFiniteNum(width) && isFiniteNum(height) && isFiniteNum(fz) &&
+            width > 0 && height > 0 && fz > 0
+          ) {
+            framing = { area: { x, y, width, height }, zoom: fz };
+          } else {
+            log.warn('[PhotoEditor] dropping malformed framing', { personId, view, framing: slot.framing });
+          }
+        }
+
         const filename = await renderSlotToWorking({
           personId,
           tpCode: tp_code,
@@ -343,6 +365,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           extract: ex,
           output: op,
           cropSpace,
+          framing,
         });
 
         const digits = view.slice(1); // 'i10' -> '10'
@@ -486,6 +509,58 @@ router.get('/:personId/photo-dates', validate({ params: photoEditor.photoDates.p
     ErrorResponses.internalError(res, 'Failed to fetch photo dates', err as Error);
   }
 });
+
+/**
+ * GET /:personId/framing/:tpCode
+ * Each rendered view's recorded framing, read from the render itself (XMP — see
+ * services/imaging/photo-framing-xmp.ts). The editor uses it to reopen a saved view
+ * where it was left and to show a saved view's zoom/rotation. Read-only — rides the
+ * global auth gate.
+ */
+router.get(
+  '/:personId/framing/:tpCode',
+  validate({ params: photoEditor.framing.params }),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const views = await readSavedFramings(Number(req.params.personId), Number(req.params.tpCode));
+      sendData(res, photoEditor.framing.response, views);
+    } catch (err) {
+      if (err instanceof FileExplorerError) {
+        sendError(res, err.status, err.message);
+        return;
+      }
+      log.error('[PhotoEditor] framing read failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Failed to read photo framing', err as Error);
+    }
+  }
+);
+
+/**
+ * GET /:personId/source-size?path=
+ * An original's pixel size after EXIF orientation. The editor frames against a 2048 px
+ * proxy by default; the saved view keeps the crop's native pixels, so this is how its
+ * resolution readout knows what a save will keep. Read-only — rides the global auth gate.
+ */
+router.get(
+  '/:personId/source-size',
+  validate({ params: photoEditor.sourceSize.params, query: photoEditor.sourceSize.query }),
+  async (
+    req: Request<{ personId: string }, unknown, unknown, photoEditor.SourceSizeQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const size = await readSourceSize(Number(req.params.personId), req.query.path);
+      sendData(res, photoEditor.sourceSize.response, size);
+    } catch (err) {
+      if (err instanceof FileExplorerError) {
+        sendError(res, err.status, err.message);
+        return;
+      }
+      log.error('[PhotoEditor] source-size failed', { error: (err as Error).message });
+      ErrorResponses.internalError(res, 'Failed to read photo size', err as Error);
+    }
+  }
+);
 
 /**
  * GET /:personId/taken-dates?folder=&scope=

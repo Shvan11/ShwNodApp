@@ -282,18 +282,6 @@
   color: var(--error-700);
 }
 
-.messageCountInfo.success {
-  background: var(--success-100);
-  border-left-color: var(--success-color);
-  color: var(--success-700);
-}
-
-.messageCountInfo.warning {
-  background: var(--warning-100);
-  border-left-color: var(--warning-color);
-  color: var(--warning-800);
-}
-
 /* Date Warning Banner */
 .dateWarningBanner {
   display: flex;
@@ -361,7 +349,32 @@
   vertical-align: middle;
 }
 
-/* Connection Status States (keep as global since they're dynamic) */
+/* Status panel states — the colour says what the text says (FE-F16-15: four
+   global `connection-status-*` classes no rule matched since the Jan-2026 module
+   conversion, so connected, error and sending all looked the same). */
+.statusConnected {
+  background: var(--success-50);
+  border-color: var(--success-200);
+  color: var(--success-800);
+}
+
+.statusSending {
+  background: var(--info-50);
+  border-color: var(--info-200);
+  color: var(--info-800);
+}
+
+.statusError {
+  background: var(--error-50);
+  border-color: var(--error-200);
+  color: var(--error-700);
+}
+
+.statusDisconnected {
+  background: var(--warning-50);
+  border-color: var(--warning-200);
+  color: var(--warning-800);
+}
 
 /* Sending Progress Container */
 .sendingProgressContainer {
@@ -588,11 +601,10 @@
   color: var(--error-color);
 }
 
-.statusTable tbody tr:global(.status-ready) {
+.statusTable tbody tr.rowReady {
   background-color: rgba(245, 158, 11, 0.08);
 }
-.statusTable tbody tr:global(.status-failed),
-.statusTable tbody tr:global(.status-invalid) {
+.statusTable tbody tr.rowFailed {
   background-color: rgba(220, 53, 69, 0.06);
 }
 
@@ -624,14 +636,6 @@
 }
 
 .timeSent {
-  white-space: nowrap;
-}
-
-/* Message preview truncation */
-.messagePreview {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -701,10 +705,6 @@
   .statusTable th,
   .statusTable td {
     padding: 8px 6px;
-  }
-
-  .messagePreview {
-    max-width: 120px;
   }
 
   .tableSummary {

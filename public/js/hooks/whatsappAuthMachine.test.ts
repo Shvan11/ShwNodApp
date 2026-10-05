@@ -65,4 +65,28 @@ describe('whatsappAuthMachine (FE-F3-5)', () => {
     expect(initialAuthModel(true, null).authState).toBe(S.AUTHENTICATED);
     expect(initialAuthModel(false, 'qr').authState).toBe(S.INITIALIZING);
   });
+
+  it('a reopened stream keeps a shown QR (FE-F16-12: it used to blank it)', () => {
+    const qr = run(fresh(), { type: 'status', clientReady: false, qrCode: 'qr-1' });
+    expect(run(qr, { type: 'transport', event: 'connected' }).authState).toBe(S.QR_REQUIRED);
+    const restoring = run(fresh(), { type: 'initialState', data: { restoring: true } });
+    expect(run(restoring, { type: 'transport', event: 'connected' }).authState).toBe(S.RESTORING);
+  });
+
+  it('a dropped stream shows DISCONNECTED, and the reopen waits for the snapshot', () => {
+    const qr = run(fresh(), { type: 'status', clientReady: false, qrCode: null }, { type: 'initialState', data: { restoring: true } });
+    const dropped = run(qr, { type: 'transport', event: 'disconnected' });
+    expect(dropped).toMatchObject({ authState: S.DISCONNECTED, streamDown: true });
+    const back = run(dropped, { type: 'transport', event: 'connected' });
+    expect(back).toMatchObject({ authState: S.INITIALIZING, streamDown: false });
+    expect(run(back, { type: 'initialState', data: { restoring: true } }).authState).toBe(S.RESTORING);
+  });
+
+  it('a ready client stays AUTHENTICATED over a dropped stream, which the model still records', () => {
+    const ready = run(fresh(), { type: 'status', clientReady: true, qrCode: null });
+    expect(run(ready, { type: 'transport', event: 'disconnected' })).toMatchObject({
+      authState: S.AUTHENTICATED,
+      streamDown: true,
+    });
+  });
 });

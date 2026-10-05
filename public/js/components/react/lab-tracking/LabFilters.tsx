@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LAB_STAGE_META, type ListLabCasesQuery } from '@shared/contracts/lab-case.contract';
 import { labelForStage } from '@/config/labStages';
 import styles from './LabFilters.module.css';
@@ -30,12 +30,19 @@ const LabFilters = ({ filters, labs, onChange }: LabFiltersProps) => {
         setSyncedQ(filters.q ?? '');
         setQDraft(filters.q ?? '');
     }
+    // The debounce reads the LATEST filters when it fires: it used to apply the
+    // ones it captured, so a stage/lab change made within 300 ms of typing was
+    // thrown away (FE-F20-8a).
+    const latest = useRef({ filters, onChange });
+    useEffect(() => {
+        latest.current = { filters, onChange };
+    });
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (qDraft !== (filters.q ?? '')) onChange({ ...filters, q: qDraft || undefined });
+            const { filters: current, onChange: apply } = latest.current;
+            if (qDraft !== (current.q ?? '')) apply({ ...current, q: qDraft || undefined });
         }, 300);
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-arm on qDraft changes; onChange/filters would re-fire the debounce on every parent render
     }, [qDraft]);
 
     return (

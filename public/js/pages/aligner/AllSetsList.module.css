@@ -329,6 +329,12 @@
 .patientName {
     font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
+    text-decoration: none;
+}
+
+.patientName:hover,
+.patientName:focus-visible {
+    text-decoration: underline;
 }
 
 /* Badge Variants */

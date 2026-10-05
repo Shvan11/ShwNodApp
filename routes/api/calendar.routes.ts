@@ -26,6 +26,7 @@ import {
   fillCalendar,
 } from '../../services/database/queries/calendar-queries.js';
 import { parseLocalDate } from '../../utils/date.js';
+import { upsertOptions } from '../../services/database/queries/options-queries.js';
 // The view-model types, the Sat→Thu grid math and the two transforms live in the
 // service — see services/business/CalendarViewService.ts (C2).
 import {
@@ -223,6 +224,45 @@ router.post(
     } catch (error) {
       log.error('❌ Calendar regeneration error:', error);
       ErrorResponses.internalError(res, 'Failed to regenerate calendar', error as Error);
+    }
+  }
+);
+
+/**
+ * PUT /api/calendar/slot-settings
+ * Which configured times are "early" / "late" (hidden by default) and whether the
+ * calendar shows them by default — the three options written in one statement. Either
+ * list may be empty (FE-F21-5). Front desk runs this tab with the admin (owner, RF1),
+ * the same tier that adds and removes the times themselves.
+ */
+const sortHHMM = (times: string[]): string[] => [...new Set(times)].sort();
+
+router.put(
+  '/slot-settings',
+  authorize(FINANCE_ROLES),
+  validate({ body: calendar.updateSlotSettings.body }),
+  async (
+    req: Request<unknown, unknown, calendar.UpdateSlotSettingsBody>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const earlySlots = sortHHMM(req.body.earlySlots);
+      const lateSlots = sortHHMM(req.body.lateSlots);
+      const both = earlySlots.filter((t) => lateSlots.includes(t));
+      if (both.length > 0) {
+        ErrorResponses.badRequest(res, `A time can't be both early and late: ${both.join(', ')}`);
+        return;
+      }
+      const { showExtendedDefault } = req.body;
+      await upsertOptions([
+        { name: 'CALENDAR_EARLY_SLOTS', value: earlySlots.join(',') },
+        { name: 'CALENDAR_LATE_SLOTS', value: lateSlots.join(',') },
+        { name: 'CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', value: String(showExtendedDefault) },
+      ]);
+      sendData(res, calendar.updateSlotSettings.response, { earlySlots, lateSlots, showExtendedDefault });
+    } catch (error) {
+      log.error('Error saving calendar slot settings:', error);
+      ErrorResponses.internalError(res, 'Failed to save calendar slot settings', error as Error);
     }
   }
 );

@@ -67,6 +67,43 @@ plus a row upserted into `time_point_images`. On completion the route emits
 `tpCode`, camelCase — see the note in `photo-editor.routes.ts`). See
 `services/imaging/photo-render.service.ts`.
 
+**The framing record — "Continue editing".** Each render also records how the view was
+framed: zoom, rotation, mirror/flip, and the frame itself (react-easy-crop's
+`croppedAreaPercentages` — % of the flipped + rotated original, so it is independent of
+the 2048 px proxy vs the original), plus the original it was cut from (clean name, the
+listing's mtime, post-EXIF size). It is stored **inside the rendered JPEG as XMP**
+(`services/imaging/photo-framing-xmp.ts`; shape `savedFraming` in the contract), not in
+a table: the record always describes exactly the pixels it sits in, a view re-rendered
+any other way (Dolphin, a build before 2026-10-05) simply carries none, and removing a
+view removes its record. No schema change, so nothing to mirror to Supabase.
+`GET /api/photo-editor/:id/framing/:tpCode` reads it back (header-only). A saved slot
+then offers both re-edit routes: **Continue editing** (its tagged original, framed as
+saved — offered only while that original is still the file the record names, by name +
+mtime) and **Start over from original** (default framing). A view saved without a record
+offers only Start over, and the menu says why.
+
+**What counts as a change.** A slot is *unsaved* only when Save would change what is on
+disk: a newly placed photo, or a re-opened one whose framing moved from the saved one
+(`framing.ts#isSlotDirty`, 0.25 % tolerance). So reopening a view and leaving it is not a
+change, **Save writes only the changed slots**, and **Cancel** asks before leaving only
+when something would be lost. Each slot's title bar shows *Saved* / *Unsaved*; the top
+bar counts the unsaved ones. "Discard changes" on an edited saved view brings the saved
+photo back; "Reset framing" returns to where the edit started (the saved framing after
+Continue, else the default).
+
+**Readout.** Beside the quick actions, the selected slot's zoom (100 % = the photo just
+fills the frame), rotation, flips (the occlusal default flip included), the resolution
+the save will keep (a view keeps the crop's native pixels; in Fast-preview mode the
+original's size comes from `GET /api/photo-editor/:id/source-size`), a warning under
+2 MP, and a **White edge** warning when the frame runs past the photo — those parts are
+saved white (the live preview shows them dark). Zoom and rotation reset individually on
+click. For a saved view the recorded values show read-only.
+
+**Overlay.** A toggle lays another session's saved views (the grid's 480 px thumbnails)
+faintly over the slots, stretched to the slot box — the box is the view's frame — so a
+new session can be framed like the last one. Default session: the latest one before
+this; on/off and strength persist per device (`pe:overlay`, `pe:overlayOpacity`).
+
 > **Prepare guards (`POST /:id/prepare`):** the three normal outcomes ride the
 > success envelope as a discriminated result — `{ tp_code }` (prepared),
 > `{ conflict: true, … }` (an existing tblwork Initial/Final date differs → needs
@@ -136,8 +173,10 @@ returns the logo). The full set of codes the data may contain is in `image_types
 | Timepoint reads (local tables) | `services/database/queries/timepoint-queries.ts` |
 | Timepoint/image writes (find-or-create, upsert, update, delete) | `services/database/queries/native-timepoint-queries.ts` |
 | Photo-session prep helpers (patient, dates, tblwork conflict) | `services/database/queries/photo-session-queries.ts` |
-| Prepare / render / photo-dates / delete-view endpoints | `routes/api/photo-editor.routes.ts` |
-| Server-side sharp render | `services/imaging/photo-render.service.ts` |
+| Prepare / render / photo-dates / delete-view / framing / source-size endpoints | `routes/api/photo-editor.routes.ts` |
+| Server-side sharp render (embeds the framing record) | `services/imaging/photo-render.service.ts` |
+| Framing record: XMP encode/decode (pure) + reads | `services/imaging/photo-framing-xmp.ts`, `photo-framing.service.ts` |
+| Editor framing maths (dirty check, white edge, resolution) | `public/js/components/react/photo-editor/framing.ts` |
 | View-image sizing + `/DolImgs` static mount | `services/imaging/index.ts`, `index.ts` |
 | View codes + original-tag convention (shared SSoT) | `shared/photo-views.ts` |
 | Editor UI | `public/js/components/react/photo-editor/`, `PhotoSessionDialog.tsx` |

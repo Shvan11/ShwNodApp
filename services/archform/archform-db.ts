@@ -4,9 +4,11 @@
  * Provides access to the Archform aligner design software's SQLite database.
  * Used to cross-reference Archform patients with aligner sets in the main SQL Server database.
  *
- * The DB path is configurable via the ARCHFORM_DB_PATH option in tbloptions.
- * On Windows production: UNC paths (\\workPC\Archform\__ARCHFORMDB) work natively.
- * On WSL2 development: requires manual SMB mount at /mnt/archform/.
+ * The DB path is the install's `ARCHFORM_DB_PATH` option (Settings → General). There is
+ * NO default: it used to fall back to `\\workPC\Archform\__ARCHFORMDB` — this clinic's
+ * machine — on every install (audit FE-F18-4). An empty or missing row means "this center
+ * doesn't use Archform", and the matcher tab is hidden. A UNC path works natively on
+ * Windows; on WSL it is converted to its `/mnt/<host>/…` mount.
  */
 import Database from 'better-sqlite3';
 import fsSync from 'fs';
@@ -35,6 +37,22 @@ export type ArchformPatient = {
 // CUSTOM ERROR
 // ==============================
 
+/** No `ARCHFORM_DB_PATH` is set on this install — Archform is not used here. */
+export class ArchformNotConfiguredError extends Error {
+  constructor() {
+    super('Archform is not set up on this install (ARCHFORM_DB_PATH is empty).');
+    this.name = 'ArchformNotConfiguredError';
+  }
+}
+
+/** The patient id is not (or no longer) in the Archform database. */
+export class ArchformPatientNotFoundError extends Error {
+  constructor(id: number) {
+    super(`Archform patient ${id} was not found — it may have been deleted or merged in Archform.`);
+    this.name = 'ArchformPatientNotFoundError';
+  }
+}
+
 export class ArchformDbUnavailableError extends Error {
   public readonly dbPath: string;
   constructor(dbPath: string) {
@@ -50,10 +68,6 @@ export class ArchformDbUnavailableError extends Error {
 // STATE
 // ==============================
 
-/** Default UNC path for Windows production (hostname resolved via NetBIOS) */
-const DEFAULT_WINDOWS_PATH = '\\\\workPC\\Archform\\__ARCHFORMDB';
-/** Default mount path for WSL2 development */
-const DEFAULT_WSL_PATH = '/mnt/archform/__ARCHFORMDB';
 
 let db: Database.Database | null = null;
 let currentPath: string | null = null;
@@ -62,38 +76,37 @@ let currentPath: string | null = null;
 // INTERNAL HELPERS
 // ==============================
 
-/**
- * Get the platform-appropriate default DB path
- */
-function getDefaultDbPath(): string {
-  const { platform } = getPlatformInfo();
-  return platform === 'wsl' ? DEFAULT_WSL_PATH : DEFAULT_WINDOWS_PATH;
+/** The configured ARCHFORM_DB_PATH, trimmed; '' when unset. Never throws. */
+async function readConfiguredPath(): Promise<string> {
+  try {
+    return ((await getOption('ARCHFORM_DB_PATH')) ?? '').trim();
+  } catch (error) {
+    log.warn('Failed to read ARCHFORM_DB_PATH from options', { error: (error as Error).message });
+    return '';
+  }
+}
+
+/** Does this install use Archform at all? (A path is set.) */
+export async function isArchformConfigured(): Promise<boolean> {
+  return (await readConfiguredPath()) !== '';
 }
 
 /**
- * Resolve the configured DB path from tbloptions, falling back to default.
- * Auto-converts between Windows UNC and WSL paths based on current platform.
+ * Resolve the configured DB path for this platform, or null when none is set.
+ * Auto-converts between Windows UNC and WSL paths.
  */
-async function resolveDbPath(): Promise<string> {
-  try {
-    const configured = await getOption('ARCHFORM_DB_PATH');
-    if (!configured) return getDefaultDbPath();
+async function resolveDbPath(): Promise<string | null> {
+  const configured = await readConfiguredPath();
+  if (!configured) return null;
 
-    const { platform } = getPlatformInfo();
-    // Auto-convert if stored path doesn't match current platform
-    if (platform === 'wsl' && configured.startsWith('\\\\')) {
-      return convertWindowsPathToWSL(configured);
-    }
-    if (platform === 'windows' && configured.startsWith('/mnt/')) {
-      return convertWSLPathToWindows(configured);
-    }
-    return configured;
-  } catch (error) {
-    log.warn('Failed to read ARCHFORM_DB_PATH from options, using default', {
-      error: (error as Error).message,
-    });
-    return getDefaultDbPath();
+  const { platform } = getPlatformInfo();
+  if (platform === 'wsl' && configured.startsWith('\\\\')) {
+    return convertWindowsPathToWSL(configured);
   }
+  if (platform === 'windows' && configured.startsWith('/mnt/')) {
+    return convertWSLPathToWindows(configured);
+  }
+  return configured;
 }
 
 /**
@@ -137,6 +150,7 @@ async function reconnect(): Promise<Database.Database> {
  */
 async function getDb(): Promise<Database.Database> {
   const dbPath = await resolveDbPath();
+  if (!dbPath) throw new ArchformNotConfiguredError();
 
   if (db && currentPath === dbPath) {
     // Verify the connection is still alive
@@ -183,16 +197,21 @@ function isReadable(p: string): boolean {
  */
 export async function isArchformAvailable(): Promise<{
   available: boolean;
+  configured: boolean;
   path: string;
   error?: string;
 }> {
   const dbPath = await resolveDbPath();
+  if (!dbPath) {
+    return { available: false, configured: false, path: '', error: 'ARCHFORM_DB_PATH is not set' };
+  }
   try {
     fsSync.accessSync(dbPath, fsSync.constants.R_OK);
-    return { available: true, path: dbPath };
+    return { available: true, configured: true, path: dbPath };
   } catch (error) {
     return {
       available: false,
+      configured: true,
       path: dbPath,
       error: (error as Error).message,
     };
@@ -235,9 +254,10 @@ const RETRYABLE_WRITE_CODES = new Set([
  * Retries once with a fresh connection if the write fails (e.g. after SMB remount).
  */
 export async function updateArchformPatient(id: number, name: string, lastName: string): Promise<void> {
+  let changes: number;
   try {
     const database = await getDb();
-    database.prepare('UPDATE Patient SET Name = ?, LastName = ? WHERE Id = ?').run(name, lastName, id);
+    changes = database.prepare('UPDATE Patient SET Name = ?, LastName = ? WHERE Id = ?').run(name, lastName, id).changes;
   } catch (error) {
     // A dropped/remounted share surfaces as an I/O or open failure, not just BUSY
     // — the doc comment promised remount recovery that these two codes never caught.
@@ -245,11 +265,14 @@ export async function updateArchformPatient(id: number, name: string, lastName: 
     if (RETRYABLE_WRITE_CODES.has(code ?? '')) {
       log.warn('Archform write failed, retrying with fresh connection', { code });
       const database = await reconnect();
-      database.prepare('UPDATE Patient SET Name = ?, LastName = ? WHERE Id = ?').run(name, lastName, id);
+      changes = database.prepare('UPDATE Patient SET Name = ?, LastName = ? WHERE Id = ?').run(name, lastName, id).changes;
     } else {
       throw error;
     }
   }
+  // An UPDATE of 0 rows was reported as success: the toast said "Patient name
+  // updated" and the row then vanished on refetch (F18's found-along-the-way).
+  if (changes === 0) throw new ArchformPatientNotFoundError(id);
 }
 
 /** Conservative bound on SQLite's per-statement parameter limit. */

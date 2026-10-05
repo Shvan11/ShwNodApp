@@ -19,6 +19,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { WORK_STATUS } from '@shared/treatment-taxonomy';
 import { postJSON, deleteJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { invalidateAligner } from '@/query/aligner';
 import { qk } from '@/query/keys';
 import { invalidateApprovals } from '@/services/approvals';
 import {
@@ -181,6 +182,10 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const invalidateWorkWrite = (workId: number) => {
         void queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
         void queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
+        // A work's status, owner or existence also decides which aligner sets the
+        // aligner lists show (All Sets hides closed works) — FE-F7-8's hand-down to
+        // F17, answered in FE-F17-6.
+        void invalidateAligner();
     };
 
     const handlePrintNoWorkReceipt = () => {
@@ -333,6 +338,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             }
             toast.success(t('toast.deleted'));
             void queryClient.invalidateQueries({ queryKey: qk.patient.all(personId ?? '') });
+            void invalidateAligner();
             // The work is gone: drop its own reads rather than refetch them into a 404.
             queryClient.removeQueries({ queryKey: qk.work.all(work.work_id) });
         } catch (err) {

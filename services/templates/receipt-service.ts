@@ -7,9 +7,10 @@ import { sql } from 'kysely';
 import { getKysely } from '../database/kysely.js';
 import { getPatientNoWorkReceiptData } from '../database/queries/patient-queries.js';
 import { promises as fs } from 'fs';
-import path from 'path';
 import { log } from '../../utils/logger.js';
 import { formatDatePattern } from '../../utils/date.js';
+import { resolveTemplateFile, RECEIPT_DOCUMENT_TYPE_ID } from './template-files.js';
+import { getClinicDisplayName } from '../settings/clinic-identity.js';
 
 // =============================================================================
 // TYPES
@@ -277,25 +278,8 @@ async function getTemplatePath(
   throw new Error('Default receipt template not found');
 }
 
-/**
- * Resolve a DB-stored template path to an absolute file inside the templates
- * directory.
- *
- * `template_file_path` is admin-editable through the templates screen, and the old
- * `path.join(process.cwd(), stored)` would happily follow a `../../` out of the
- * repo and read any file the service account can — an absolute path escaped
- * outright. Containment is checked AFTER resolution, so `..` segments and absolute
- * paths are both caught.
- */
-function resolveTemplateFile(storedPath: string): string {
-  const root = path.resolve(process.cwd(), 'data', 'templates');
-  const full = path.resolve(root, storedPath.replace(/^[/\\]+/, '').replace(/^data[/\\]+templates[/\\]+/, ''));
-  const rel = path.relative(root, full);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error(`Template path escapes the templates directory: ${storedPath}`);
-  }
-  return full;
-}
+// `resolveTemplateFile` (the containment rule for every template file) lives in
+// ./template-files.ts, shared with the designer's read and save routes.
 
 /**
  * Escape a resolved placeholder value for HTML text/attribute context.
@@ -427,16 +411,25 @@ export async function generateReceiptHTML(workId: number): Promise<string> {
   // Pick the flat template variant: discount layout only when a discount applies.
   const templatePath = data.work.HasDiscount
     ? await getTemplatePath({ templateName: DISCOUNT_TEMPLATE_NAME }, FALLBACK_TEMPLATE_PATHS.discount)
-    : await getTemplatePath({ documentTypeId: 1 });
+    : await getTemplatePath({ documentTypeId: RECEIPT_DOCUMENT_TYPE_ID });
   const fullPath = resolveTemplateFile(templatePath);
 
   // Read template file
   const templateHTML = await fs.readFile(fullPath, 'utf-8');
 
   // Render template with data
-  const html = renderTemplate(templateHTML, data);
+  const html = renderTemplate(templateHTML, { ...data, clinic: await clinicData() });
 
   return html;
+}
+
+/**
+ * `{{clinic.*}}` on a receipt — the designer's *Clinic Header* block reads it, and
+ * receipts had no `clinic` data, so the block printed an empty header (FE-F20-9).
+ * The name is the configured clinic name (Settings → General), never a literal.
+ */
+async function clinicData(): Promise<{ Name: string }> {
+  return { Name: await getClinicDisplayName() };
 }
 
 /**
@@ -492,7 +485,7 @@ export async function generateNoWorkReceiptHTML(patientId: number): Promise<stri
   log.debug('[RECEIPT-SERVICE] Rendering template with data');
 
   // Render template with data
-  const html = renderTemplate(templateHTML, data);
+  const html = renderTemplate(templateHTML, { ...data, clinic: await clinicData() });
 
   log.info('[RECEIPT-SERVICE] Receipt generated successfully');
 

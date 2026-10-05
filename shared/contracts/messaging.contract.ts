@@ -2,13 +2,12 @@
  * API contract — messaging endpoints (`/api/messaging/*`).
  *
  * Single source of truth for each endpoint's response shapes, imported by BOTH
- * the Express routes (relative `.js`) and the React app (`@shared` alias). See
- * docs/shared-contract-progress.md.
+ * the Express routes (relative `.js`) and the React app (`@shared` alias).
  *
  * Phase 13 (Wave 2). Group B — now MODELED. `status/:date` is consumed by the
  * React-Query `useMessageStatus` hook (its rows ride `data.messages`); `count`/`reset`
- * ride the raw whatsapp-api-client (top-level `{success,data}` envelope), so their
- * schemas only drive the server-side dev-parse. Shapes mirror the service interfaces:
+ * are read through the funnel with these schemas (the bespoke WhatsApp `APIClient`
+ * that used to read them is gone, FE-F16-8). Shapes mirror the service interfaces:
  * TransformedMessage / MessageCount (MessagingService) + ResetResult (messaging-queries).
  */
 import { z } from 'zod';
@@ -42,6 +41,9 @@ const transformedMessage = z.object({
 export const status = {
   response: z.looseObject({ messages: z.array(transformedMessage) }),
 } as const;
+/** One row of the /send status table — the page's row type (FE-F16-10: it was written by hand). */
+export type StatusRow = z.infer<typeof transformedMessage>;
+export type StatusResponse = z.infer<typeof status.response>;
 
 // GET /api/messaging/count/:date → MessageCount + the route-patched `date`.
 export const count = {
@@ -53,6 +55,7 @@ export const count = {
     date: z.string().optional(),
   }),
 } as const;
+export type CountResponse = z.infer<typeof count.response>;
 
 // POST /api/messaging/reset/:date → ResetResult (per-channel reset tallies).
 export const reset = {
@@ -67,6 +70,7 @@ export const reset = {
     smsRecordsReset: z.number(),
   }),
 } as const;
+export type ResetResponse = z.infer<typeof reset.response>;
 
 // GET /api/messaging/message-text/:appointmentId → the reminder text that
 // is/would be sent for one appointment. Powers the right-click "Copy message"

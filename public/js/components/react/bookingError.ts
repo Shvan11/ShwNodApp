@@ -58,20 +58,47 @@ interface BookingToast {
     error: (message: string) => void;
 }
 
+/** `/api/wa/send-appointment`'s raw answer: on a refusal, a `code` per case (FE-F16-9). */
+interface ConfirmationResult {
+    success: boolean;
+    code?: string;
+    message?: string;
+}
+
+/**
+ * The reason a confirmation wasn't sent, in the form's language. The server
+ * answers 200 `{ success: false, code, message }` with its own English text, which
+ * the Arabic forms used to toast verbatim beside translated chrome (FE-F16-9).
+ */
+export function confirmationFailureMessage(code: string | undefined, t: TFunction<'appointments'>): string {
+    switch (code) {
+        case 'not_connected':
+            return t('form.waNotConnected');
+        case 'not_found':
+            return t('form.waNotFound');
+        case 'no_phone':
+            return t('form.waNoPhone');
+        case 'invalid_phone':
+            return t('form.waInvalidPhone');
+        default:
+            return t('form.waFailed');
+    }
+}
+
 /**
  * Send the patient the appointment's WhatsApp confirmation, and report the
  * outcome. Fire-and-forget: the booking itself has already succeeded. Both forms
- * ran their own copy of this.
+ * ran their own copy of this; the calendar's drag-to-another-day uses it too.
  */
 export function sendAppointmentConfirmation(
     appointmentId: number | string,
     toast: BookingToast,
     t: TFunction<'appointments'>
 ): void {
-    postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', { appointmentId })
+    postJSON<ConfirmationResult>('/api/wa/send-appointment', { appointmentId })
         .then(waResult => {
             if (waResult.success) toast.success(t('form.waSent'));
-            else toast.warning(waResult.message || t('form.waFailed'));
+            else toast.warning(confirmationFailureMessage(waResult.code, t));
         })
         .catch(err => {
             toast.error(t('form.waError', { error: httpErrorMessage(err, t('form.waFailed')) }));

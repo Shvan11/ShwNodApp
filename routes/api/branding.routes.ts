@@ -32,6 +32,7 @@ import {
   saveLogo,
   pruneLogosExcept,
   logoFilePath,
+  CLINIC_LOGO_OPTION,
   LOGO_MIME_EXT,
   LOGO_EXT_MIME,
   type LogoExt,
@@ -40,7 +41,7 @@ import * as branding from '../../shared/contracts/branding.contract.js';
 
 const router = Router();
 
-const LOGO_OPTION = 'CLINIC_LOGO';
+const LOGO_OPTION = CLINIC_LOGO_OPTION;
 const NAME_OPTION = 'CLINIC_NAME';
 
 // Logos are small; 2 MB is generous. Memory storage → the service writes to disk.

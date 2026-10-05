@@ -27,8 +27,6 @@ const ARABIC_PDF_FONT_FILES: Record<PdfArabicFont, string> = {
   noto: path.resolve(PROJECT_ROOT, 'fonts/NotoSansArabic.ttf'),
 };
 
-/** Clinic logo used on rich aligner labels. */
-export const DEFAULT_LOGO_PATH = path.resolve(PROJECT_ROOT, 'public/shawan logon.png');
 
 /**
  * Is the path a file this process can read?
@@ -74,10 +72,11 @@ export function hasArabic(text: string | null | undefined): boolean {
 }
 
 /**
- * Resolve a logo path, falling back to the bundled clinic logo, then `null`.
+ * The logo file to draw, or `null` when there is none to read. There is no bundled
+ * fallback: the code used to ship THIS clinic's logo and print it on every install's
+ * aligner labels (audit FE-F20-3). The caller passes the clinic's configured logo
+ * (Settings → General); none configured = no logo.
  */
 export function resolveLogoPath(requested: string | undefined | null): string | null {
-  if (isReadableFile(requested)) return requested!;
-  if (isReadableFile(DEFAULT_LOGO_PATH)) return DEFAULT_LOGO_PATH;
-  return null;
+  return isReadableFile(requested) ? requested! : null;
 }

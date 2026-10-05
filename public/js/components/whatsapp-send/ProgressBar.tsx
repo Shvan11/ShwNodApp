@@ -1,30 +1,26 @@
 /**
  * Progress Bar Component
- * Shows message sending progress
+ * Shows the running batch's progress.
  */
 
+import type { SendingProgress } from '../../hooks/useWhatsAppSync';
 import styles from '../../routes/WhatsAppSend.module.css';
-
-export interface SendingProgress {
-  started: boolean;
-  finished: boolean;
-  total: number;
-  sent: number;
-  failed: number;
-}
 
 interface ProgressBarProps {
   sendingProgress: SendingProgress;
 }
 
 export default function ProgressBar({ sendingProgress }: ProgressBarProps) {
-  const { started, finished, total, sent } = sendingProgress;
+  const { started, finished, total, sent, failed } = sendingProgress;
 
   if (!started || finished || total === 0) {
     return null;
   }
 
-  const percentage = Math.min((sent / total) * 100, 100);
+  // A failure is an attempted recipient too: counting only `sent` stalled the
+  // bar short of 100 % on every batch with a bad number (FE-F16-11).
+  const attempted = sent + failed;
+  const percentage = Math.min((attempted / total) * 100, 100);
 
   return (
     <div
@@ -32,14 +28,14 @@ export default function ProgressBar({ sendingProgress }: ProgressBarProps) {
       className={styles.sendingProgressContainer}
       role="progressbar"
       aria-label="Message sending progress"
-      aria-valuenow={sent}
+      aria-valuenow={attempted}
       aria-valuemin={0}
       aria-valuemax={total}
     >
       <div className={styles.sendingProgressHeader}>
         <span className={styles.sendingProgressTitle}>Sending Messages</span>
         <span id="progressStats" className={styles.sendingProgressStats}>
-          {sent}/{total}
+          {attempted}/{total}
         </span>
       </div>
       <div className={styles.sendingProgressBarContainer}>
@@ -50,7 +46,7 @@ export default function ProgressBar({ sendingProgress }: ProgressBarProps) {
         ></div>
       </div>
       <div id="progressText" className={styles.sendingProgressText}>
-        {sent} of {total} messages delivered
+        {sent} handed to WhatsApp{failed > 0 ? `, ${failed} failed` : ''} — {total - attempted} to go
       </div>
     </div>
   );

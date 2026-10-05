@@ -1786,9 +1786,28 @@ class WhatsAppService extends EventEmitter {
 
     try {
       return await this.sendBatch(date);
+    } catch (error) {
+      // Whatever stopped it — the breaker refusing to start, the eligibility read,
+      // a dropped connection mid-run — the page must hear that the batch ended,
+      // and why, or it sits on "Sending 7/22" (or on nothing) forever.
+      await this.endBatch((error as Error).message);
+      throw error;
     } finally {
       this.batchSendActive = false;
     }
+  }
+
+  /** Close the batch's progress (once) and tell the page. */
+  private async endBatch(error: string | null = null): Promise<void> {
+    if (this.messageState.batchProgress.finished) return;
+    await this.messageState.finishBatch(error);
+    this.emit('finishedSending');
+  }
+
+  /** Count one attempted recipient and publish the batch's own progress. */
+  private async recordBatchResult(ok: boolean): Promise<void> {
+    const progress = await this.messageState.recordBatchResult(ok);
+    this.wsEmitter?.emit(InternalEmitterEvents.WHATSAPP_SENDING_PROGRESS, progress);
   }
 
   private async sendBatch(date: string): Promise<SendResult[] | void> {
@@ -1813,10 +1832,19 @@ class WhatsAppService extends EventEmitter {
       try {
         const [numbers, messages, ids, names] = await getWhatsAppMessages(date);
 
-        if (!numbers || numbers.length === 0) {
+        // The batch's counters start here, from zero, whatever was sent before
+        // (FE-F16-1). An empty day is a batch of 0 that starts and finishes, so
+        // the page hears both frames instead of a lone "finished".
+        const total = numbers?.length ?? 0;
+        const started = await this.messageState.startBatch(date, total);
+        this.wsEmitter?.emit(InternalEmitterEvents.WHATSAPP_SENDING_STARTED, {
+          ...started,
+          sessionId: session.sessionId,
+        });
+
+        if (total === 0) {
           log.info(`No messages to send for date ${date}`);
-          await this.messageState.setFinishedSending(true);
-          this.emit('finishedSending');
+          await this.endBatch();
 
           messageSessionManager.completeSession(date);
           return;
@@ -1825,18 +1853,6 @@ class WhatsAppService extends EventEmitter {
         log.info(
           `Sending ${numbers.length} messages with session ${session.sessionId}`
         );
-
-        if (this.wsEmitter) {
-          this.wsEmitter.emit(InternalEmitterEvents.WHATSAPP_SENDING_STARTED, {
-            total: numbers.length,
-            sent: 0,
-            failed: 0,
-            started: true,
-            finished: false,
-            sessionId: session.sessionId,
-            date: date,
-          });
-        }
 
         const results: SendResult[] = [];
         // Early abort on a dead connection: two consecutive stall-type failures
@@ -1862,6 +1878,7 @@ class WhatsAppService extends EventEmitter {
             );
             results.push(result);
             guard = advanceBatchGuard(guard, 'sent');
+            await this.recordBatchResult(true);
 
             if (i < numbers.length - 1) {
               await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -1869,6 +1886,7 @@ class WhatsAppService extends EventEmitter {
           } catch (error) {
             log.error(`Error sending message to ${numbers[i]}`, error);
             results.push({ success: false, error: (error as Error).message });
+            await this.recordBatchResult(false);
 
             // 'stall' / 'malformed' are systemic (every remaining send hits the
             // same wall); anything else is about this one recipient (not on
@@ -1907,8 +1925,14 @@ class WhatsAppService extends EventEmitter {
           log.warn('Failed to mark WhatsApp batch as sent', { date, error: (err as Error).message });
         }
 
-        await this.messageState.setFinishedSending(true);
-        this.emit('finishedSending');
+        // An early abort is still the batch's end; `summarizeBatch` below says why.
+        await this.endBatch(
+          guard.abort === 'stalls'
+            ? 'WhatsApp stopped responding'
+            : guard.abort === 'malformed'
+              ? 'WhatsApp changed and the app needs updating'
+              : null
+        );
 
         log.info(`Message sending finished - session remains active for status updates`, {
           sessionId: session.sessionId,
@@ -2283,8 +2307,9 @@ class WhatsAppService extends EventEmitter {
           }
         }
 
+        // No 'finishedSending' here: that event is the reminder BATCH's end, and
+        // a report is not a batch (it used to post a "finished" frame to /send).
         await this.messageState.setFinishReport(true);
-        this.emit('finishedSending');
 
         log.info(`Report generated for ${messages.length} messages`);
         return { success: true, messagesChecked: messages.length };

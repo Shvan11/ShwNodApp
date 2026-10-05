@@ -1,12 +1,15 @@
-import React, { useState, useMemo, ChangeEvent, FormEvent, MouseEvent } from 'react';
+import React, { useState, useMemo, ChangeEvent, FormEvent } from 'react';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import type { AlignerBatch, AlignerSetForBatch } from '../../pages/aligner/aligner.types';
 import { formatISODate } from '../../core/utils';
+import { formatLocaleDate, formatLocaleDateTime } from '../../utils/formatters';
 import { describeRemainingAligners, lastFlagPrompt } from '../../utils/batchLastFlag';
 import { postJSON, putJSON, patchJSON, httpErrorMessage, type HttpError } from '@/core/http';
+import { invalidateAligner } from '@/query/aligner';
+import * as alignerContract from '@shared/contracts/aligner.contract';
 
 interface BatchFormData {
     batch_sequence: number | string;
@@ -36,12 +39,13 @@ interface FormErrors {
 interface BatchFormDrawerProps {
     isOpen: boolean;
     onClose: () => void;
+    /** A create/update was saved: closes the drawer and refreshes. */
     onSave: () => Promise<void>;
     batch?: AlignerBatch | null;
+    /** The LIVE set (its remaining counts), not the snapshot the drawer opened with. */
     set?: AlignerSetForBatch | null;
+    /** The set's batches as currently read — also the source of this batch's live dates. */
     existingBatches?: AlignerBatch[];
-    onUndoManufacture?: (batch: AlignerBatch, e: MouseEvent<HTMLButtonElement>) => void;
-    onUndoDelivery?: (batch: AlignerBatch, e: MouseEvent<HTMLButtonElement>) => void;
 }
 
 const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
@@ -51,15 +55,18 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
     batch,
     set,
     existingBatches = [],
-    onUndoManufacture,
-    onUndoDelivery
 }) => {
     const toast = useToast();
     const confirm = useConfirm();
+    // The dates are set through their own endpoints and refreshed without closing
+    // the drawer, so they are read from the live batch list, not the row the
+    // drawer opened with (FE-F17-5).
+    const liveBatch = batch ? (existingBatches.find((b) => b.aligner_batch_id === batch.aligner_batch_id) ?? batch) : null;
     // The drawer is mounted fresh each time it opens (parent renders it only while
     // open), so the initial state IS the on-open reset — seed it lazily here
-    // instead of syncing it in an effect.
-    const [formData, setFormData] = useState<BatchFormData>(() => {
+    // instead of syncing it in an effect. `initialForm` is what an edit is diffed
+    // against: only the fields the user changed are sent (FE-F17-1).
+    const [initialForm] = useState<BatchFormData>(() => {
         if (batch) {
             // Edit mode — populate from the existing batch (dates are handled
             // separately via status endpoints)
@@ -87,6 +94,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             is_last: false
         };
     });
+    const [formData, setFormData] = useState<BatchFormData>(initialForm);
 
     // State for date editing
     const [editingManufactureDate, setEditingManufactureDate] = useState<boolean>(false);
@@ -171,7 +179,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         const newErrors: FormErrors = {};
 
         // Validate active batch must have delivery date (check batch prop, not formData)
-        if (formData.is_active && !batch?.delivered_to_patient_date) {
+        if (formData.is_active && !liveBatch?.delivered_to_patient_date) {
             newErrors.is_active = 'Cannot mark as active: batch must be delivered first';
         }
 
@@ -266,41 +274,61 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             );
         }
 
-        setSaving(true);
-
-        try {
-            // batch_sequence and the start/end sequences are DERIVED server-side
-            // (createBatch/resequenceSet own them) — computedFields drives the
-            // read-only preview inputs below, it is not part of the write payload.
-            const { batch_sequence: _batchSequence, ...editableFields } = formData;
-            const dataToSend = {
+        // batch_sequence and the start/end sequences are DERIVED server-side
+        // (createBatch/resequenceSet own them) — computedFields drives the
+        // read-only preview inputs below, it is not part of the write payload.
+        const { batch_sequence: _batchSequence, ...editableFields } = formData;
+        let dataToSend: Record<string, unknown>;
+        if (batch) {
+            // An edit sends only what changed (FE-F17-1): the update is partial on the
+            // server, so a days change the doctor made in the portal since this page
+            // loaded is no longer written back over.
+            dataToSend = {};
+            const changed = (key: 'upper_aligner_count' | 'lower_aligner_count' | 'days' | 'notes' | 'is_active') =>
+                String(formData[key]) !== String(initialForm[key]);
+            if (changed('upper_aligner_count')) dataToSend.upper_aligner_count = formData.upper_aligner_count === '' ? 0 : formData.upper_aligner_count;
+            if (changed('lower_aligner_count')) dataToSend.lower_aligner_count = formData.lower_aligner_count === '' ? 0 : formData.lower_aligner_count;
+            if (changed('days')) dataToSend.days = formData.days === '' ? null : formData.days;
+            if (changed('notes')) dataToSend.notes = formData.notes;
+            if (changed('is_active')) dataToSend.is_active = formData.is_active;
+            if (isLast !== (batch.is_last ?? false)) dataToSend.is_last = isLast;
+            if (canChangeTemplateOption && hasUpperTemplate !== (batch.has_upper_template ?? false)) dataToSend.has_upper_template = hasUpperTemplate;
+            if (canChangeTemplateOption && hasLowerTemplate !== (batch.has_lower_template ?? false)) dataToSend.has_lower_template = hasLowerTemplate;
+            if (Object.keys(dataToSend).length === 0) {
+                toast.info('Nothing changed');
+                onClose();
+                return;
+            }
+        } else {
+            dataToSend = {
                 ...editableFields,
                 is_last: isLast,
                 aligner_set_id: set?.aligner_set_id,
                 has_upper_template: canChangeTemplateOption ? hasUpperTemplate : undefined,
                 has_lower_template: canChangeTemplateOption ? hasLowerTemplate : undefined
             };
+        }
 
-            const url = batch
-                ? `/api/aligner/batches/${batch.aligner_batch_id}`
-                : '/api/aligner/batches';
+        setSaving(true);
 
-            // Flat { success, …, deactivatedBatch? } (no `data` key) → passthrough; a
-            // non-2xx (400/500) now throws and is handled in the catch.
+        try {
+            // A non-2xx (400/500) throws and is handled in the catch.
             const result = batch
-                ? await putJSON<{ deactivatedBatch?: { batchSequence: number } }>(url, dataToSend)
-                : await postJSON<{ deactivatedBatch?: { batchSequence: number } }>(url, dataToSend);
+                ? await putJSON<alignerContract.UpdateBatchResponse>(`/api/aligner/batches/${batch.aligner_batch_id}`, dataToSend, {
+                      schema: alignerContract.updateBatch.response,
+                  })
+                : await postJSON<alignerContract.CreateBatchResponse>('/api/aligner/batches', dataToSend, {
+                      schema: alignerContract.createBatch.response,
+                  });
 
-            // Show success message
             toast.success(batch ? 'Batch updated successfully!' : 'Batch created successfully!');
 
-            // If a batch was automatically deactivated, inform the user
-            if (result.deactivatedBatch && formData.is_active) {
+            // Activating this batch turned another one off (only one can be active).
+            if (result.deactivatedBatch) {
                 toast.info(`Batch #${result.deactivatedBatch.batchSequence} was automatically deactivated (only one batch can be active at a time)`);
             }
 
             await onSave();
-            onClose();
         } catch (error) {
             console.error('Error saving batch:', error);
             // Preserve the old precedence: details.message → error → message → fallback,
@@ -319,62 +347,109 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
         return formatISODate();
     };
 
-    const formatDisplayDate = (dateStr: string | null | undefined): string => {
-        if (!dateStr) return 'Not set';
-        return new Date(dateStr).toLocaleDateString('en-GB', {
-            year: 'numeric', month: 'short', day: 'numeric'
-        });
+    // A date-only string is a LOCAL day, and the format matches the batch card's
+    // (it parsed as UTC midnight — a day early west of UTC — in en-GB, FE-F17-13).
+    const formatDisplayDate = (dateStr: string | null | undefined): string =>
+        formatLocaleDate(dateStr, { year: 'numeric', month: 'short', day: 'numeric' }) || 'Not set';
+
+    // Setting a date refreshes the batch in place; the drawer stays open with the
+    // rest of the form as typed. It used to call `onSave`, which CLOSED the drawer
+    // around its unsaved-work guard and threw the typed edits away (FE-F17-5).
+    const runDateChange = async (request: () => Promise<unknown>, done: string, failed: string): Promise<boolean> => {
+        setSavingDate(true);
+        try {
+            await request();
+            toast.success(done);
+            return true;
+        } catch (error) {
+            toast.error(httpErrorMessage(error, failed));
+            return false;
+        } finally {
+            setSavingDate(false);
+            await invalidateAligner();
+        }
     };
 
     // Handle date changes via status endpoints
     const handleSetManufactureDate = async (dateStr: string): Promise<void> => {
-        if (!batch) return;
+        if (!liveBatch) return;
         // A batch can't be manufactured after it was delivered. Catch it here for
         // instant feedback; the server enforces the same rule authoritatively.
-        const deliveryDate = batch.delivered_to_patient_date?.split('T')[0];
+        const deliveryDate = liveBatch.delivered_to_patient_date?.split('T')[0];
         if (deliveryDate && dateStr > deliveryDate) {
             toast.error('Manufacture date cannot be later than the delivery date');
             return;
         }
-        setSavingDate(true);
-        try {
-            // Route returns { success, message, data } — fetchJSON unwraps to `data`, so the
-            // envelope message isn't available; the static success text covers it.
-            await patchJSON(`/api/aligner/batches/${batch.aligner_batch_id}/manufacture`, { targetDate: dateStr });
-            toast.success('Manufacture date updated');
+        const ok = await runDateChange(
+            () => patchJSON(`/api/aligner/batches/${liveBatch.aligner_batch_id}/manufacture`, { targetDate: dateStr }, {
+                schema: alignerContract.manufactureBatch.response,
+            }),
+            'Manufacture date updated',
+            'Failed to update manufacture date'
+        );
+        if (ok) {
             setEditingManufactureDate(false);
             setTempManufactureDate('');
-            await onSave(); // Refresh data
-        } catch (error) {
-            toast.error(httpErrorMessage(error, 'Failed to update manufacture date'));
-        } finally {
-            setSavingDate(false);
         }
     };
 
     const handleSetDeliveryDate = async (dateStr: string): Promise<void> => {
-        if (!batch) return;
+        if (!liveBatch) return;
         // Delivery can't predate manufacture. Catch it here for instant feedback;
         // the server enforces the same rule authoritatively.
-        const manufactureDate = batch.manufacture_date?.split('T')[0];
+        const manufactureDate = liveBatch.manufacture_date?.split('T')[0];
         if (manufactureDate && dateStr < manufactureDate) {
             toast.error('Delivery date cannot be earlier than the manufacture date');
             return;
         }
-        setSavingDate(true);
-        try {
-            // Route returns { success, message, data } — fetchJSON unwraps to `data`, so the
-            // envelope message isn't available; the static success text covers it.
-            await patchJSON(`/api/aligner/batches/${batch.aligner_batch_id}/deliver`, { targetDate: dateStr });
-            toast.success('Delivery date updated');
+        const ok = await runDateChange(
+            () => patchJSON(`/api/aligner/batches/${liveBatch.aligner_batch_id}/deliver`, { targetDate: dateStr }, {
+                schema: alignerContract.deliverBatch.response,
+            }),
+            'Delivery date updated',
+            'Failed to update delivery date'
+        );
+        if (ok) {
             setEditingDeliveryDate(false);
             setTempDeliveryDate('');
-            await onSave(); // Refresh data
-        } catch (error) {
-            toast.error(httpErrorMessage(error, 'Failed to update delivery date'));
-        } finally {
-            setSavingDate(false);
         }
+    };
+
+    // Clearing a date asks first, then refreshes in place like setting one does.
+    const handleUndoManufacture = async (): Promise<void> => {
+        if (!liveBatch || savingDate) return;
+        if (liveBatch.delivered_to_patient_date) {
+            toast.error('Cannot undo manufacture: batch is already delivered. Undo delivery first.');
+            return;
+        }
+        const ok = await confirm(`Clear the manufacture date of Batch #${liveBatch.batch_sequence}?`, {
+            title: 'Undo Manufacture',
+            confirmText: 'Clear Date',
+        });
+        if (!ok) return;
+        await runDateChange(
+            () => patchJSON(`/api/aligner/batches/${liveBatch.aligner_batch_id}/undo-manufacture`, {}, {
+                schema: alignerContract.undoManufacture.response,
+            }),
+            'Manufacture undone',
+            'Failed to undo manufacture'
+        );
+    };
+
+    const handleUndoDelivery = async (): Promise<void> => {
+        if (!liveBatch || savingDate) return;
+        const ok = await confirm(
+            `Clear the delivery date of Batch #${liveBatch.batch_sequence}? This also clears the batch expiry date.`,
+            { title: 'Undo Delivery', confirmText: 'Clear Date' }
+        );
+        if (!ok) return;
+        await runDateChange(
+            () => patchJSON(`/api/aligner/batches/${liveBatch.aligner_batch_id}/undo-deliver`, {}, {
+                schema: alignerContract.undoDeliver.response,
+            }),
+            'Delivery undone',
+            'Failed to undo delivery'
+        );
     };
 
     // Block dismissal (backdrop / X / Cancel) while a save or date-apply is in
@@ -581,14 +656,14 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
 
                         {/* Show CreationDate when editing (read-only) */}
-                        {batch && batch.creation_date && (
+                        {liveBatch && liveBatch.creation_date && (
                             <div className="form-row">
                                 <div className="form-field">
                                     <label htmlFor="batch-created-on">Created On</label>
                                     <input
                                         id="batch-created-on"
                                         type="text"
-                                        value={new Date(batch.creation_date).toLocaleDateString('en-GB', {
+                                        value={formatLocaleDateTime(liveBatch.creation_date, {
                                             year: 'numeric', month: 'short', day: 'numeric',
                                             hour: '2-digit', minute: '2-digit'
                                         })}
@@ -606,7 +681,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     Manufacture Date
                                     <span className="field-optional-text">(when manufacturing completed)</span>
                                 </label>
-                                {batch ? (
+                                {liveBatch ? (
                                     editingManufactureDate ? (
                                         <div className="date-edit-inline">
                                             <input
@@ -615,7 +690,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                 value={tempManufactureDate}
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setTempManufactureDate(e.target.value)}
                                                 // Can't be manufactured after it was delivered
-                                                max={batch.delivered_to_patient_date?.split('T')[0] || undefined}
+                                                max={liveBatch.delivered_to_patient_date?.split('T')[0] || undefined}
                                                 // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                 autoFocus
                                             />
@@ -641,7 +716,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                             <input
                                                 id="batch-manufacture-date"
                                                 type="text"
-                                                value={formatDisplayDate(batch.manufacture_date)}
+                                                value={formatDisplayDate(liveBatch.manufacture_date)}
                                                 readOnly
                                                 className="readonly"
                                             />
@@ -649,21 +724,19 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                 type="button"
                                                 className="btn btn-sm btn-outline"
                                                 onClick={() => {
-                                                    setTempManufactureDate(batch.manufacture_date?.split('T')[0] || getTodayDateString());
+                                                    setTempManufactureDate(liveBatch.manufacture_date?.split('T')[0] || getTodayDateString());
                                                     setEditingManufactureDate(true);
                                                 }}
-                                                title={batch.manufacture_date ? 'Change date' : 'Set manufacture date'}
+                                                title={liveBatch.manufacture_date ? 'Change date' : 'Set manufacture date'}
                                             >
-                                                <i className="fas fa-calendar-alt"></i> {batch.manufacture_date ? 'Edit' : 'Set'}
+                                                <i className="fas fa-calendar-alt"></i> {liveBatch.manufacture_date ? 'Edit' : 'Set'}
                                             </button>
-                                            {batch.manufacture_date && !batch.delivered_to_patient_date && onUndoManufacture && (
+                                            {liveBatch.manufacture_date && !liveBatch.delivered_to_patient_date && (
                                                 <button
                                                     type="button"
                                                     className="btn btn-sm btn-outline btn-danger"
-                                                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                                        onUndoManufacture(batch, e);
-                                                        onClose();
-                                                    }}
+                                                    onClick={() => void handleUndoManufacture()}
+                                                    disabled={savingDate}
                                                     title="Clear manufacture date"
                                                 >
                                                     <i className="fas fa-times"></i> Clear
@@ -688,7 +761,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                     Delivered Date
                                     <span className="field-optional-text">(when given to patient)</span>
                                 </label>
-                                {batch ? (
+                                {liveBatch ? (
                                     editingDeliveryDate ? (
                                         <div className="date-edit-inline">
                                             <input
@@ -697,7 +770,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                 value={tempDeliveryDate}
                                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setTempDeliveryDate(e.target.value)}
                                                 // Can't be delivered before it was manufactured
-                                                min={batch.manufacture_date?.split('T')[0] || undefined}
+                                                min={liveBatch.manufacture_date?.split('T')[0] || undefined}
                                                 // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                                                 autoFocus
                                             />
@@ -723,33 +796,31 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                             <input
                                                 id="batch-delivered-date"
                                                 type="text"
-                                                value={formatDisplayDate(batch.delivered_to_patient_date)}
+                                                value={formatDisplayDate(liveBatch.delivered_to_patient_date)}
                                                 readOnly
                                                 className="readonly"
                                             />
-                                            {batch.manufacture_date ? (
+                                            {liveBatch.manufacture_date ? (
                                                 <button
                                                     type="button"
                                                     className="btn btn-sm btn-outline"
                                                     onClick={() => {
-                                                        setTempDeliveryDate(batch.delivered_to_patient_date?.split('T')[0] || getTodayDateString());
+                                                        setTempDeliveryDate(liveBatch.delivered_to_patient_date?.split('T')[0] || getTodayDateString());
                                                         setEditingDeliveryDate(true);
                                                     }}
-                                                    title={batch.delivered_to_patient_date ? 'Change date' : 'Set delivery date'}
+                                                    title={liveBatch.delivered_to_patient_date ? 'Change date' : 'Set delivery date'}
                                                 >
-                                                    <i className="fas fa-calendar-alt"></i> {batch.delivered_to_patient_date ? 'Edit' : 'Set'}
+                                                    <i className="fas fa-calendar-alt"></i> {liveBatch.delivered_to_patient_date ? 'Edit' : 'Set'}
                                                 </button>
                                             ) : (
                                                 <span className="field-hint">Requires manufacture date</span>
                                             )}
-                                            {batch.delivered_to_patient_date && onUndoDelivery && (
+                                            {liveBatch.delivered_to_patient_date && (
                                                 <button
                                                     type="button"
                                                     className="btn btn-sm btn-outline btn-danger"
-                                                    onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                                        onUndoDelivery(batch, e);
-                                                        onClose();
-                                                    }}
+                                                    onClick={() => void handleUndoDelivery()}
+                                                    disabled={savingDate}
                                                     title="Clear delivery date"
                                                 >
                                                     <i className="fas fa-times"></i> Clear

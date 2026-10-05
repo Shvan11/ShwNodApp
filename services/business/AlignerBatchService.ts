@@ -39,19 +39,18 @@ export interface BatchCreateData {
  * Same server-derived exclusions as BatchCreateData. manufacture_date and
  * delivered_to_patient_date are managed via markBatchManufactured/markBatchDelivered.
  *
- * A FULL REPLACE, not a partial patch: `updateBatch` writes every editable column
- * unconditionally, so an omitted count persists as 0 and an omitted days/notes as
- * NULL. `aligner_set_id` is REQUIRED and identifies the owning set — the query layer
- * rejects a value that differs from the stored one (a batch cannot move between
- * sets), so omitting it used to 400 with a misleading "Cannot change aligner_set_id".
+ * A PARTIAL update: an omitted field keeps its stored value (FE-F17-1 — it was a
+ * full replace, so a page loaded before the doctor changed `days` in the portal
+ * wrote the old days back). `days: null` clears it. `aligner_set_id`, when sent,
+ * must equal the stored set (a batch cannot move between sets).
  */
 export interface BatchUpdateData {
-  aligner_set_id: number;
+  aligner_set_id?: number;
   is_active?: boolean;
   notes?: string;
   upper_aligner_count?: number;
   lower_aligner_count?: number;
-  days?: number;
+  days?: number | null;
   is_last?: boolean;
   has_upper_template?: boolean;
   has_lower_template?: boolean;
@@ -264,8 +263,9 @@ function mapBatchError(message: string): AlignerErrorCode | null {
   // -- sequence integrity (update AND delete both refuse to renumber a locked batch) -----------
   if (message.includes('would be renumbered')) return 'SEQUENCE_LOCKED';
 
-  // -- template flags -------------------------------------------------------------------------
+  // -- template flags / counts ----------------------------------------------------------------
   if (
+    message === 'Enter an upper or lower aligner count' ||
     message.startsWith('Template flag') ||
     message.includes('requires upper_aligner_count') ||
     message.includes('requires lower_aligner_count')
@@ -322,40 +322,26 @@ export async function validateAndUpdateBatch(
 
   const parsedBatchId = parseInt(String(batchId), 10);
 
-  // This PUT is a FULL REPLACE, not a partial patch: `updateBatch` writes every
-  // editable column unconditionally, so an omitted count is persisted as 0 and an
-  // omitted days/notes as NULL. Validate on that basis — an absent count IS a
-  // request to set that arch to 0, so the checks run unconditionally rather than
-  // only when the field happens to be present (which let an omit-both PUT through
-  // to write a meaningless 0/0 batch).
-  const upperCount = parseOptionalCount(
-    batchData.upper_aligner_count,
-    'Upper aligner count'
-  );
-  const lowerCount = parseOptionalCount(
-    batchData.lower_aligner_count,
-    'Lower aligner count'
-  );
-  const days = parseOptionalDays(batchData.days);
-
-  // A 0/0 batch is meaningless (mirrors create).
-  if (upperCount <= 0 && lowerCount <= 0) {
-    throw new AlignerValidationError(
-      'Enter an upper or lower aligner count',
-      'VALIDATION_ERROR'
-    );
+  // PARTIAL: only the fields present are validated and written; the rest keep
+  // their stored values (FE-F17-1). The 0/0 rule needs the stored counts, so the
+  // query layer checks the RESULTING pair ("Enter an upper or lower aligner count").
+  const has = (key: keyof BatchUpdateData) => Object.prototype.hasOwnProperty.call(batchData, key) && batchData[key] !== undefined;
+  const update: BatchUpdateData = { ...batchData };
+  if (has('upper_aligner_count')) {
+    update.upper_aligner_count = parseOptionalCount(batchData.upper_aligner_count, 'Upper aligner count');
+  }
+  if (has('lower_aligner_count')) {
+    update.lower_aligner_count = parseOptionalCount(batchData.lower_aligner_count, 'Lower aligner count');
+  }
+  if (Object.prototype.hasOwnProperty.call(batchData, 'days')) {
+    update.days = batchData.days === undefined ? undefined : parseOptionalDays(batchData.days);
   }
 
   log.info(`Updating aligner batch ${batchId}:`, batchData);
 
   // Persist the validated values (see validateAndCreateBatch).
   const result = await withMappedBatchErrors({ batchId: parsedBatchId }, () =>
-    alignerBatchQueries.updateBatch(parsedBatchId, {
-      ...batchData,
-      upper_aligner_count: upperCount,
-      lower_aligner_count: lowerCount,
-      days,
-    })
+    alignerBatchQueries.updateBatch(parsedBatchId, update)
   );
   log.info(`Aligner batch ${batchId} updated successfully`);
 

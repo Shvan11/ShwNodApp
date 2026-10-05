@@ -3,37 +3,21 @@
  * Tabular display of sales history with status badges, profit colouring,
  * and View / Void action buttons.
  */
-import React from 'react';
 import type { StandSale } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import { formatStandDateTime } from './standFormat';
 import styles from './SalesHistoryTable.module.css';
 
 interface SalesHistoryTableProps {
   sales: StandSale[];
   loading: boolean;
+  /** Voiding is admin-only on the server (FE-F19-7). */
+  canVoid: boolean;
   onView: (saleId: number) => void;
   onVoid: (saleId: number) => void;
 }
 
-/**
- * Format an ISO date string as DD/MM/YYYY HH:mm.
- */
-function formatDateTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
-
-const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
-  sales,
-  loading,
-  onView,
-  onVoid,
-}) => {
+export default function SalesHistoryTable({ sales, loading, canVoid, onView, onVoid }: SalesHistoryTableProps) {
   const isVoided = (sale: StandSale): boolean => sale.voided_date != null;
 
   return (
@@ -79,7 +63,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                     key={sale.sale_id}
                     className={voided ? styles.voidedRow : undefined}
                   >
-                    <td>{formatDateTime(sale.sale_date)}</td>
+                    <td>{formatStandDateTime(sale.sale_date)}</td>
                     <td>#{sale.sale_id}</td>
                     <td className={styles.itemsCell} title={sale.items_summary}>
                       {sale.items_summary || '-'}
@@ -119,7 +103,7 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
                           <i className="fas fa-eye" />
                           View
                         </button>
-                        {!voided && (
+                        {!voided && canVoid && (
                           <button
                             className={styles.btnVoid}
                             onClick={() => onVoid(sale.sale_id)}
@@ -141,6 +125,4 @@ const SalesHistoryTable: React.FC<SalesHistoryTableProps> = ({
       )}
     </div>
   );
-};
-
-export default React.memo(SalesHistoryTable);
+}

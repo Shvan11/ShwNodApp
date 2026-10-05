@@ -15,6 +15,9 @@ import { clinicPath } from './clinic-paths.js';
 
 const BRANDING_REL = 'branding';
 
+/** The `options` row naming the current logo file (written by the branding routes). */
+export const CLINIC_LOGO_OPTION = 'CLINIC_LOGO';
+
 /**
  * Accepted raster logo formats → canonical extension. SVG is deliberately
  * excluded: an uploaded SVG can embed scripts, an XSS vector when served from

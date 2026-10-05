@@ -3,13 +3,14 @@ import React, { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import PhoneDisplay from '../../components/react/PhoneDisplay';
+import { httpErrorMessage } from '@/core/http';
 import { alignerPatientSearchQuery } from '@/query/queries';
-import * as alignerContract from '@shared/contracts/aligner.contract';
+import type { AlignerPatient } from '@shared/contracts/aligner.contract';
+import AlignerLoadError from './AlignerLoadError';
 import styles from './SearchPatient.module.css';
 
-// Row shape comes from the shared contract (single source of truth, drift-checked
-// against the schema the search read validates with).
-type AlignerPatient = alignerContract.AlignerPatient;
+/** The server returns at most one more than this, so the screen can say there are more (FE-F18-7). */
+const SHOWN_RESULTS = 50;
 
 const SearchPatient: React.FC = () => {
     const navigate = useNavigate();
@@ -26,8 +27,10 @@ const SearchPatient: React.FC = () => {
         if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     }, []);
 
-    const { data, isFetching, isSuccess } = useQuery(alignerPatientSearchQuery(debouncedQuery));
-    const searchResults = (data?.patients ?? []) as AlignerPatient[];
+    const { data, isFetching, isSuccess, isError, error, refetch } = useQuery(alignerPatientSearchQuery(debouncedQuery));
+    const allResults = data?.patients ?? [];
+    const searchResults = allResults.slice(0, SHOWN_RESULTS);
+    const moreThanShown = allResults.length > SHOWN_RESULTS;
     const loading = isFetching;
     // Mirror the old behavior: the results panel appears only once a search has
     // resolved successfully (not while the first request is still in flight).
@@ -64,10 +67,11 @@ const SearchPatient: React.FC = () => {
             {/* Search Box */}
             <div className={styles.searchSection}>
                 <div className={styles.searchBox}>
-                    <i className={`fas fa-search ${styles.searchIcon}`}></i>
+                    <i className={`fas fa-search ${styles.searchIcon}`} aria-hidden="true"></i>
                     <input
                         type="text"
                         id="patient-search"
+                        aria-label="Search aligner patients"
                         placeholder="Search aligner patients by name, phone, or patient ID..."
                         autoComplete="off"
                         value={searchQuery}
@@ -75,6 +79,11 @@ const SearchPatient: React.FC = () => {
                     />
                     <span className={styles.searchInfo}>Minimum 2 characters</span>
                 </div>
+
+                {/* A failed search says so — it used to fall back to the intro (FE-F18-6). */}
+                {isError && debouncedQuery.trim().length >= 2 && (
+                    <AlignerLoadError what="the search results" message={httpErrorMessage(error, 'Unknown error')} onRetry={() => void refetch()} />
+                )}
 
                 {/* Search Results */}
                 {showResults && (
@@ -110,11 +119,16 @@ const SearchPatient: React.FC = () => {
                                 </div>
                             ))
                         )}
+                        {moreThanShown && (
+                            <div className={styles.searchNoResults}>
+                                <p>Showing the first {SHOWN_RESULTS} matches — type more of the name to narrow it down.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {/* Empty State */}
-                {!loading && !showResults && (
+                {!loading && !showResults && !isError && (
                     <div className={styles.emptyState}>
                         <i className="fas fa-search"></i>
                         <h3>Quick Search</h3>

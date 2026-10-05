@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { invalidateAligner } from '@/query/aligner';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -110,9 +111,13 @@ const PortalActivityBell = () => {
     const markGroup = (g: ActivityGroup) => runAction(() => markPortalActivityRead(g.unreadIds));
     const markAll = () => runAction(() => markAllPortalActivityRead());
 
+    // The doctor's change is the reason for the click, so the case is re-read even
+    // when it is the one already on screen — the same URL used to fetch nothing
+    // (FE-F17-2).
     const openCase = (g: ActivityGroup) => {
         if (g.latest.work_id == null) return;
         setOpen(false);
+        void invalidateAligner();
         navigate(`/aligner/patient/${g.latest.work_id}`);
     };
 

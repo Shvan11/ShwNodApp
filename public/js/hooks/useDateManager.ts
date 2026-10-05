@@ -3,7 +3,7 @@
  */
 import { useState, useMemo } from 'react';
 import { CONFIG } from '../utils/whatsapp-send-constants';
-import { validateDate } from '../utils/whatsapp-validation';
+import { dateString } from '@shared/validation';
 import { toLocalDateString } from '../utils/calendarDate';
 
 /**
@@ -54,10 +54,12 @@ function getDefaultDate(): string {
     const urlParams = new URLSearchParams(window.location.search);
     const urlDate = urlParams.get('date');
 
-    if (urlDate) {
-      validateDate(urlDate);
+    // A real YYYY-MM-DD only: the old check took anything `Date` could parse
+    // (`1`, `May 5`, `2026-02-30`) as `/send?date=` (FE-F16-15).
+    if (urlDate && dateString.safeParse(urlDate).success) {
       return urlDate;
     }
+    if (urlDate) console.warn('Ignoring invalid ?date= on /send:', urlDate);
   } catch (error) {
     console.warn('Invalid date in URL parameters:', error instanceof Error ? error.message : error);
   }
@@ -202,13 +204,12 @@ export function useDateManager(): UseDateManagerReturn {
 
   // Handle date change
   const handleDateChange = (newDate: string): void => {
-    try {
-      validateDate(newDate);
-      if (newDate !== currentDate) {
-        setCurrentDate(newDate);
-      }
-    } catch (error) {
-      console.error('Invalid date provided:', error instanceof Error ? error.message : error);
+    if (!dateString.safeParse(newDate).success) {
+      console.error('Invalid date provided:', newDate);
+      return;
+    }
+    if (newDate !== currentDate) {
+      setCurrentDate(newDate);
     }
   };
 

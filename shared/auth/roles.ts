@@ -80,6 +80,23 @@ export interface RoleCapabilities {
    * 403 at Save (audit FE-F10-14).
    */
   manageLookups: boolean;
+  /**
+   * May pair, restart or re-link the clinic's WhatsApp client and edit the daily
+   * appointment-list group (server: `authorize(FINANCE_ROLES)` on `/api/wa/{restart,
+   * refresh-qr,unlink,initialize,group-settings}`, and `initial-state` withholds the
+   * QR). Sending, resetting and emailing stay CLINICAL_ROLES. The /send and /auth
+   * screens offered all of it to every role, so a doctor met a 403 toast on every
+   * visit and a QR that never came (audit FE-F16-4; owner: hide it, 2026-10-04).
+   */
+  manageWhatsApp: boolean;
+  /**
+   * May see and edit the clinic-wide part of Settings → General: the header branding and
+   * the system options list (server: `authorize(ADMIN_ROLES)` on `GET /api/options`, every
+   * option write and every branding write). Everyone keeps the per-device part (chair ID,
+   * theme, language, font). The list used to load for every role, which is how any login
+   * could read the Telegram session and the SMTP password (audit FE-F21-1).
+   */
+  manageSettings: boolean;
   manageUsers: boolean;
 }
 
@@ -94,6 +111,8 @@ export function roleCaps(role: UserRole | undefined): RoleCapabilities {
     editRecords: isAdmin || isFrontDesk,
     adminWrites: isAdmin,
     manageLookups: isAdmin || isFrontDesk,
+    manageWhatsApp: isAdmin || isFrontDesk,
+    manageSettings: isAdmin,
     manageUsers: isAdmin,
   };
 }

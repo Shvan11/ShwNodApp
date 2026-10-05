@@ -25,15 +25,18 @@
 import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
-import { isViewCode } from '../../shared/photo-views.js';
+import { isViewCode, parseViewTag, MAX_RENDER_EDGE } from '../../shared/photo-views.js';
+import type { FramingArea } from '../../shared/contracts/photo-editor.contract.js';
 import { getFileCategory } from '../../utils/file-mime.js';
 import { workingFileName, workingFileNameVariants, workingFilePath } from '../files/clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from '../files/file-explorer.service.js';
 import { log } from '../../utils/logger.js';
+import { framingToXmp } from './photo-framing-xmp.js';
 
-/** Cap absurd inputs/outputs (phone photos ~40 MP are well under this). */
+/** Cap absurd inputs/outputs (phone photos ~40 MP are well under this). The output cap
+ *  is shared with the editor, whose resolution readout must agree with the render. */
 const MAX_INPUT_PIXELS = 300_000_000;
-const MAX_OUTPUT_EDGE = 8000;
+const MAX_OUTPUT_EDGE = MAX_RENDER_EDGE;
 
 export interface RenderSlotInput {
   personId: number;
@@ -54,6 +57,14 @@ export interface RenderSlotInput {
    * here. Omitted / equal to the source dims → no scaling (Original mode).
    */
   cropSpace?: { width: number; height: number };
+  /**
+   * The editor's own description of this framing — the frame in % of the flipped +
+   * rotated photo (react-easy-crop's croppedAreaPercentages) and its zoom. When given
+   * WITH `extract`, the render records it in the output's XMP (photo-framing-xmp.ts),
+   * so the editor can later reopen the view where it was left. It never drives the
+   * pixels — `extract` does.
+   */
+  framing?: { area: FramingArea; zoom: number };
 }
 
 // Cap libvips' per-pipeline thread pool (process-wide, set once at import). Its default
@@ -104,7 +115,8 @@ let tmpSeq = 0;
  * Returns the written filename.
  */
 export async function renderSlotToWorking(input: RenderSlotInput): Promise<string> {
-  const { personId, tpCode, view, sourceRelPath, flipH, flipV, rotation, extract, output, cropSpace } = input;
+  const { personId, tpCode, view, sourceRelPath, flipH, flipV, rotation, extract, output, cropSpace, framing } =
+    input;
 
   // ── Validation (these values build a filename + drive a decode) ───────────────
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
@@ -143,6 +155,26 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     const rad = (rotation * Math.PI) / 180;
     const rotW = Math.round(Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)));
     const rotH = Math.round(Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad)));
+
+    // The framing record this render carries (see RenderSlotInput.framing). `modified`
+    // is the source's mtime in the folder listing's own form (`st.mtime.toISOString()`,
+    // file-explorer.service), so the editor can tell later whether the view's tagged
+    // original is still this file; the tag rename that follows the render keeps the
+    // mtime. The name is the clean one — a re-edit's source is already `{view}-…`.
+    let xmp: string | null = null;
+    if (framing && extract) {
+      const base = path.basename(sourceRelPath);
+      const st = await fs.stat(sourceAbs);
+      xmp = framingToXmp({
+        v: 1,
+        source: { name: parseViewTag(base)?.original ?? base, modified: st.mtime.toISOString(), width: w, height: h },
+        rotation,
+        flipH,
+        flipV,
+        zoom: framing.zoom,
+        area: framing.area,
+      });
+    }
 
     // The requested crop rect, in flipped+rotated client pixel space. With free
     // panning / zoom-out the client can hand us a rect that runs past the image
@@ -274,9 +306,11 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
       });
       if (flipV) flipped = flipped.flip();
       if (flipH) flipped = flipped.flop();
-      await flipped.jpeg(JPEG_OPTS).toFile(tmpPath);
+      flipped = flipped.jpeg(JPEG_OPTS);
+      await (xmp ? flipped.withXmp(xmp) : flipped).toFile(tmpPath);
     } else {
-      await out.jpeg(JPEG_OPTS).toFile(tmpPath);
+      out = out.jpeg(JPEG_OPTS);
+      await (xmp ? out.withXmp(xmp) : out).toFile(tmpPath);
     }
     await fs.rename(tmpPath, destAbs);
 

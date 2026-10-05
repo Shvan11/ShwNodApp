@@ -27,6 +27,7 @@ export type StandErrorCode =
   | 'ITEM_NOT_FOUND'
   | 'INVALID_QUANTITY'
   | 'UNDERPAID'
+  | 'PRICE_CHANGED'
   | 'SALE_NOT_FOUND'
   | 'ALREADY_VOIDED';
 
@@ -56,6 +57,8 @@ interface SaleInput {
     quantity: number;
   }>;
   amountPaid: number;
+  /** The total the till showed; a mismatch with the current prices is refused (PRICE_CHANGED). */
+  expectedTotal?: number;
   paymentMethod?: string;
   customerNote?: string | null;
   personId?: number | null;
@@ -63,7 +66,7 @@ interface SaleInput {
 }
 
 export async function validateAndCreateSale(saleData: SaleInput) {
-  const { items, amountPaid, paymentMethod = 'cash', customerNote, personId, cashierId } = saleData;
+  const { items, amountPaid, expectedTotal, paymentMethod = 'cash', customerNote, personId, cashierId } = saleData;
 
   if (!items || items.length === 0) {
     throw new StandValidationError('Sale must contain at least one item', 'INVALID_QUANTITY');
@@ -129,6 +132,22 @@ export async function validateAndCreateSale(saleData: SaleInput) {
   const totalCost = resolvedItems.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
   const totalProfit = totalAmount - totalCost;
 
+  // The till prices its cart from the item rows it loaded when each item was added;
+  // a price edited since then would otherwise be recorded at a total nobody saw
+  // (or refused as "Underpaid" on a total the screen never showed). Hand back the
+  // current prices so the till can reprice and ask again (FE-F19-14).
+  if (expectedTotal !== undefined && expectedTotal !== totalAmount) {
+    throw new StandValidationError(
+      `Prices changed since these items were added: the total is now ${totalAmount}, not ${expectedTotal}`,
+      'PRICE_CHANGED',
+      {
+        totalAmount,
+        expectedTotal,
+        prices: resolvedItems.map((i) => ({ itemId: i.itemId, unitPrice: i.unitPrice })),
+      }
+    );
+  }
+
   // Validate payment
   if (amountPaid < totalAmount) {
     throw new StandValidationError(
@@ -191,7 +210,7 @@ export async function validateAndRestockItem(
   quantity: number,
   unitCost: number,
   userId: number | null
-) {
+): Promise<{ costPrice: number }> {
   if (quantity <= 0) {
     throw new StandValidationError('Restock quantity must be positive', 'INVALID_QUANTITY', { quantity });
   }
@@ -205,9 +224,10 @@ export async function validateAndRestockItem(
     throw new StandValidationError('Item not found', 'ITEM_NOT_FOUND', { itemId });
   }
 
-  await restockItem(itemId, quantity, unitCost, userId);
+  const result = await restockItem(itemId, quantity, unitCost, userId);
 
-  log.info(`Stand item restocked: item_id=${itemId}, Qty=${quantity}, unit_cost=${unitCost}`);
+  log.info(`Stand item restocked: item_id=${itemId}, Qty=${quantity}, unit_cost=${unitCost}, cost_price=${result.costPrice}`);
+  return result;
 }
 
 // ============================================================================

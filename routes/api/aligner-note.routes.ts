@@ -91,31 +91,20 @@ router.post(
 );
 
 /**
- * Toggle note read/unread status
+ * Set notes read/unread — idempotent (it was a per-note toggle, FE-F17-12).
+ * Registered before `PATCH /aligner/notes/:noteId` so `read` is never taken for an id.
  */
 router.patch(
-  '/aligner/notes/:noteId/toggle-read',
+  '/aligner/notes/read',
   authorize(CLINICAL_ROLES),
-  validate({ params: contract.noteIdParams }),
-  async (req: Request<{ noteId: string }>, res: Response): Promise<void> => {
+  validate({ body: contract.markNotesRead.body }),
+  async (req: Request<unknown, unknown, contract.MarkNotesReadBody>, res: Response): Promise<void> => {
     try {
-      const { noteId } = req.params;
-
-      if (!noteId || isNaN(parseInt(noteId, 10))) {
-        ErrorResponses.badRequest(res, 'Valid note id is required');
-        return;
-      }
-
-      await alignerNoteQueries.toggleNoteReadStatus(parseInt(noteId, 10));
-
-      sendSuccess(res, null, 'note read status toggled successfully');
+      const updated = await alignerNoteQueries.setNotesReadStatus(req.body.noteIds, req.body.isRead);
+      sendData(res, contract.markNotesRead.response, { updated });
     } catch (error) {
-      log.error('Error toggling note read status:', error);
-      ErrorResponses.internalError(
-        res,
-        'Failed to toggle read status',
-        error as Error
-      );
+      log.error('Error setting note read status:', error);
+      ErrorResponses.internalError(res, 'Failed to update read status', error as Error);
     }
   }
 );

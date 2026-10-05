@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, ComponentType } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { authMeQuery } from '@/query/queries';
-import { roleCaps, type UserRole } from '@shared/auth/roles';
+import { roleCaps, type RoleCapabilities, type UserRole } from '@shared/auth/roles';
+import { useUnsavedRouteGuard } from '../../hooks/useUnsavedRouteGuard';
 
 // CSS Modules
 import styles from './SettingsContainer.module.css';
@@ -36,15 +37,13 @@ interface TabConfig {
     icon: string;
     component: ComponentType<SettingsTabComponentProps>;
     description: string;
-    adminOnly?: boolean;
-    /** Hide from roles without finance-write capability (clinical). */
-    financeOnly?: boolean;
-}
-
-interface TabDataState {
-    [key: string]: {
-        hasChanges: boolean;
-    };
+    /**
+     * The capability a role needs to see the tab — the same line the tab's endpoints
+     * draw on the server. Absent = every staff role. Database, Database Backup and
+     * Email were offered to everyone and opened on "Insufficient permissions"; Lookups
+     * and Calendar Times on a clinical 403 (audit FE-F21-3).
+     */
+    requires?: keyof RoleCapabilities;
 }
 
 // Tab configuration defined statically outside the component to avoid recreation on render.
@@ -61,14 +60,16 @@ const tabs: TabConfig[] = [
         label: 'Database',
         icon: 'fas fa-database',
         component: DatabaseSettings,
-        description: 'Database connection and configuration'
+        description: 'Database connection and configuration',
+        requires: 'manageSettings'
     },
     {
         id: 'databaseBackup',
         label: 'Database Backup',
         icon: 'fas fa-download',
         component: DatabaseBackupSettings,
-        description: 'Download a full backup of this clinic\'s database'
+        description: 'Download a full backup of this clinic\'s database',
+        requires: 'manageSettings'
     },
     {
         id: 'protocolHandlers',
@@ -89,7 +90,8 @@ const tabs: TabConfig[] = [
         label: 'Email',
         icon: 'fas fa-envelope',
         component: EmailSettings,
-        description: 'Email notifications and SMTP configuration'
+        description: 'Email notifications and SMTP configuration',
+        requires: 'manageSettings'
     },
     {
         id: 'employees',
@@ -97,7 +99,7 @@ const tabs: TabConfig[] = [
         icon: 'fas fa-users',
         component: EmployeeSettings,
         description: 'Manage staff members and email notification settings',
-        adminOnly: true
+        requires: 'manageSettings'
     },
     {
         id: 'exchangeRates',
@@ -105,21 +107,24 @@ const tabs: TabConfig[] = [
         icon: 'fas fa-exchange-alt',
         component: ExchangeRatesSettings,
         description: "Edit today's USD→IQD rate and view historical rates",
-        financeOnly: true
+        requires: 'writeFinance'
     },
     {
         id: 'lookups',
         label: 'Lookups',
         icon: 'fas fa-list',
         component: LookupsSettings,
-        description: 'Manage dropdown and reference data'
+        description: 'Manage dropdown and reference data',
+        requires: 'manageLookups'
     },
     {
         id: 'calendarTimes',
         label: 'Calendar Times',
         icon: 'fas fa-clock',
         component: CalendarTimesSettings,
-        description: 'Configure calendar time slot visibility'
+        description: 'Configure calendar time slot visibility',
+        // Owner decision (RF1, 2026-10-05): admin + front desk run it.
+        requires: 'manageLookups'
     },
     {
         id: 'supabaseStatus',
@@ -151,7 +156,7 @@ const tabs: TabConfig[] = [
         icon: 'fas fa-plug',
         component: IntegrationsSettings,
         description: 'Manage Telegram (and later WhatsApp/Google) authentication',
-        adminOnly: true
+        requires: 'manageSettings'
     },
     {
         id: 'security',
@@ -166,7 +171,7 @@ const tabs: TabConfig[] = [
         icon: 'fas fa-users',
         component: AdminUserManagement,
         description: 'User management (admin only)',
-        adminOnly: true // Only show to admins
+        requires: 'manageUsers'
     }
 ];
 
@@ -181,33 +186,23 @@ const SettingsComponent: React.FC = () => {
     const { data: me } = useQuery(authMeQuery());
     const userRole = (me?.success && me.user ? me.user.role : null) ?? null;
 
-    // Ref to hold current activeTab - allows stable callback that reads current value.
-    // Synced in an effect (not during render); the callbacks that read it run after
-    // the commit, so they always see the latest tab.
-    const activeTabRef = useRef(activeTab);
-    useEffect(() => {
-        activeTabRef.current = activeTab;
-    }, [activeTab]);
-    // Per-tab unsaved-changes flags, keyed by tab id. Starts empty: a tab only ever
-    // appears here once it has reported a state, and `handleTabChangesUpdate` below
-    // creates the entry on demand ("absent" and "false" both mean "no changes").
-    const [tabData, setTabData] = useState<TabDataState>({});
+    // The active tab's unsaved-changes flag. Only the active tab can hold unsaved work
+    // (a tab's edits live in its own state and are gone once it unmounts), so one
+    // flag is the whole story. It used to be a per-tab map filed under a ref the
+    // parent synced in an effect — which runs AFTER the newly mounted child's own
+    // report, so a new tab's first report landed on the previous tab (FE-F21-4).
+    const [dirtyTab, setDirtyTab] = useState<string | null>(null);
+    const activeDirty = dirtyTab === activeTab;
 
     // Filter tabs based on user role dynamically.
     const filteredTabs = useMemo(() => {
         const caps = roleCaps((userRole ?? undefined) as UserRole | undefined);
-        return tabs.filter(tabItem => {
-            // Hide admin-only tabs from non-admins
-            if (tabItem.adminOnly && userRole !== 'admin') {
-                return false;
-            }
-            // Hide finance-write tabs from clinical (view-only money access)
-            if (tabItem.financeOnly && !caps.writeFinance) {
-                return false;
-            }
-            return true;
-        });
+        return tabs.filter(tabItem => !tabItem.requires || caps[tabItem.requires]);
     }, [userRole]);
+
+    // Switching tabs or leaving Settings with unsaved edits asks first (the tab's
+    // edits are dropped when it unmounts); a reload gets the browser's prompt.
+    useUnsavedRouteGuard(activeDirty);
 
     // Sync activeTab with URL parameter. Done during render (adjust-state-during-render),
     // keyed on the URL `tab` value, rather than in an effect so the React Compiler can
@@ -217,6 +212,8 @@ const SettingsComponent: React.FC = () => {
         setSyncedTab(tab);
         if (tab && filteredTabs.some(t => t.id === tab)) {
             setActiveTab(tab);
+            // The guard let this switch through, so the old tab's edits are discarded.
+            setDirtyTab(null);
         }
     }
 
@@ -235,23 +232,16 @@ const SettingsComponent: React.FC = () => {
         }
     };
 
-    // Stable callback - reads activeTab from ref, so it never changes reference
+    // The reporter handed to the active tab, bound to that tab's id. Stable per tab
+    // (several tabs list it in an effect's deps).
     const handleTabChangesUpdate = useCallback((hasChanges: boolean): void => {
-        const tabId = activeTabRef.current;
-        setTabData(prev => {
-            // Only update if the value actually changed to avoid unnecessary re-renders
-            if (prev[tabId]?.hasChanges === hasChanges) {
-                return prev;
-            }
-            return {
-                ...prev,
-                [tabId]: {
-                    ...prev[tabId],
-                    hasChanges
-                }
-            };
-        });
-    }, []); // Empty deps = stable reference forever
+        setDirtyTab(prev => (hasChanges ? activeTab : prev === activeTab ? null : prev));
+    }, [activeTab]);
+
+    const tabData = useMemo(
+        () => (dirtyTab ? { [dirtyTab]: { hasChanges: true } } : {}),
+        [dirtyTab]
+    );
 
     // Every tab has a component, so this is undefined only for an unknown or
     // unauthorized tab id — for the single render before the effect above

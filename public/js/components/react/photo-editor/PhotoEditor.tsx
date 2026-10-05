@@ -2,7 +2,13 @@
  * Native Dolphin-style photo layout manager (Phase 4). Drag originals from the
  * Sequence Files sidebar into the 8 view slots (or click a photo, then a slot), frame
  * each, then Save — the server (sharp) renders working/{pid}0{tp}.iNN so the grid
- * lights up.
+ * lights up. Save writes only the slots that differ from what is saved; Cancel leaves
+ * without saving (asking first when something would be lost).
+ *
+ * Each render records its framing (zoom, rotation, flips, frame) inside the saved
+ * photo, so a saved view can be reopened where it was left ("Continue editing") as
+ * well as from scratch. The Overlay tool lays another session's saved views faintly
+ * over the slots, to frame a new session the way the last one was framed.
  *
  * Mounted by ContentRenderer at `/photo-editor/tp{code}`, keyed by the code. The
  * session's name and date come from the timepoints read BY CODE, never from the URL:
@@ -18,6 +24,7 @@ import SlotActions from './SlotActions';
 import SequenceSidebar, { type ArmedPhoto } from './SequenceSidebar';
 import { usePhotoEditorState } from './usePhotoEditorState';
 import {
+  EMPTY_HYDRATION,
   VIEW_CODES,
   VIEW_OUTPUT,
   parseOriginalViewTag,
@@ -26,6 +33,7 @@ import {
   type SlotHydration,
   type SlotRenderSpec,
 } from './photoEditorTypes';
+import { framingMatchesOriginal, isSlotDirty } from './framing';
 import { useToast } from '../../../contexts/ToastContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { useUnsavedRouteGuard } from '../../../hooks/useUnsavedRouteGuard';
@@ -34,10 +42,10 @@ import { newRenderJobId, watchRenderJob } from '../../../services/photo-render-w
 import { postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
 import { qk } from '@/query/keys';
 import { invalidatePatientPhotos } from '@/query/photos';
-import { galleryQuery, patientFilesQuery, timepointsQuery } from '@/query/queries';
+import { framingQuery, galleryQuery, patientFilesQuery, timepointsQuery } from '@/query/queries';
 import { sessionFolderName } from '@shared/photo-session-folder';
 import { renderedEvent } from '@shared/contracts/photo-editor.contract';
-import type { GalleryResponse } from '@shared/contracts/patient.contract';
+import type { GalleryResponse, TimepointRow } from '@shared/contracts/patient.contract';
 import { buildWorkingContentUrl } from '../files/fileHelpers';
 
 interface Props {
@@ -77,6 +85,47 @@ function readStoredQuality(): 'proxy' | 'original' {
 }
 
 const clampWidth = (n: number): number => Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, n));
+
+// The Overlay tool: another session's saved photos laid faintly over the slots, to
+// frame this session the way that one was framed. On/off and strength persist per
+// device; which session is per patient, so it is chosen afresh (default: the latest
+// session before this one).
+const OVERLAY_KEY = 'pe:overlay';
+const OVERLAY_OPACITY_KEY = 'pe:overlayOpacity';
+const OVERLAY_OPACITY_DEFAULT = 0.35;
+const OVERLAY_OPACITY_MIN = 0.1;
+const OVERLAY_OPACITY_MAX = 0.8;
+
+function readStoredOverlay(): boolean {
+  try {
+    return localStorage.getItem(OVERLAY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function readStoredOverlayOpacity(): number {
+  try {
+    const n = Number(localStorage.getItem(OVERLAY_OPACITY_KEY));
+    return n >= OVERLAY_OPACITY_MIN && n <= OVERLAY_OPACITY_MAX ? n : OVERLAY_OPACITY_DEFAULT;
+  } catch {
+    return OVERLAY_OPACITY_DEFAULT;
+  }
+}
+
+function persist(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore persistence failure */
+  }
+}
+
+/** Chronological order: date, then code (two sessions can share a day). */
+function sessionOrder(a: TimepointRow, b: TimepointRow): number {
+  if (a.tp_date_time !== b.tp_date_time) return a.tp_date_time < b.tp_date_time ? -1 : 1;
+  return Number(a.tp_code) - Number(b.tp_code);
+}
 
 function readStoredWidth(): number | null {
   try {
@@ -135,6 +184,32 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
   const [removing, setRemoving] = useState(false);
   const [sidebarRefresh, setSidebarRefresh] = useState(0);
 
+  // The Overlay tool (see OVERLAY_KEY). The sessions it can show: every other one, in
+  // date order; unless the user picks one, the latest before this session (else the
+  // earliest after it — re-framing an Initial against a later session).
+  const [overlayOn, setOverlayOn] = useState<boolean>(readStoredOverlay);
+  const [overlayOpacity, setOverlayOpacity] = useState<number>(readStoredOverlayOpacity);
+  const [overlayPick, setOverlayPick] = useState<string | null>(null);
+  const otherSessions = (sessionsQ.data ?? []).filter((t) => t.tp_code !== tpCode).sort(sessionOrder);
+  const overlayDefault = session
+    ? (otherSessions.filter((t) => sessionOrder(t, session) < 0).at(-1) ?? otherSessions[0] ?? null)
+    : null;
+  const overlayTp =
+    overlayPick && otherSessions.some((t) => t.tp_code === overlayPick) ? overlayPick : (overlayDefault?.tp_code ?? null);
+  const overlayGalleryQ = useQuery({
+    ...galleryQuery(personId ?? '', overlayTp ?? ''),
+    enabled: !!personId && overlayOn && !!overlayTp,
+    retry: false,
+  });
+  const overlayUrls: Partial<Record<PhotoViewCode, string>> = {};
+  if (personId && overlayOn && overlayGalleryQ.data) {
+    for (const view of VIEW_CODES) {
+      const img = overlayGalleryQ.data[view];
+      // The grid's 480 px thumbnail: a faint guide needs no more, and it is usually cached.
+      if (img) overlayUrls[view] = buildWorkingContentUrl(personId, img.name, { thumb: 480, v: img.mtime });
+    }
+  }
+
   // On-open hydration probes (best-effort): the working/ gallery (baked crops) and
   // the timepoint folder listing (tagged originals). Both on React Query so a
   // background render landing just invalidates them → the hydration effect re-runs.
@@ -149,14 +224,21 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
     enabled: !!personId && !!sessionFolder,
     retry: false,
   });
+  // The framing each saved view was rendered with — "Continue editing" + the readout.
+  const hydrateFramingQ = useQuery({
+    ...framingQuery(personId ?? '', tpCode),
+    enabled: !!personId && !!session,
+    retry: false,
+  });
 
-  // Unsaved-changes guard: any slot holding a live edit is hours of framing the
-  // router would silently discard. The shared page guard (useConfirm + the
+  // Unsaved-changes guard: a slot whose live edit differs from what is saved is
+  // framing the router would silently discard. The shared page guard (useConfirm + the
   // `common:unsaved.*` wording + beforeunload) — this file used to hand-roll all of
-  // it (FE-F14-8). Hydrated saved slots have no sourceRelPath, so a freshly opened
-  // timepoint is clean.
-  const placedCount = VIEW_CODES.filter((v) => editor.slots[v].sourceRelPath).length;
-  const { allowNextNavigation } = useUnsavedRouteGuard(placedCount > 0);
+  // it (FE-F14-8). Hydrated saved slots have no live edit, and a saved view reopened
+  // with its saved framing is not a change until it is moved, so neither asks.
+  const dirtyViews = VIEW_CODES.filter((v) => isSlotDirty(editor.slots[v]));
+  const filledCount = VIEW_CODES.filter((v) => editor.slots[v].sourceRelPath || editor.slots[v].savedImageUrl).length;
+  const { allowNextNavigation } = useUnsavedRouteGuard(dirtyViews.length > 0);
 
   // On open (and whenever either probe settles), sync the slots with what is saved:
   // the baked image read-only and, when the source original is still tagged in the
@@ -166,6 +248,7 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
   // contributes nothing.
   const hydrateGalleryData: GalleryResponse | undefined = hydrateGalleryQ.data;
   const hydrateFilesData = hydrateFilesQ.data;
+  const hydrateFramingData = hydrateFramingQ.data;
   useEffect(() => {
     if (!personId || !hydrateGalleryData) return;
     const views: Partial<Record<PhotoViewCode, SlotHydration>> = {};
@@ -177,37 +260,38 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
       const img = hydrateGalleryData[view];
       if (!img) continue;
       views[view] = {
+        ...EMPTY_HYDRATION,
         savedImageUrl: buildWorkingContentUrl(personId, img.name, { thumb: 480, v: img.mtime }),
-        canReEdit: false,
-        reEditRelPath: null,
-        reEditName: null,
-        reEditVersion: null,
+        savedSize: { width: img.width, height: img.height },
+        savedFraming: hydrateFramingData?.[view] ?? null,
       };
     }
-    // Tagged originals → enable "Restore original" for their view.
+    // Tagged originals → enable re-editing for their view.
     for (const e of hydrateFilesData?.entries ?? []) {
       if (e.type !== 'file') continue;
       const tag = parseOriginalViewTag(e.name);
       if (!tag) continue;
       views[tag.view] = {
-        ...(views[tag.view] ?? {
-          savedImageUrl: null,
-          canReEdit: false,
-          reEditRelPath: null,
-          reEditName: null,
-          reEditVersion: null,
-        }),
+        ...(views[tag.view] ?? EMPTY_HYDRATION),
         canReEdit: true,
         reEditRelPath: e.relPath,
         reEditName: tag.original,
         reEditVersion: e.modified ?? null,
       };
     }
+    // "Continue editing" needs the recorded framing to belong to the original that is
+    // tagged NOW — a re-tagged or replaced one would get the old frame.
+    for (const view of VIEW_CODES) {
+      const h = views[view];
+      if (h?.savedFraming && h.canReEdit) {
+        h.canContinue = framingMatchesOriginal(h.savedFraming, h.reEditName, h.reEditVersion);
+      }
+    }
     editor.hydrate(views);
     // editor.hydrate dispatches through a stable reducer dispatch; re-run only when
     // a probe's data changes (covers a background render landing → query invalidated).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personId, tpCode, hydrateGalleryData, hydrateFilesData]);
+  }, [personId, tpCode, hydrateGalleryData, hydrateFilesData, hydrateFramingData]);
 
   // Listen for this timepoint's background-render completion while the editor
   // is open: re-hydrate (sidebar included — its originals get view-tagged by the
@@ -323,7 +407,9 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
 
   const handleSave = async (): Promise<void> => {
     const slots: SlotRenderSpec[] = [];
-    for (const view of VIEW_CODES) {
+    // Only what differs from disk: re-rendering an untouched slot would rewrite the
+    // same photo for nothing.
+    for (const view of dirtyViews) {
       const s = editor.slots[view];
       if (!s.sourceRelPath) continue;
       const a = s.croppedAreaPixels;
@@ -340,10 +426,12 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
         // The pixel space the extract rect lives in (proxy thumbnail vs full
         // original) — the server scales the rect to source space when they differ.
         ...(s.mediaSize ? { cropSpace: s.mediaSize } : {}),
+        // The framing record the render embeds, so this view can be continued later.
+        ...(a && s.croppedArea ? { framing: { area: s.croppedArea, zoom: s.zoom } } : {}),
       });
     }
     if (slots.length === 0) {
-      toast.warning('Drop at least one photo into a slot first.');
+      toast.warning('Nothing to save — no photo has changed.');
       return;
     }
 
@@ -409,15 +497,73 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
           <div className={styles.titleBlock}>
             <span className={styles.tpName}>{tpName || 'Photo session'}</span>
             {tpDate && <span className={styles.tpDate}>{tpDate}</span>}
-            <span className={styles.count}>{placedCount}/8 placed</span>
+            <span className={styles.count}>
+              {filledCount}/8
+              {dirtyViews.length > 0 && <span className={styles.unsavedCount}> · {dirtyViews.length} unsaved</span>}
+            </span>
           </div>
           <SlotActions
+            personId={personId}
             editor={editor}
             activeView={activeView}
+            proxyMode={quality === 'proxy'}
             onRemoveSaved={(view) => void removeView(view)}
           />
         </div>
         <div className={styles.rightTools}>
+          <div className={styles.overlayControls} role="group" aria-label="Overlay another session">
+            <button
+              type="button"
+              className={styles.overlayToggle}
+              onClick={() => {
+                const next = !overlayOn;
+                setOverlayOn(next);
+                persist(OVERLAY_KEY, next ? '1' : '0');
+              }}
+              aria-pressed={overlayOn}
+              disabled={!overlayTp}
+              title={
+                overlayTp
+                  ? "Lay another session's saved photos faintly over the slots, to frame this session the same way"
+                  : 'No other photo session to overlay'
+              }
+            >
+              <i className="fas fa-layer-group" aria-hidden="true" />
+              Overlay
+            </button>
+            {overlayOn && overlayTp && (
+              <>
+                <select
+                  className={styles.overlaySelect}
+                  value={overlayTp}
+                  onChange={(e) => setOverlayPick(e.target.value)}
+                  aria-label="Session to overlay"
+                  title="Session to overlay"
+                >
+                  {otherSessions.map((t) => (
+                    <option key={t.tp_code} value={t.tp_code}>
+                      {t.tp_description} · {t.tp_date_time}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="range"
+                  className={styles.overlayRange}
+                  min={OVERLAY_OPACITY_MIN * 100}
+                  max={OVERLAY_OPACITY_MAX * 100}
+                  step={5}
+                  value={Math.round(overlayOpacity * 100)}
+                  onChange={(e) => {
+                    const v = Number(e.target.value) / 100;
+                    setOverlayOpacity(v);
+                    persist(OVERLAY_OPACITY_KEY, String(v));
+                  }}
+                  aria-label="Overlay strength"
+                  title={`Overlay strength ${Math.round(overlayOpacity * 100)}%`}
+                />
+              </>
+            )}
+          </div>
           <button
             type="button"
             className={styles.qualityToggle}
@@ -464,9 +610,21 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
           </div>
           <button
             type="button"
+            className={styles.cancelBtn}
+            disabled={saving}
+            // Back to the session's photos. The route guard asks first when an
+            // unsaved change would be lost; with none, this just leaves.
+            onClick={() => navigate(`/patient/${personId}/photos/tp${tpCode}`)}
+            title={dirtyViews.length > 0 ? 'Leave without saving the changed photos' : 'Back to the photos'}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
             className={styles.saveBtn}
-            disabled={saving || placedCount === 0}
+            disabled={saving || dirtyViews.length === 0}
             onClick={handleSave}
+            title={dirtyViews.length === 0 ? 'Nothing to save — no photo has changed' : undefined}
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -496,6 +654,8 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
             onPlaced={() => setArmed(null)}
             onActivate={setActiveView}
             onRemoveView={(view) => void removeView(view)}
+            overlayUrls={overlayUrls}
+            overlayOpacity={overlayOpacity}
           />
         </main>
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a focusable separator with a value is the WAI-ARIA window-splitter pattern; ←/→ resize it */}

@@ -42,6 +42,14 @@ export function viewLabel(view: string): string {
   return (VIEW_LABELS as Record<string, string>)[view] ?? view.toUpperCase();
 }
 
+/**
+ * Longest edge a rendered view may have, in pixels. A view keeps its crop's NATIVE
+ * resolution; only a pathological zoom-out (a frame far larger than the photo) is
+ * scaled down to this. Shared so the editor's resolution readout predicts the render
+ * (`services/imaging/photo-render.service.ts`) exactly.
+ */
+export const MAX_RENDER_EDGE = 8000;
+
 /** `{viewCode}-{originalName}` — code prefix, hyphen, no spaces. */
 export const VIEW_TAG_RE = /^(i10|i12|i13|i20|i21|i22|i23|i24)-(.+)$/;
 

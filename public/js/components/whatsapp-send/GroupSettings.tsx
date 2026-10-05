@@ -96,7 +96,7 @@ export default function GroupSettings() {
               className={styles.dateDropdown}
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Shwan Orthodontics"
+              placeholder="Exact WhatsApp group name"
               maxLength={100}
               autoComplete="off"
               disabled={!enabled}

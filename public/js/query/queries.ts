@@ -182,15 +182,89 @@ export const alignerDoctorsQuery = () =>
       }),
   });
 
-/** GET /api/aligner/all-sets — every aligner set across doctors. */
-export const alignerAllSetsQuery = () =>
+/** GET /api/aligner/sets/:workId — one work's sets, with their payment and unread-note roll-ups. */
+export const alignerSetsQuery = (workId: Id) =>
   queryOptions({
-    queryKey: qk.aligner.allSets(),
+    queryKey: qk.aligner.sets(workId),
     queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof alignerContract.allSets.response>>('/api/aligner/all-sets', {
+      fetchJSON<z.infer<typeof alignerContract.setsByWorkId.response>>(`/api/aligner/sets/${workId}`, {
         signal,
-        schema: alignerContract.allSets.response,
+        schema: alignerContract.setsByWorkId.response,
       }),
+  });
+
+/** GET /api/aligner/batches/:setId — a set's batches. */
+export const alignerBatchesQuery = (setId: Id) =>
+  queryOptions({
+    queryKey: qk.aligner.batches(setId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.batchesBySetId.response>>(`/api/aligner/batches/${setId}`, {
+        signal,
+        schema: alignerContract.batchesBySetId.response,
+      }),
+  });
+
+/** GET /api/aligner/notes/:setId — a set's lab ↔ doctor messages. */
+export const alignerNotesQuery = (setId: Id) =>
+  queryOptions({
+    queryKey: qk.aligner.notes(setId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.notesBySetId.response>>(`/api/aligner/notes/${setId}`, {
+        signal,
+        schema: alignerContract.notesBySetId.response,
+      }),
+  });
+
+/** GET /api/aligner/sets/:setId/photos — the doctor's portal uploads for a set. */
+export const alignerSetPhotosQuery = (setId: Id) =>
+  queryOptions({
+    queryKey: qk.aligner.photos(setId),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.getSetPhotos.response>>(`/api/aligner/sets/${setId}/photos`, {
+        signal,
+        schema: alignerContract.getSetPhotos.response,
+      }),
+  });
+
+/**
+ * GET /api/aligner/labels/settings — where the next label print starts on the sheet
+ * and whether the clinic logo can be printed. Always stale: another workstation may
+ * have printed since, so the dialog re-reads it each time it opens.
+ */
+export const alignerLabelSettingsQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.labelSettings(),
+    queryFn: ({ signal }) =>
+      fetchJSON<alignerContract.LabelSettings>('/api/aligner/labels/settings', {
+        signal,
+        schema: alignerContract.labelSettings.response,
+      }),
+    staleTime: 0,
+  });
+
+/** GET /api/aligner/features — Archform / doctor-portal use on this install (changes only on a config edit). */
+export const alignerFeaturesQuery = () =>
+  queryOptions({
+    queryKey: qk.aligner.features(),
+    queryFn: ({ signal }) =>
+      fetchJSON<alignerContract.AlignerFeatures>('/api/aligner/features', {
+        signal,
+        schema: alignerContract.alignerFeatures.response,
+      }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+/** GET /api/aligner/all-sets — every aligner set across doctors. */
+export const alignerAllSetsQuery = (opts: { inactive: boolean; finished: boolean }) =>
+  queryOptions({
+    queryKey: qk.aligner.allSets(opts),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof alignerContract.allSets.response>>(
+        `/api/aligner/all-sets?inactive=${opts.inactive ? 1 : 0}&finished=${opts.finished ? 1 : 0}`,
+        { signal, schema: alignerContract.allSets.response }
+      ),
+    // Toggling a history filter keeps the current rows up until the new read lands.
+    placeholderData: keepPreviousData,
   });
 
 /** GET /api/aligner/patients/all — all aligner patients (all doctors). */
@@ -890,6 +964,37 @@ export const galleryQuery = (id: Id, tpCode: Id) =>
       ),
   });
 
+/**
+ * GET /api/photo-editor/:id/framing/:tpCode — the framing each saved view of a session
+ * was rendered with (null per view when none was recorded) — the photo editor's
+ * "Continue editing" and saved-photo readout.
+ */
+export const framingQuery = (id: Id, tpCode: Id) =>
+  queryOptions({
+    queryKey: qk.patient.framing(id, tpCode),
+    queryFn: ({ signal }) =>
+      fetchJSON<photoEditorContract.FramingResponse>(`/api/photo-editor/${id}/framing/${tpCode}`, {
+        signal,
+        schema: photoEditorContract.framing.response,
+      }),
+  });
+
+/**
+ * GET /api/photo-editor/:id/source-size?path= — an original's pixel size after EXIF
+ * orientation (the photo editor's resolution readout while framing a 2048 px proxy).
+ * The key carries the file's version, so the answer never goes stale.
+ */
+export const sourceSizeQuery = (id: Id, relPath: string, version: string | null) =>
+  queryOptions({
+    queryKey: qk.patient.sourceSize(id, relPath, version),
+    queryFn: ({ signal }) =>
+      fetchJSON<photoEditorContract.SourceSizeResponse>(
+        `/api/photo-editor/${id}/source-size?${new URLSearchParams({ path: relPath })}`,
+        { signal, schema: photoEditorContract.sourceSize.response }
+      ),
+    staleTime: Infinity,
+  });
+
 /** GET /api/patients/:id/files?path=&flat= — patient file-explorer listing for a folder. */
 export const patientFilesQuery = (id: Id, path = '', flat = false) =>
   queryOptions({
@@ -1544,6 +1649,27 @@ export const threeShapeMediaQuery = (personId: number | string) =>
         { signal, schema: threeshapeContract.listMedia.response }
       ),
     retry: false,
+  });
+
+/**
+ * GET /api/wa/initial-state — the WhatsApp client's ready flag + pairing QR, and the
+ * reminder batch in progress. Flat (no envelope), so the funnel passes it through.
+ * Three readers share it (the status provider, `useWhatsAppSync`, `useWhatsAppAuth`)
+ * instead of each fetching it on every stream open (FE-F16-16). The SSE `connected`
+ * event invalidates it; live changes arrive as SSE frames in between.
+ */
+export const whatsappInitialStateQuery = () =>
+  queryOptions({
+    queryKey: qk.whatsapp.initialState(),
+    queryFn: ({ signal }) =>
+      fetchJSON<whatsappContract.InitialStateResponse>('/api/wa/initial-state', {
+        signal,
+        schema: whatsappContract.initialState.response,
+      }),
+    // Short, not 0: a page that mounts right after the status provider's read (its
+    // lazy chunk landing) reuses that snapshot instead of fetching a third copy. The
+    // SSE `connected` invalidation and the auth page's explicit refetches ignore it.
+    staleTime: 2_000,
   });
 
 /** GET /api/wa/group-settings — WhatsApp daily-list group posting config. */

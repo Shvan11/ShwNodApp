@@ -71,8 +71,44 @@ export interface SetUpdateData {
  * @returns New set id
  * @throws AlignerValidationError If validation fails
  */
+/**
+ * Who is asking — the set-price rule depends on it (FE-F17-9: set prices are
+ * front-desk/admin, like a work item's cost under FE-F7-7; doctors and assistants
+ * still create and edit sets).
+ */
+export interface SetActor {
+  mayPrice: boolean;
+}
+
+/**
+ * The two rules on a NEW set price (owner decision 2026-10-04, FE-F17-9):
+ *  - only a role that may price sets may set one;
+ *  - only on a work billed in USD. A set's payments are refused on any other work
+ *    (FE-F8-6), so a cost there could never be paid and read "Unpaid" forever.
+ * An unchanged cost passes both, so the three legacy priced sets on non-USD works
+ * stay editable in every other field.
+ */
+async function assertMayPriceSet(workId: number, actor: SetActor): Promise<void> {
+  if (!actor.mayPrice) {
+    throw new AlignerValidationError(
+      'Only the front desk or an admin can set an aligner set\'s price.',
+      'SET_COST_NOT_ALLOWED'
+    );
+  }
+  const currency = await alignerSetQueries.getWorkCurrency(workId);
+  if (currency !== 'USD') {
+    throw new AlignerValidationError(
+      `Aligner sets are priced in USD, but this treatment is billed in ${currency ?? 'no currency'}. ` +
+        'Record the charge on the Works page instead.',
+      'WORK_CURRENCY_NOT_USD',
+      { workId, currency }
+    );
+  }
+}
+
 export async function validateAndCreateSet(
-  setData: SetCreateData
+  setData: SetCreateData,
+  actor: SetActor
 ): Promise<number> {
   const { work_id, aligner_dr_id } = setData;
 
@@ -91,6 +127,10 @@ export async function validateAndCreateSet(
       ? Number(setData.set_cost)
       : undefined,
   };
+
+  if (sanitizedData.set_cost !== undefined && sanitizedData.set_cost !== null) {
+    await assertMayPriceSet(work_id, actor);
+  }
 
   try {
     const newSetId = await alignerSetQueries.createAlignerSet(sanitizedData);
@@ -117,7 +157,8 @@ export async function validateAndCreateSet(
  */
 export async function validateAndUpdateSet(
   setId: number | string,
-  setData: SetUpdateData
+  setData: SetUpdateData,
+  actor: SetActor
 ): Promise<void> {
   if (!setId || isNaN(parseInt(String(setId), 10))) {
     throw new AlignerValidationError('Valid setId is required', 'INVALID_SET_ID');
@@ -144,6 +185,23 @@ export async function validateAndUpdateSet(
         ? Number(setData.set_cost)
         : undefined,
   };
+
+  // A CHANGED price must pass the pricing rules; re-sending the stored one is not a
+  // change (FE-F17-9). Clearing it (null) is a change too, so it is finance-only as well.
+  const storedCost = setExists.set_cost ?? null;
+  const newCost = sanitizedData.set_cost;
+  if (newCost !== undefined && newCost !== storedCost) {
+    if (newCost === null) {
+      if (!actor.mayPrice) {
+        throw new AlignerValidationError(
+          'Only the front desk or an admin can change an aligner set\'s price.',
+          'SET_COST_NOT_ALLOWED'
+        );
+      }
+    } else {
+      await assertMayPriceSet(setExists.work_id, actor);
+    }
+  }
 
   // Re-enforce the dropped CK_MoreThanTotalW invariant in TS: a set's cost must never
   // drop below what's already been paid for it, otherwise the set becomes overpaid.

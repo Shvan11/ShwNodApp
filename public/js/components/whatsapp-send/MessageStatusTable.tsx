@@ -4,11 +4,13 @@
  */
 
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { MESSAGE_STATUS, type MessageStatusValue } from '../../utils/whatsapp-send-constants';
+import type { StatusRow } from '@shared/contracts/messaging.contract';
+import { MESSAGE_STATUS, MESSAGE_STATUS_TEXT, type MessageStatusValue } from '../../utils/whatsapp-send-constants';
+import type { MessageSummary } from '../../hooks/useMessageStatus';
 import { formatPhoneForDisplay } from '../../utils/phoneFormatter';
 import styles from '../../routes/WhatsAppSend.module.css';
 import { formatISODate } from '../../core/utils';
-import { formatLocaleTime } from '../../utils/formatters';
+import { formatLocaleDate, formatLocaleTime } from '../../utils/formatters';
 
 /**
  * WhatsApp-style delivery indicator for the Status column (Font Awesome):
@@ -18,7 +20,7 @@ import { formatLocaleTime } from '../../utils/formatters';
  *  - clock         (fa-clock)         → not sent yet / ready to resend
  *  - alert         (fa-circle-exclamation) → failed / invalid phone
  */
-function StatusTicks({ status }: { status: MessageStatusValue }) {
+function StatusTicks({ status }: { status: number }) {
   switch (status) {
     case MESSAGE_STATUS.SERVER:
       return <i className={`fas fa-check ${styles.waTick} ${styles.waTickGray}`} aria-hidden="true" />;
@@ -38,56 +40,31 @@ function StatusTicks({ status }: { status: MessageStatusValue }) {
   }
 }
 
-export interface MessageItem {
-  status: MessageStatusValue;
-  appointmentId?: number;
-  errorMessage?: string;
-  timeSent?: string;
-  sentAt?: string;
-  timestamp?: string;
-  patientName?: string;
-  name?: string;
-  patient?: string;
-  phone?: string;
-  phoneNumber?: string;
-  mobile?: string;
-  message?: string;
-  messageText?: string;
-  content?: string;
-}
-
-export interface MessageSummary {
-  total: number;
-  pending: number;
-  ready: number;
-  server: number;
-  device: number;
-  read: number;
-  played: number;
-  failed: number;
-}
-
 interface MessageStatusTableProps {
-  messages: MessageItem[];
+  messages: StatusRow[];
   loading: boolean;
   currentDate: string;
-  formatDisplayDate: (date: string) => string;
-  MESSAGE_STATUS_TEXT: Record<MessageStatusValue, string>;
-  MESSAGE_STATUS_CLASS: Record<MessageStatusValue, string>;
-  escapeHtml: (text: string) => string;
   summary: MessageSummary;
   /** Right-click on a row — opens the resend/copy context menu (owner: page). */
-  onRowContextMenu?: (event: ReactMouseEvent, msg: MessageItem) => void;
+  onRowContextMenu?: (event: ReactMouseEvent, msg: StatusRow) => void;
+}
+
+/** The selected day is a 'YYYY-MM-DD', read as a LOCAL day. */
+function formatDisplayDate(date: string): string {
+  return formatLocaleDate(date, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+/** Ready-to-resend rows tint amber; failed / invalid-phone rows red. */
+function rowClass(status: number): string | undefined {
+  if (status === MESSAGE_STATUS.READY) return styles.rowReady;
+  if (status === MESSAGE_STATUS.FAILED || status === MESSAGE_STATUS.INVALID_PHONE) return styles.rowFailed;
+  return undefined;
 }
 
 export default function MessageStatusTable({
   messages,
   loading,
   currentDate,
-  formatDisplayDate,
-  MESSAGE_STATUS_TEXT,
-  MESSAGE_STATUS_CLASS,
-  escapeHtml,
   summary,
   onRowContextMenu,
 }: MessageStatusTableProps) {
@@ -130,18 +107,8 @@ export default function MessageStatusTable({
     );
   }
 
-  const getStatusText = (status: MessageStatusValue): string => {
-    return MESSAGE_STATUS_TEXT[status] || 'Unknown';
-  };
-
-  const getStatusClass = (status: MessageStatusValue): string => {
-    return MESSAGE_STATUS_CLASS[status] || 'status-unknown';
-  };
-
-  const getTimeSent = (msg: MessageItem): string => {
-    const sent = msg.timeSent || msg.sentAt || msg.timestamp;
-    return sent ? formatLocaleTime(sent) : 'Not sent';
-  };
+  const getTimeSent = (msg: StatusRow): string =>
+    msg.timeSent ? formatLocaleTime(msg.timeSent) || 'Not sent' : 'Not sent';
 
   return (
     <div className={styles.messageStatusTable}>
@@ -154,39 +121,26 @@ export default function MessageStatusTable({
               <th>Phone</th>
               <th>Status</th>
               <th>Time Sent</th>
-              <th>Message</th>
             </tr>
           </thead>
           <tbody>
             {messages.map((msg, index) => {
-              const statusText = getStatusText(msg.status);
-              const statusClass = getStatusClass(msg.status);
               const timeSent = getTimeSent(msg);
-
-              const patientName = msg.patientName || msg.name || msg.patient || 'N/A';
-              const rawPhone = msg.phone || msg.phoneNumber || msg.mobile || '';
-              const phoneNumber = rawPhone ? formatPhoneForDisplay(rawPhone) : 'N/A';
-              const messageText = msg.message || msg.messageText || msg.content || '';
-
-              const messagePreview =
-                messageText.substring(0, 50) + (messageText.length > 50 ? '...' : '');
+              const patientName = msg.patientName || msg.name || 'N/A';
+              const phoneNumber = msg.phone ? formatPhoneForDisplay(msg.phone) : 'N/A';
 
               return (
                 <tr
-                  key={`${rawPhone || 'na'}-${timeSent}-${index}`}
-                  className={`status-row ${statusClass}`}
+                  key={msg.appointmentId ?? `${msg.phone || 'na'}-${index}`}
+                  className={rowClass(msg.status)}
                   onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(e, msg) : undefined}
                 >
-                  <td className={styles.patientName}>
-                    <div dangerouslySetInnerHTML={{ __html: escapeHtml(patientName) }} />
-                  </td>
-                  <td className={styles.phoneNumber}>
-                    <div dangerouslySetInnerHTML={{ __html: escapeHtml(phoneNumber) }} />
-                  </td>
+                  <td className={styles.patientName}>{patientName}</td>
+                  <td className={styles.phoneNumber}>{phoneNumber}</td>
                   <td className={styles.statusCell}>
                     <span className={styles.waStatus}>
                       <StatusTicks status={msg.status} />
-                      {statusText}
+                      {MESSAGE_STATUS_TEXT[msg.status as MessageStatusValue] ?? 'Unknown'}
                     </span>
                     {msg.errorMessage && (
                       <div className={styles.errorReason} title={msg.errorMessage}>
@@ -195,9 +149,6 @@ export default function MessageStatusTable({
                     )}
                   </td>
                   <td className={styles.timeSent}>{timeSent}</td>
-                  <td className={styles.messagePreview} title={messageText}>
-                    <div dangerouslySetInnerHTML={{ __html: escapeHtml(messagePreview) }} />
-                  </td>
                 </tr>
               );
             })}

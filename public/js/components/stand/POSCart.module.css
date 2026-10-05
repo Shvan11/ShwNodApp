@@ -108,6 +108,16 @@
   text-overflow: ellipsis;
 }
 
+.expiredTag {
+  margin-inline-start: var(--spacing-xs);
+  padding: 0 var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--error-color);
+  border: var(--border-width-thin) solid var(--error-color);
+  border-radius: var(--radius-sm);
+}
+
 .rowPrice {
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
@@ -163,13 +173,6 @@
   font-family: var(--font-primary);
   color: var(--text-primary);
   outline: none;
-  -moz-appearance: textfield;
-}
-
-.quantityInput::-webkit-outer-spin-button,
-.quantityInput::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .lineTotal {

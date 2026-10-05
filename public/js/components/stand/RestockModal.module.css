@@ -142,3 +142,9 @@
     margin: 10px;
   }
 }
+
+.costHint {
+  margin: var(--spacing-sm) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}

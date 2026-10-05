@@ -11,10 +11,9 @@ import CreateTemplateModal from './CreateTemplateModal';
 import TemplateStats from './TemplateStats';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import type { Template } from './TemplateCard';
-import type { DocumentType, TemplateSubmissionData } from './CreateTemplateModal';
 import type { TemplateStatsData } from './TemplateStats';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as templateContract from '@shared/contracts/template.contract';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { documentTypesQuery, templatesQuery } from '@/query/queries';
@@ -28,11 +27,13 @@ function TemplateManagement() {
     // Document types + the full template list, both on useQuery. A template
     // write invalidates qk.templates.all() (a prefix of both keys), so the list
     // and stats refresh app-wide without a manual reload.
+    // The contract's rows as they come — the hand-written copies these were cast
+    // into are gone (FE-F20-11).
     const { data: documentTypesData } = useQuery(documentTypesQuery());
-    const documentTypes = (documentTypesData ?? []) as DocumentType[];
+    const documentTypes = documentTypesData ?? [];
 
     const { data: templatesData, isLoading, isError, refetch } = useQuery(templatesQuery());
-    const allTemplates = useMemo(() => (templatesData ?? []) as Template[], [templatesData]);
+    const allTemplates = useMemo(() => templatesData ?? [], [templatesData]);
     const error = isError ? 'Failed to load templates' : null;
 
     const [currentDocumentType, setCurrentDocumentType] = useState<number | null>(null);
@@ -56,9 +57,11 @@ function TemplateManagement() {
         }).length
     }), [allTemplates]);
 
-    const handleCreateTemplate = async (templateData: TemplateSubmissionData) => {
+    const handleCreateTemplate = async (templateData: templateContract.CreateTemplateBody) => {
         try {
-            const data = await postJSON<{ template_id: number }>('/api/templates', templateData);
+            const data = await postJSON<{ template_id: number }>('/api/templates', templateData, {
+                schema: templateContract.createTemplate.response,
+            });
             queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             setIsCreateModalOpen(false);
             // Navigate to designer
@@ -79,7 +82,8 @@ function TemplateManagement() {
         }
 
         try {
-            await putJSON(`/api/templates/${templateId}`, { is_default: true, modified_by: 'user' });
+            // No `modified_by`: the server records the session's user.
+            await putJSON(`/api/templates/${templateId}`, { is_default: true });
             queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             toast.success('Template set as default!');
         } catch (err) {
@@ -143,7 +147,7 @@ function TemplateManagement() {
                                     className={`${styles.tab} ${effectiveDocumentType === docType.type_id ? styles.tabActive : ''}`}
                                     onClick={() => setCurrentDocumentType(docType.type_id)}
                                 >
-                                    <i className={`fas ${docType.icon}`}></i>
+                                    <i className={`fas ${docType.icon ?? 'fa-file-alt'}`}></i>
                                     {docType.type_name}
                                     <span className={styles.tabBadge}>{templateCount}</span>
                                 </button>

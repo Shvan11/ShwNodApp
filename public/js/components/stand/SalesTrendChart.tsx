@@ -3,12 +3,13 @@
  * Chart.js line chart showing Revenue and Profit trends over time.
  * Follows the same useRef + useEffect pattern as StatisticsComponent.
  */
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import Chart from '../../utils/chartSetup';
 import type { SalesSummaryRow } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import { getChartThemeColors } from '../../utils/chartTheme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { parseLocalDate } from '../../utils/calendarDate';
 import styles from './SalesTrendChart.module.css';
 
 interface SalesTrendChartProps {
@@ -16,14 +17,15 @@ interface SalesTrendChartProps {
 }
 
 /**
- * Format an ISO date string as DD/MM.
+ * A `'YYYY-MM-DD'` day as D/M, read as a LOCAL day (`new Date('YYYY-MM-DD')` is UTC
+ * midnight, a day early west of UTC — FE-F19-12).
  */
 function formatShortDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   return `${d.getDate()}/${d.getMonth() + 1}`;
 }
 
-const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
+export default function SalesTrendChart({ data }: SalesTrendChartProps) {
   const { resolvedTheme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
@@ -91,12 +93,6 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
               padding: 16,
             },
           },
-          title: {
-            display: true,
-            text: 'Sales Trend',
-            font: { size: 16, weight: 'bold' },
-            padding: { top: 10, bottom: 20 },
-          },
           tooltip: {
             callbacks: {
               label: (context) =>
@@ -138,6 +134,4 @@ const SalesTrendChart: React.FC<SalesTrendChartProps> = ({ data }) => {
       <canvas ref={canvasRef} />
     </div>
   );
-};
-
-export default React.memo(SalesTrendChart);
+}

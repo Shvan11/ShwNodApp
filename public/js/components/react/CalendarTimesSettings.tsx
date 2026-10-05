@@ -24,11 +24,6 @@ interface CategorizedSlots {
     late: string[];
 }
 
-// GET /api/options/:name success shape ({ status:'success', optionName, value }).
-interface OptionResponse {
-    value?: string | null;
-}
-
 // Helper to parse time from database format (1970-01-01T14:00:00 or HH:MM)
 const parseTimeToHHMM = (timeStr: string): string => {
     if (timeStr.includes('T')) {
@@ -147,10 +142,10 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
     const [seededEarly, setSeededEarly] = useState<unknown>(null);
     if (earlyQuery.data !== seededEarly) {
         setSeededEarly(earlyQuery.data);
-        const earlyData = earlyQuery.data as OptionResponse | null | undefined;
-        const earlySlotsArr = earlyData?.value
-            ? earlyData.value.split(',').filter(Boolean)
-            : ['12:00', '12:30', '13:00', '13:30']; // Default
+        // A missing or empty row hides nothing — what the calendar itself does
+        // (`getSlotSettings`). Stand-in lists here used to show four "early" times
+        // the calendar never hid, and an emptied list re-seeded them.
+        const earlySlotsArr = (earlyQuery.data?.value ?? '').split(',').filter(Boolean);
         setEarlySlots(earlySlotsArr);
         setOriginalEarlySlots(earlySlotsArr);
     }
@@ -158,10 +153,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
     const [seededLate, setSeededLate] = useState<unknown>(null);
     if (lateQuery.data !== seededLate) {
         setSeededLate(lateQuery.data);
-        const lateData = lateQuery.data as OptionResponse | null | undefined;
-        const lateSlotsArr = lateData?.value
-            ? lateData.value.split(',').filter(Boolean)
-            : ['21:00', '21:30', '22:00', '22:30']; // Default
+        const lateSlotsArr = (lateQuery.data?.value ?? '').split(',').filter(Boolean);
         setLateSlots(lateSlotsArr);
         setOriginalLateSlots(lateSlotsArr);
     }
@@ -169,8 +161,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
     const [seededToggle, setSeededToggle] = useState<unknown>(null);
     if (toggleQuery.data !== seededToggle) {
         setSeededToggle(toggleQuery.data);
-        const toggleData = toggleQuery.data as OptionResponse | null | undefined;
-        const toggleValue = toggleData?.value === 'true';
+        const toggleValue = toggleQuery.data?.value === 'true';
         setShowExtendedSlotsDefault(toggleValue);
         setOriginalShowExtendedDefault(toggleValue);
     }
@@ -262,8 +253,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             flashSuccess(`Added time slot ${timeStr}`);
 
         } catch (err) {
-            console.error('Error adding time slot:', err);
-            setError('Failed to add time slot');
+            setError(httpErrorMessage(err, 'Failed to add time slot'));
         } finally {
             setIsSaving(false);
         }
@@ -294,8 +284,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             flashSuccess(`Deleted time slot ${timeStr}`);
 
         } catch (err) {
-            console.error('Error deleting time slot:', err);
-            setError('Failed to delete time slot');
+            setError(httpErrorMessage(err, 'Failed to delete time slot'));
         } finally {
             setIsSaving(false);
         }
@@ -308,29 +297,37 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         setSuccessMessage(null);
 
         try {
-            // PUT /api/options/:name is update-only (404s if the row is missing).
-            // These three are seeded (verified — audit N12/N20), so a non-2xx is a
-            // genuine failure that putJSON now throws → the catch surfaces it,
-            // instead of the old fire-and-forget that always reported success.
-            await putJSON('/api/options/CALENDAR_EARLY_SLOTS', { value: sortTimes(earlySlots).join(',') });
-            await putJSON('/api/options/CALENDAR_LATE_SLOTS', { value: sortTimes(lateSlots).join(',') });
-            await putJSON('/api/options/CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT', { value: showExtendedSlotsDefault.toString() });
+            // One request, written in one statement; either list may be empty. It was
+            // three update-only option PUTs, the first of which refused an emptied list
+            // and any of which could fail after another had saved (FE-F21-5).
+            const saved = await putJSON<calendarContract.UpdateSlotSettingsResponse>(
+                '/api/calendar/slot-settings',
+                {
+                    earlySlots: sortTimes(earlySlots),
+                    lateSlots: sortTimes(lateSlots),
+                    showExtendedDefault: showExtendedSlotsDefault,
+                },
+                { schema: calendarContract.updateSlotSettings.response }
+            );
 
             // Update original values (baseline for change detection)
-            setOriginalEarlySlots([...earlySlots]);
-            setOriginalLateSlots([...lateSlots]);
-            setOriginalShowExtendedDefault(showExtendedSlotsDefault);
+            setEarlySlots(saved.earlySlots);
+            setLateSlots(saved.lateSlots);
+            setOriginalEarlySlots(saved.earlySlots);
+            setOriginalLateSlots(saved.lateSlots);
+            setOriginalShowExtendedDefault(saved.showExtendedDefault);
 
-            // Refresh the cached option rows to match what was just saved.
+            // Refresh the cached option rows (the booking picker reads them) and the
+            // calendar, whose grids hide the early/late times server-side.
             queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_EARLY_SLOTS') });
             queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_LATE_SLOTS') });
             queryClient.invalidateQueries({ queryKey: qk.settings.option('CALENDAR_SHOW_EXTENDED_SLOTS_DEFAULT') });
+            queryClient.invalidateQueries({ queryKey: qk.calendar.all() });
 
             flashSuccess('Settings saved successfully!');
 
         } catch (err) {
-            console.error('Error saving settings:', err);
-            setError('Failed to save settings. Please try again.');
+            setError(httpErrorMessage(err, 'Failed to save settings. Please try again.'));
         } finally {
             setIsSaving(false);
         }

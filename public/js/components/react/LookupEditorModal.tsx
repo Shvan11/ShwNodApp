@@ -1,39 +1,17 @@
-import React, { useState, useEffect, useMemo, useRef, FormEvent, ChangeEvent } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useMemo, FormEvent, ChangeEvent } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { formatISODate } from '../../core/utils';
 import { adminLookupItemsQuery } from '@/query/queries';
+import type { LookupColumn } from '@shared/contracts/lookup-admin.contract';
+import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 
-// Types
-interface ReferenceConfig {
-    table: string;
-    idColumn: string;
-    displayColumn: string;
-}
+/** A lookup row as the generic admin feed returns it (columns vary per table). */
+export type LookupItem = Record<string, unknown>;
+/** What the form sends: one value per configured column. */
+export type LookupFormData = Record<string, unknown>;
 
-interface ColumnConfig {
-    name: string;
-    label: string;
-    type: string;
-    required?: boolean;
-    maxLength?: number;
-    reference?: ReferenceConfig;
-}
-
-type ReferenceOption = { id: string | number; label: string };
-
-interface LookupItem {
-    [key: string]: any;
-}
-
-interface Position {
-    top: number;
-    left: number;
-}
-
-interface FormData {
-    [key: string]: any;
-}
+type ReferenceOption = { id: string; label: string };
 
 interface FormErrors {
     [key: string]: string;
@@ -42,55 +20,28 @@ interface FormErrors {
 interface LookupEditorModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: FormData) => Promise<void>;
-    columns: ColumnConfig[];
+    onSave: (data: LookupFormData) => Promise<void>;
+    columns: LookupColumn[];
     editingItem: LookupItem | null;
     tableName: string;
-    idColumn: string;
-    anchorEl: HTMLElement | null;
 }
 
+const TITLE_ID = 'lookup-editor-dialog-title';
+
 /**
- * Positioned modal for adding/editing lookup table items
- * Appears next to the anchor element (edit button or add button)
+ * The add/edit form for one lookup row, in the shared `<Modal>`.
+ *
+ * It was a hand-rolled portal positioned beside the button that opened it, with no
+ * focus handling: focus stayed on the page behind, Tab walked out of it, and the
+ * icon-only close had no name (audit FE-F21-14). `<Modal>` brings the focus trap
+ * and return, the Escape stack (it opens over LookupManagerModal, and only the top
+ * one closes — what the old capture-phase listener did by hand) and the unsaved
+ * guard.
  */
-// Pure positioner — module-scoped, takes an already-measured rect (keeps the DOM
-// read at the call site).
-const calculatePosition = (rect: DOMRect): Position => {
-    const padding = 12;
-    // Clamp against the width the popover will ACTUALLY render at: the stylesheet
-    // caps it with `max-width: calc(100vw - 24px)`, so on a narrow viewport the box
-    // is narrower than the 420px design width. Positioning against the design width
-    // instead used to push it off-screen, which the stylesheet then had to drag back
-    // with `left: … !important` — this keeps one source of truth.
-    const modalWidth = Math.min(420, window.innerWidth - padding * 2);
-    const modalHeight = 400;
-
-    let left = rect.left - modalWidth - padding;
-    let top = rect.top;
-
-    if (left < padding) {
-        left = rect.right + padding;
-    }
-
-    if (left + modalWidth > window.innerWidth - padding) {
-        left = Math.max(padding, window.innerWidth - modalWidth - padding);
-    }
-
-    if (top + modalHeight > window.innerHeight - padding) {
-        top = Math.max(padding, window.innerHeight - modalHeight - padding);
-    }
-    top = Math.max(padding, top);
-
-    return { top, left };
-};
-
-const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, onSave, columns, editingItem, tableName, idColumn: _idColumn, anchorEl }) => {
-    const [formData, setFormData] = useState<FormData>({});
+const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, onSave, columns, editingItem, tableName }) => {
+    const [formData, setFormData] = useState<LookupFormData>({});
     const [errors, setErrors] = useState<FormErrors>({});
     const [isSaving, setIsSaving] = useState<boolean>(false);
-    const [position, setPosition] = useState<Position | null>(null);
-    const modalRef = useRef<HTMLDivElement>(null);
 
     // Distinct reference-type columns (one fetch per referenced table). Derived
     // from the columns config while the modal is open; closed → no reads fire.
@@ -125,7 +76,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
             if (!rows) return;
             const refCol = refColumns.find(c => c.reference!.table === table)!.reference!;
             out[table] = rows.map(r => ({
-                id: r[refCol.idColumn],
+                id: String(r[refCol.idColumn]),
                 label: String(r[refCol.displayColumn] ?? ''),
             }));
         });
@@ -139,69 +90,20 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
     if (seededItem.open !== isOpen || seededItem.item !== editingItem) {
         setSeededItem({ open: isOpen, item: editingItem });
         if (isOpen) {
-            if (editingItem) {
-                // Edit mode: populate form with existing values
-                const data: FormData = {};
-                columns.forEach(col => {
-                    data[col.name] = editingItem[col.name] ?? '';
-                });
-                setFormData(data);
-            } else {
-                // Add mode: initialize with empty values. Bit columns in the whitelist
-                // are all "Active"-style flags (labs.is_active, document_types.is_active,
-                // each DB-default true) — a new row should default ACTIVE so it shows up
-                // immediately in the dropdowns that filter on the flag (e.g. getLabs).
-                const data: FormData = {};
-                columns.forEach(col => {
-                    data[col.name] = col.type === 'bit' ? true : '';
-                });
-                setFormData(data);
-            }
+            const data: LookupFormData = {};
+            columns.forEach(col => {
+                // Edit mode: the row's values. Add mode: empty, except bit columns —
+                // every bit in the whitelist is an "Active"-style flag (labs.is_active,
+                // document_types.is_active, each DB-default true), so a new row starts
+                // ACTIVE and shows up at once in the dropdowns that filter on it.
+                data[col.name] = editingItem ? editingItem[col.name] ?? '' : col.type === 'bit' ? true : '';
+            });
+            setFormData(data);
             setErrors({});
         }
     }
 
-    // Position modal next to the anchor. Seeded by measuring during render (keyed
-    // adjust-during-render, mirroring the form seeding above) so the only
-    // synchronous setState stays out of the effect (react-hooks/set-state-in-effect).
-    const [seededPos, setSeededPos] = useState<{ open: boolean; anchor: HTMLElement | null }>({ open: false, anchor: null });
-    if (seededPos.open !== isOpen || seededPos.anchor !== anchorEl) {
-        setSeededPos({ open: isOpen, anchor: anchorEl });
-        setPosition(isOpen && anchorEl ? calculatePosition(anchorEl.getBoundingClientRect()) : null);
-    }
-
-    // Keep the modal pinned to the anchor as the viewport changes — setState lives
-    // in the event callback, never synchronously in the effect body.
-    useEffect(() => {
-        if (!isOpen || !anchorEl) return;
-        const updatePosition = (): void => setPosition(calculatePosition(anchorEl.getBoundingClientRect()));
-        window.addEventListener('resize', updatePosition);
-        window.addEventListener('scroll', updatePosition, true);
-
-        return () => {
-            window.removeEventListener('resize', updatePosition);
-            window.removeEventListener('scroll', updatePosition, true);
-        };
-    }, [isOpen, anchorEl]);
-
-    // Close on Escape — and ONLY this popover. Capture phase + stopImmediate, the
-    // same as LookupContextMenu: the popover opens inside LookupManagerModal (a
-    // <Modal>), whose document listener otherwise closed the manager on the same
-    // key press. The key is swallowed mid-save too, so the manager can't close
-    // under a pending write.
-    useEffect(() => {
-        if (!isOpen) return;
-        const handleEscape = (e: KeyboardEvent): void => {
-            if (e.key !== 'Escape') return;
-            e.stopImmediatePropagation();
-            e.preventDefault();
-            if (!isSaving) onClose();
-        };
-        document.addEventListener('keydown', handleEscape, true);
-        return () => document.removeEventListener('keydown', handleEscape, true);
-    }, [isOpen, isSaving, onClose]);
-
-    const handleInputChange = (columnName: string, value: any): void => {
+    const handleInputChange = (columnName: string, value: unknown): void => {
         setFormData(prev => ({
             ...prev,
             [columnName]: value
@@ -222,13 +124,9 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
         columns.forEach(col => {
             const value = formData[col.name];
 
-            // Check required
-            if (col.required) {
-                if (col.type === 'bit') {
-                    // Bit fields are always valid (false is a valid value)
-                } else if (!value && value !== 0) {
-                    newErrors[col.name] = `${col.label} is required`;
-                }
+            // Bit fields are always valid (false is a valid value).
+            if (col.required && col.type !== 'bit' && !value && value !== 0) {
+                newErrors[col.name] = `${col.label} is required`;
             }
 
             // Check max length for string fields
@@ -238,8 +136,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
 
             // Check numeric fields
             if (col.type === 'int' && value !== '' && value !== null && value !== undefined) {
-                const numVal = parseInt(value, 10);
-                if (isNaN(numVal)) {
+                if (isNaN(parseInt(String(value), 10))) {
                     newErrors[col.name] = `${col.label} must be a number`;
                 }
             }
@@ -251,10 +148,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
         e.preventDefault();
-
-        if (!validate()) {
-            return;
-        }
+        if (isSaving || !validate()) return;
 
         setIsSaving(true);
         try {
@@ -264,14 +158,14 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
         }
     };
 
-    const handleBackdropClick = (): void => {
-        if (!isSaving) {
-            onClose();
-        }
+    // Closing mid-save would drop the write's outcome on the floor.
+    const close = (): void => {
+        if (!isSaving) onClose();
     };
 
-    const renderInput = (column: ColumnConfig): React.ReactNode => {
-        const value = formData[column.name] ?? '';
+    const renderInput = (column: LookupColumn): React.ReactNode => {
+        const raw = formData[column.name];
+        const value = raw === null || raw === undefined ? '' : String(raw);
         const inputId = `lookup-field-${column.name}`;
 
         switch (column.type) {
@@ -281,7 +175,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                         <input
                             type="checkbox"
                             id={inputId}
-                            checked={value === true || value === 1 || value === '1'}
+                            checked={raw === true || raw === 1 || raw === '1'}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange(column.name, e.target.checked)}
                             disabled={isSaving}
                         />
@@ -307,14 +201,14 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                 return (
                     <select
                         id={inputId}
-                        value={value === null || value === undefined ? '' : String(value)}
+                        value={value}
                         onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange(column.name, e.target.value)}
                         disabled={isSaving || isLoading}
                         className={errors[column.name] ? 'input-error' : ''}
                     >
                         <option value="">{isLoading ? 'Loading…' : '— Select —'}</option>
                         {(options ?? []).map(opt => (
-                            <option key={String(opt.id)} value={String(opt.id)}>{opt.label}</option>
+                            <option key={opt.id} value={opt.id}>{opt.label}</option>
                         ))}
                     </select>
                 );
@@ -323,7 +217,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
             case 'date': {
                 // Format date value for input (YYYY-MM-DD) using local getters —
                 // avoids the UTC-midnight day-shift of toISOString() in a +tz browser.
-                const dateValue = formatISODate(value as string | Date | null | undefined);
+                const dateValue = formatISODate(raw as string | Date | null | undefined);
                 return (
                     <input
                         type="date"
@@ -367,94 +261,85 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
         }
     };
 
-    if (!isOpen || !position) return null;
-
     const isEditMode = !!editingItem;
     const singularName = tableName.endsWith('s') ? tableName.slice(0, -1) : tableName;
 
-    return createPortal(
-        <>
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss */}
-            <div className="popover-backdrop" onClick={handleBackdropClick} />
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- backdrop click-to-dismiss */}
-            <div
-                ref={modalRef}
-                className="lookup-editor-popover"
-                style={{ top: position.top, left: position.left }}
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="popover-header">
-                    <h3>
-                        <i className={isEditMode ? 'fas fa-edit' : 'fas fa-plus'}></i>
-                        {isEditMode ? `Edit ${singularName}` : `Add ${singularName}`}
-                    </h3>
-                    <button
-                        className="popover-close"
-                        onClick={onClose}
-                        disabled={isSaving}
-                        type="button"
-                    >
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={close}
+            ariaLabelledBy={TITLE_ID}
+            contentClassName="lookup-editor-dialog"
+            closeOnEscape={!isSaving}
+            closeOnBackdropClick={!isSaving}
+            unsavedGuard={{ watchInput: true }}
+        >
+            {(dismiss) => (
+                <>
+                    <ModalHeader
+                        titleId={TITLE_ID}
+                        icon={<i className={isEditMode ? 'fas fa-edit' : 'fas fa-plus'} />}
+                        title={isEditMode ? `Edit ${singularName}` : `Add ${singularName}`}
+                        onClose={dismiss}
+                        dense
+                    />
+                    <form onSubmit={handleSubmit}>
+                        <div className="lookup-dialog-body">
+                            {columns.map(column => (
+                                <div
+                                    key={column.name}
+                                    className={`form-group ${column.type === 'bit' ? 'form-group-checkbox' : ''}`}
+                                >
+                                    {column.type !== 'bit' && (
+                                        <label htmlFor={`lookup-field-${column.name}`}>
+                                            {column.label}
+                                            {column.required && <span className="required">*</span>}
+                                        </label>
+                                    )}
+                                    {renderInput(column)}
+                                    {errors[column.name] && (
+                                        <span className="field-error">{errors[column.name]}</span>
+                                    )}
+                                    {column.maxLength && column.type !== 'bit' && column.type !== 'int' && (
+                                        <span className="field-hint">
+                                            Max {column.maxLength} characters
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="popover-body">
-                        {columns.map(column => (
-                            <div
-                                key={column.name}
-                                className={`form-group ${column.type === 'bit' ? 'form-group-checkbox' : ''}`}
+                        <div className="lookup-dialog-footer">
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={dismiss}
+                                disabled={isSaving}
                             >
-                                {column.type !== 'bit' && (
-                                    <label htmlFor={`lookup-field-${column.name}`}>
-                                        {column.label}
-                                        {column.required && <span className="required">*</span>}
-                                    </label>
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="btn btn-primary btn-sm"
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin"></i>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-save"></i>
+                                        {isEditMode ? 'Update' : 'Create'}
+                                    </>
                                 )}
-                                {renderInput(column)}
-                                {errors[column.name] && (
-                                    <span className="field-error">{errors[column.name]}</span>
-                                )}
-                                {column.maxLength && column.type !== 'bit' && column.type !== 'int' && (
-                                    <span className="field-hint">
-                                        Max {column.maxLength} characters
-                                    </span>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="popover-footer">
-                        <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={onClose}
-                            disabled={isSaving}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="btn btn-primary btn-sm"
-                            disabled={isSaving}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <i className="fas fa-spinner fa-spin"></i>
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <i className="fas fa-save"></i>
-                                    {isEditMode ? 'Update' : 'Create'}
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </>,
-        document.body
+                            </button>
+                        </div>
+                    </form>
+                </>
+            )}
+        </Modal>
     );
 };
 

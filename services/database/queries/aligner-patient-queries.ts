@@ -5,7 +5,8 @@
  * Split out of aligner-queries.ts (S2/C4). These read `patients` + `works` +
  * `aligner_sets` together; the row shape is the shared `AlignerPatient` contract type.
  */
-import { sql } from 'kysely';
+import { sql, type ExpressionBuilder } from 'kysely';
+import type { DB } from '../../../types/db.js';
 import { getKysely } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
 import type { AlignerPatient } from '../../../shared/contracts/aligner.contract.js';
@@ -15,6 +16,27 @@ import { ALIGNER_SET_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js
 // ==============================
 // ALIGNER PATIENTS QUERIES
 // ==============================
+
+/** The patient-list reads' shared select: the work's unread doctor notes. */
+type PatientListEb = ExpressionBuilder<DB & { p: DB['patients']; w: DB['works']; wt: DB['work_types']; s: DB['aligner_sets'] }, 'p' | 'w' | 'wt' | 's'>;
+function unreadDoctorNotes(eb: PatientListEb) {
+  return eb
+    .selectFrom('aligner_notes as n')
+    .innerJoin('aligner_sets as sets', 'n.aligner_set_id', 'sets.aligner_set_id')
+    .whereRef('sets.work_id', '=', 'w.work_id')
+    .where('n.note_type', '=', 'Doctor')
+    .where('n.is_read', '=', false)
+    .select((e) => e.fn.countAll().as('cnt'))
+    .as('UnreadDoctorNotes');
+}
+
+/** Search hits returned at most; the screen says when there are more. */
+export const SEARCH_LIMIT = 50;
+
+/** `%`, `_` and `\` in a search term are text, not wildcards (FE-F18-7). */
+function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
 
 /**
  * Get all aligner patients (all doctors)
@@ -50,6 +72,9 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
         eb.fn
           .sum(sql<number>`case when "s"."is_active" = true then 1 else 0 end`)
           .as('ActiveSets'),
+        // The by-doctor read had this and the All Doctors view didn't, so its
+        // cards never showed the unread banner (FE-F18-8).
+        unreadDoctorNotes(eb),
       ])
       .orderBy('p.patient_name')
       .orderBy('p.first_name')
@@ -68,6 +93,7 @@ export async function getAllAlignerPatients(): Promise<AlignerPatient[]> {
       WorkTypeID: r.WorkTypeID,
       TotalSets: Number(r.TotalSets) || 0,
       ActiveSets: Number(r.ActiveSets) || 0,
+      UnreadDoctorNotes: Number(r.UnreadDoctorNotes) || 0,
     }));
   } catch (err) {
     log.error('Failed to get all aligner patients', {
@@ -112,14 +138,7 @@ export async function getAlignerPatientsByDoctor(doctorId: number): Promise<Alig
         eb.fn
           .sum(sql<number>`case when "s"."is_active" = true then 1 else 0 end`)
           .as('ActiveSets'),
-        eb
-          .selectFrom('aligner_notes as n')
-          .innerJoin('aligner_sets as sets', 'n.aligner_set_id', 'sets.aligner_set_id')
-          .whereRef('sets.work_id', '=', 'w.work_id')
-          .where('n.note_type', '=', 'Doctor')
-          .where('n.is_read', '=', false)
-          .select((e) => e.fn.countAll().as('cnt'))
-          .as('UnreadDoctorNotes'),
+        unreadDoctorNotes(eb),
       ])
       .orderBy('p.patient_name')
       .orderBy('p.first_name')
@@ -156,7 +175,11 @@ export async function searchAlignerPatients(
   doctorId: number | null = null
 ): Promise<AlignerPatient[]> {
   try {
-    const like = `%${searchTerm}%`;
+    const term = searchTerm.trim();
+    const like = `%${escapeLike(term)}%`;
+    // An all-digits term is also a patient ID — the screen promised "name, phone,
+    // or patient ID" and the read searched names and phone only (FE-F18-7).
+    const asId = /^\d{1,9}$/.test(term) ? Number(term) : null;
 
     let q = getKysely()
       .selectFrom('patients as p')
@@ -175,6 +198,7 @@ export async function searchAlignerPatients(
           eb(sql<string>`${eb.ref('p.patient_name')}::text`, 'ilike', like),
           eb(sql<string>`${eb.ref('p.phone')}::text`, 'ilike', like),
           eb(sql<string>`${eb.ref('p.first_name')}::text || ' ' || ${eb.ref('p.last_name')}::text`, 'ilike', like),
+          ...(asId !== null ? [eb('p.person_id', '=', asId)] : []),
         ])
       );
 
@@ -196,6 +220,8 @@ export async function searchAlignerPatients(
       .distinct()
       .orderBy('p.first_name')
       .orderBy('p.last_name')
+      // One more than shown, so the screen can say "showing the first 50".
+      .limit(SEARCH_LIMIT + 1)
       .execute();
 
     return rows as AlignerPatient[];

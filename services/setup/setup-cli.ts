@@ -27,6 +27,7 @@ import {
   createFirstAdmin,
   generateCalendar,
   ensureVideosFolderOption,
+  ensureIntegrationPathOptions,
   identityWarnings,
   readIdentity,
   type SetupStep,
@@ -177,6 +178,7 @@ export async function runSetupCli(argv: string[], print: Printer = console.log):
     steps.push(...(await applyStarterVocabularies()));
     steps.push(await generateCalendar());
     steps.push(await ensureVideosFolderOption());
+    steps.push(await ensureIntegrationPathOptions());
 
     print('');
     printSteps(print, steps);

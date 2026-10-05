@@ -1,0 +1,21 @@
+.box {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--text-secondary);
+}
+
+.box i {
+  font-size: 2.5rem;
+  color: var(--error-color);
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.box h3 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.box p {
+  margin: 0 0 1rem;
+}

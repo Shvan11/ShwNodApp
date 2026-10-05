@@ -87,6 +87,71 @@ export type TakenDatesScope = z.infer<typeof takenDatesScope>;
 export type TakenDatesQuery = z.infer<typeof takenDates.query>;
 export type TakenDatesResponse = z.infer<typeof takenDates.response>;
 
+// A saved view's FRAMING — what the editor needs to reopen it where it was left
+// ("Continue editing") and to show what was changed. POST /render records it INSIDE
+// the rendered JPEG (XMP — services/imaging/photo-framing-xmp.ts), so it always
+// describes exactly the pixels it sits in: a view rendered any other way (Dolphin, a
+// build before this) carries none, and is reopened only "from scratch".
+//  - `source`: the original it was cut from — the CLEAN name (no `{view}-` tag), its
+//    mtime as the folder listing reports it (`modified`, ISO), and its post-EXIF size.
+//    The editor offers "Continue" only while the view's tagged original is still that
+//    file.
+//  - `area`: react-easy-crop's croppedAreaPercentages — the frame in % of the flipped +
+//    rotated photo's bounding box. Resolution-free, so it restores the same frame in the
+//    Fast-preview proxy and the full original alike. It may run past 0–100 (a frame
+//    that leaves the photo is filled with white).
+//  - `zoom`: 1 = the photo just covers the frame.
+export const framingArea = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+export const savedFraming = z.object({
+  v: z.literal(1),
+  source: z.object({
+    name: z.string().min(1),
+    modified: z.string().nullable(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  }),
+  rotation: z.number(),
+  flipH: z.boolean(),
+  flipV: z.boolean(),
+  zoom: z.number().positive(),
+  area: framingArea,
+});
+export type FramingArea = z.infer<typeof framingArea>;
+export type SavedFraming = z.infer<typeof savedFraming>;
+
+// GET /api/photo-editor/:personId/framing/:tpCode → the session's saved views'
+// recorded framing, KEYED BY VIEW CODE like the gallery; null = that view is not
+// rendered, or was rendered without a record (see `savedFraming`).
+const viewFraming = savedFraming.nullable();
+export const framing = {
+  params: z.object({
+    personId: z.string().regex(/^\d+$/, 'Invalid patient id'),
+    tpCode: z.string().regex(/^\d+$/, 'Invalid timepoint code'),
+  }),
+  response: z.object({
+    i10: viewFraming, i12: viewFraming, i13: viewFraming, i23: viewFraming,
+    i24: viewFraming, i20: viewFraming, i22: viewFraming, i21: viewFraming,
+  }),
+} as const;
+export type FramingResponse = z.infer<typeof framing.response>;
+
+// GET /api/photo-editor/:personId/source-size?path= → an original's pixel size AFTER
+// EXIF orientation (what a browser's naturalWidth/Height report). The editor frames
+// against a 2048 px proxy by default, so this is how it knows the resolution a save
+// will keep (output = the crop's native pixels).
+export const sourceSize = {
+  params: personIdParams,
+  query: z.object({ path: z.string().min(1, 'path is required').max(1024) }),
+  response: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }),
+} as const;
+export type SourceSizeQuery = z.infer<typeof sourceSize.query>;
+export type SourceSizeResponse = z.infer<typeof sourceSize.response>;
+
 // SSE `photos_rendered` (appointments stream) — a background render finished. Not an
 // HTTP response: the frame the broadcaster forwards from POST /render's job. `jobId`
 // is the id the client sent with the render (absent for a legacy caller); `problems`

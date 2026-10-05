@@ -14,6 +14,11 @@ const r2Config = config.r2;
 
 let s3Client: S3Client | null = null;
 
+/** Is the doctor-portal storage (Cloudflare R2) configured on this install? */
+export function isR2Configured(): boolean {
+  return !!(r2Config.accountId && r2Config.accessKeyId && r2Config.secretAccessKey);
+}
+
 function getS3Client(): S3Client {
   if (s3Client) return s3Client;
 
@@ -72,6 +77,9 @@ const MAX_KEYS_PER_SET = 5_000;
  * `uploaded_at` is the ISO STRING the wire carries, not the SDK's `Date`.
  */
 export async function listPhotosForSet(setId: number): Promise<AlignerPhoto[]> {
+  // An install without the portal's storage has no doctor uploads to list — an empty
+  // list, not a 500 on every set the page opens (found in RE1's runtime checks).
+  if (!isR2Configured()) return [];
   const client = getS3Client();
   const bucketName = r2Config.bucketName;
   const prefix = `sets/${setId}/`;

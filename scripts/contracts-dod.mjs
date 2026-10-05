@@ -46,7 +46,10 @@ const STRICT = process.env.STRICT === '1' || process.argv.includes('--strict');
 //             utility google, payment raw UpdateResult[], media patient-link).
 //       → 8  (media patient-link modeled — it is three fixed `patients` columns
 //             (getPatientWebcephLink), not a WebCeph API payload; audit FE-F9-13).
-const BASELINE = { D1: 0, D2: 8 };
+//       → 7  (the Google contacts response modeled; RE1).
+//       → 6  (lookup-admin `tables` modeled — the descriptor and its columns have one fixed
+//             shape even though the column SET varies per table; audit FE-F21-15).
+const BASELINE = { D1: 0, D2: 6 };
 
 /** Recursively collect files under `dir` whose name ends with one of `exts`. */
 function walk(dir, exts, acc = []) {

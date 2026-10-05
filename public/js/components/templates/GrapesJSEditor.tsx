@@ -7,17 +7,23 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import type { Editor as GrapesJSEditorType } from 'grapesjs';
+import type { DocumentTemplateRow } from '@shared/contracts/template.contract';
 // GrapesJS stylesheet — co-located with the editor so Vite bundles it into the
 // lazy TemplateDesigner route chunk (loaded only when the designer opens),
 // instead of a render-blocking unpkg <link> in index.html on every page. Uses
 // the installed package version, fixing the prior CSS/JS version drift.
 import 'grapesjs/dist/css/grapes.min.css';
 
-interface Template {
+/** The contract's row, or the designer's unsaved "new template" stub (no id yet). */
+type Template = Pick<DocumentTemplateRow, 'template_name' | 'template_file_path'> & {
     template_id: number | null;
-    template_name: string;
-    template_file_path: string | null;
-}
+};
+
+/**
+ * Fire on the editor after the design was saved (`editor.trigger(DESIGN_SAVED_EVENT)`):
+ * what is on screen becomes the new "unchanged" baseline.
+ */
+export const DESIGN_SAVED_EVENT = 'shwan:design-saved';
 
 interface EditorStyles {
     readonly [key: string]: string;
@@ -26,14 +32,36 @@ interface EditorStyles {
 interface GrapesJSEditorProps {
     template: Template | null;
     styles: EditorStyles;
+    /**
+     * Called when the design starts or stops differing from the one loaded (or last
+     * saved — see DESIGN_SAVED_EVENT).
+     */
+    onDirtyChange?: (dirty: boolean) => void;
 }
 
-const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps>(({ template, styles }, ref) => {
+const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps>(({ template, styles, onDirtyChange }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<GrapesJSEditorType | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const toast = useToast();
+    // The editor's listeners are bound once, at init; they read the latest callback.
+    const onDirtyChangeRef = useRef(onDirtyChange);
+    useEffect(() => {
+        onDirtyChangeRef.current = onDirtyChange;
+    });
+
+    // Dirty = the design's HTML + CSS differ from the baseline. GrapesJS's own change
+    // counter can't say it: it also moves on its own after a design loads (runtime:
+    // an untouched template counted as changed), and it can't see an edit undone.
+    const baselineRef = useRef<string | null>(null);
+    const snapshot = (editor: GrapesJSEditorType): string => `${editor.getHtml()}\n${editor.getCss() ?? ''}`;
+    /** The design on screen is the unchanged one (just loaded, or just saved). */
+    const markClean = (editor: GrapesJSEditorType) => {
+        editor.clearDirtyCount();
+        baselineRef.current = snapshot(editor);
+        onDirtyChangeRef.current?.(false);
+    };
 
     useImperativeHandle(ref, () => editorRef.current!);
 
@@ -111,6 +139,9 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                 height: 'calc(100vh - 71px)',
                 width: 'auto',
                 storageManager: false,
+                // The designer's route guard owns the reload/close prompt (one
+                // mechanism, and it knows a save cleared the changes).
+                noticeOnUnload: false,
 
                 canvas: {
                     styles: [
@@ -163,6 +194,13 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
 
             editorRef.current = editor;
 
+            // GrapesJS fires `update` (deferred) whenever its change counter moves.
+            editor.on('update', () => {
+                onDirtyChangeRef.current?.(snapshot(editor) !== baselineRef.current);
+            });
+            editor.on(DESIGN_SAVED_EVENT, () => markClean(editor));
+            markClean(editor);
+
             // Load template if available
             if (template) {
                 loadTemplateContent();
@@ -204,9 +242,10 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
                 extractedCss += style.textContent + '\n';
             });
 
-            // Load into editor
+            // Load into editor. The saved design is the baseline, not a change.
             editorRef.current.setComponents(bodyContent);
             editorRef.current.setStyle(extractedCss);
+            markClean(editorRef.current);
         } catch (error) {
             console.error('Error loading template content:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -217,15 +256,16 @@ const GrapesJSEditor = forwardRef<GrapesJSEditorType | null, GrapesJSEditorProps
     const addReceiptBlocks = (editor: GrapesJSEditorType) => {
         const blockManager = editor.BlockManager;
 
-        // Clinic Header Block
+        // Clinic Header Block. Only the clinic name: it is the one `clinic.*` field a
+        // receipt is rendered with (the configured name — receipt-service.ts). The
+        // block also inserted Location/Phone1/Phone2, which nothing fills, so it
+        // printed two empty lines and a stray "|" (FE-F20-9b).
         blockManager.add('clinic-header', {
             label: 'Clinic Header',
             category: 'Receipt Elements',
             content: `
                 <div class="clinic-header" style="text-align: center; padding: 20px; border-bottom: 2px solid #333;">
                     <h1 style="margin: 0; font-size: 24px; color: #333;">{{clinic.Name}}</h1>
-                    <p style="margin: 5px 0; font-size: 14px; color: #666;">{{clinic.Location}}</p>
-                    <p style="margin: 5px 0; font-size: 14px; color: #666;">{{clinic.Phone1}} | {{clinic.Phone2}}</p>
                 </div>
             `,
             attributes: { class: 'fa fa-building' }

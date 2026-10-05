@@ -22,6 +22,8 @@ import { formatLocaleDate } from '../../utils/formatters';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
+import i18next from 'i18next';
+import { sendAppointmentConfirmation } from './bookingError';
 import { calendarRangeQuery, calendarMonthQuery } from '@/query/queries';
 import * as holiday from '@shared/contracts/holiday.contract';
 import type {
@@ -372,17 +374,10 @@ const AppointmentCalendar = () => {
 
             // A move to another DAY tells the patient, as the edit form does on a
             // date change; the drag used to move them silently (FE-F10-8).
+            // The calendar isn't translated, so it reports in English whatever the
+            // language — the same per-case messages as the booking forms (FE-F16-9).
             if (newDate !== fromDate) {
-                postJSON<{ success: boolean; message?: string }>('/api/wa/send-appointment', {
-                    appointmentId: appointmentID
-                })
-                    .then(waResult => {
-                        if (waResult.success) toast.success('WhatsApp confirmation sent');
-                        else toast.warning(waResult.message || 'WhatsApp confirmation was not sent');
-                    })
-                    .catch(err => {
-                        toast.error(`WhatsApp confirmation failed: ${httpErrorMessage(err, 'send failed')}`);
-                    });
+                sendAppointmentConfirmation(appointmentID, toast, i18next.getFixedT('en', 'appointments'));
             }
         },
         [refetch, refreshAppointmentReads, toast]

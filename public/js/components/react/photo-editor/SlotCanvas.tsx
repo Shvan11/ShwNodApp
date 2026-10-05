@@ -4,13 +4,18 @@
  * the same flipped space the server extracts from) — so the cropper is the single
  * source of truth for framing and a slot looks identical whether or not it's
  * focused. Inactive slots render the same cropper non-interactively; empty slots
- * show the practice logo placeholder.
+ * show a neutral placeholder.
+ *
+ * A recorded framing ("Continue editing", a reset) is applied by remounting the
+ * cropper (`slot.framingKey`) with `initialCroppedAreaPercentages`, which react-easy-crop
+ * honours on media load. An optional ghost of the same view from another session lies
+ * on top (pointer-events none) as an alignment guide.
  */
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import Cropper from 'react-easy-crop';
 import type { Area, MediaSize, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
-import type { CropArea, PhotoViewCode, SlotState } from './photoEditorTypes';
+import type { CropArea, FramingArea, PhotoViewCode, SlotState } from './photoEditorTypes';
 import { aspectForView, gridLinesForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
 import { buildContentUrl } from '../files/fileHelpers';
 
@@ -45,9 +50,29 @@ interface Props {
   proxyMode: boolean;
   onCropChange: (crop: Point) => void;
   onZoomChange: (zoom: number) => void;
-  onCropComplete: (area: CropArea) => void;
+  /** The frame in % of the flipped + rotated photo, and in its natural pixels. */
+  onCropComplete: (area: FramingArea, pixels: CropArea) => void;
   /** Natural (post-EXIF) dims of the loaded media — the space the crop rect lives in. */
   onMediaLoaded: (size: { width: number; height: number }) => void;
+  /** Another session's saved photo of this view, drawn faintly over the slot to line
+   *  the framing up with it. Null = no overlay. */
+  overlayUrl?: string | null;
+  overlayOpacity?: number;
+}
+
+/** The faint other-session photo over a slot. The slot box IS the view's frame, and a
+ *  saved view is that frame, so stretching it to the box lines the two frames up. */
+function Ghost({ url, opacity }: { url: string; opacity: number }): ReactElement {
+  return (
+    <img
+      src={url}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      className={styles.ghost}
+      style={{ opacity }}
+    />
+  );
 }
 
 /**
@@ -88,7 +113,18 @@ async function makeFlippedUrl(srcUrl: string, flipH: boolean, flipV: boolean): P
   return URL.createObjectURL(blob);
 }
 
-const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomChange, onCropComplete, onMediaLoaded }: Props) => {
+const SlotCanvas = ({
+  personId,
+  slot,
+  active,
+  proxyMode,
+  onCropChange,
+  onZoomChange,
+  onCropComplete,
+  onMediaLoaded,
+  overlayUrl = null,
+  overlayOpacity = 0.35,
+}: Props) => {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
 
@@ -147,6 +183,7 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
             className={styles.savedImg}
             loading="lazy"
           />
+          {overlayUrl && <Ghost url={overlayUrl} opacity={overlayOpacity} />}
           <GridLines view={slot.view} />
         </div>
       );
@@ -173,10 +210,16 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
   // space. Because the cropper container is absolutely positioned, slot content
   // never participates in layout — the cell stays locked to its view's aspect box
   // and can't reflow when framing changes.
+  //
+  // While a recorded framing is pending, crop + zoom changes get through even on an
+  // inactive slot: applying it on load IS such a change, and dropping it would leave
+  // the slot showing the default frame while the editor holds the recorded one.
+  const acceptsChanges = active || !!slot.pendingFraming;
   return (
     <div className={styles.cropWrap}>
       {mediaUrl && (
         <Cropper
+          key={slot.framingKey}
           image={mediaUrl}
           crop={slot.crop}
           zoom={slot.zoom}
@@ -196,9 +239,10 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
           zoomWithScroll={false}
           showGrid={false}
           objectFit="cover"
-          onCropChange={active ? onCropChange : noop}
-          onZoomChange={active ? onZoomChange : undefined}
-          onCropComplete={(_area: Area, areaPixels: Area) => onCropComplete(areaPixels as CropArea)}
+          initialCroppedAreaPercentages={slot.pendingFraming?.area}
+          onCropChange={acceptsChanges ? onCropChange : noop}
+          onZoomChange={acceptsChanges ? onZoomChange : undefined}
+          onCropComplete={(area: Area, areaPixels: Area) => onCropComplete(area, areaPixels)}
           onMediaLoaded={(ms: MediaSize) => onMediaLoaded({ width: ms.naturalWidth, height: ms.naturalHeight })}
           style={{
             // The cell's own border frames the crop; hide the cropper's internal
@@ -208,6 +252,7 @@ const SlotCanvas = ({ personId, slot, active, proxyMode, onCropChange, onZoomCha
           }}
         />
       )}
+      {mediaUrl && overlayUrl && <Ghost url={overlayUrl} opacity={overlayOpacity} />}
       {mediaUrl && <GridLines view={slot.view} />}
     </div>
   );

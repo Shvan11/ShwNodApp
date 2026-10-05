@@ -109,7 +109,6 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
-  text-transform: capitalize;
 }
 
 .typePurchase {
@@ -135,6 +134,11 @@
 .typeRestock {
   background-color: var(--indigo-100);
   color: var(--indigo-700);
+}
+
+.typeRemoved {
+  background-color: var(--error-100);
+  color: var(--error-700);
 }
 
 .typeDefault {

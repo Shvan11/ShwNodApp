@@ -20,6 +20,7 @@ import { createUser } from '../database/queries/user-queries.js';
 import { fillCalendar } from '../database/queries/calendar-queries.js';
 import { getOptions, upsertOption } from '../database/queries/options-queries.js';
 import { defaultVideosPath } from '../files/clinic-paths.js';
+import { ALIGNER_SETS_FOLDER_OPTION, ARCHFORM_DB_PATH_OPTION } from '../../shared/clinic-options.js';
 
 /** The educational-videos folder option (read by services/database/queries/video-queries.ts). */
 const VIDEOS_PATH_OPTION = 'VideosPath';
@@ -190,6 +191,29 @@ export async function ensureVideosFolderOption(): Promise<SetupStep> {
   const value = defaultVideosPath();
   await upsertOption(VIDEOS_PATH_OPTION, value);
   return { step: 'Videos folder', outcome: 'applied', detail: value };
+}
+
+/**
+ * Give the install empty `AlignerSetsFolder` and `ARCHFORM_DB_PATH` rows when it has
+ * none. Settings → General edits only rows that exist (`PUT /api/options/:name` is
+ * update-only), so without them a new center could not point the aligner screens
+ * at its own machines without SQL (audit FE-F17-7 / FE-F18-4). Empty means "not set
+ * up": the folder buttons say so, and the Archform tab stays hidden. An existing
+ * row is never touched.
+ */
+export async function ensureIntegrationPathOptions(): Promise<SetupStep> {
+  const names = [ALIGNER_SETS_FOLDER_OPTION, ARCHFORM_DB_PATH_OPTION];
+  const current = await getOptions(names);
+  const missing = names.filter((n) => !current.has(n));
+  if (missing.length === 0) {
+    return { step: 'Aligner + Archform paths', outcome: 'skipped', detail: 'rows already exist' };
+  }
+  for (const name of missing) await upsertOption(name, '');
+  return {
+    step: 'Aligner + Archform paths',
+    outcome: 'applied',
+    detail: `${missing.join(', ')} created empty — set them in Settings → General if this center uses them`,
+  };
 }
 
 // ── Identity + currency ───────────────────────────────────────────────────────

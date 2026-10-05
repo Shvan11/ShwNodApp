@@ -18,6 +18,11 @@ import {
 } from '../../services/database/queries/options-queries.js';
 import DatabaseConfigService from '../../services/settings/DatabaseConfigService.js';
 import { MASKED_SECRET } from '../../shared/masked-secret.js';
+import {
+  canReadOption,
+  isSecretOption,
+  withoutSecretOptions
+} from '../../services/settings/option-access.js';
 import { sendSuccess, sendData, ErrorResponses } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
 import { authorize } from '../../middleware/auth.js';
@@ -28,9 +33,13 @@ import * as settings from '../../shared/contracts/settings.contract.js';
 
 const router = Router();
 
-// Role gate. The two `GET /options` reads stay open to any staff session — the
-// SPA shell reads `PatientsFolder`/`VideosPath` on every page — but every write
-// and the whole database-config surface is ADMIN only. Left ungated these were
+// Role gate. The full `GET /options` list is ADMIN only (Settings → General), and
+// so is every write and the whole database-config surface. `GET /options/:name`
+// stays open to any staff session for the few rows the working screens read
+// (calendar slots, the default work currency, the aligner-sets share), and no one
+// gets a credential row through any of them — `services/settings/option-access.ts`
+// (FE-F21-1: the list used to hand the Telegram session and the SMTP password to
+// every login). Left ungated these were
 // the most privileged endpoints in the app on an `authenticate`-only footing:
 // `GET /config/database/backup` streams a full `pg_dump` of the clinic (total
 // PHI exfiltration), `POST /config/database/test` probes arbitrary host/port/
@@ -60,9 +69,9 @@ type RestartBody = settings.RestartBody;
  * Get all system options
  * GET /api/options
  */
-router.get('/options', async (_req: Request, res: Response): Promise<void> => {
+router.get('/options', adminOnly, async (_req: Request, res: Response): Promise<void> => {
   try {
-    const options = await getAllOptions();
+    const options = withoutSecretOptions(await getAllOptions());
     sendData(res, settings.getOptions.response, { options });
   } catch (error) {
     log.error('Error getting options:', error);
@@ -97,6 +106,14 @@ router.put(
         return;
       }
 
+      const secret = options.filter((o) => isSecretOption(o.name)).map((o) => o.name);
+      if (secret.length > 0) {
+        ErrorResponses.forbidden(res, 'These options are managed on their own settings screen', {
+          options: secret
+        });
+        return;
+      }
+
       const result = await bulkUpdateOptions(options);
       sendData(
         res,
@@ -121,9 +138,14 @@ router.put(
  */
 router.get(
   '/options/:optionName',
+  validate({ params: settings.getOptionByName.params }),
   async (req: Request<OptionNameParams>, res: Response): Promise<void> => {
     try {
       const { optionName } = req.params;
+      if (!canReadOption(optionName, req.session.userRole === 'admin')) {
+        ErrorResponses.forbidden(res, 'Insufficient permissions', { option: optionName });
+        return;
+      }
       const value = await getOption(optionName);
 
       if (value === null) {
@@ -158,6 +180,13 @@ router.put(
     try {
       const { optionName } = req.params;
       const { value } = req.body;
+
+      if (isSecretOption(optionName)) {
+        ErrorResponses.forbidden(res, 'This option is managed on its own settings screen', {
+          option: optionName
+        });
+        return;
+      }
 
       if (!value) {
         ErrorResponses.missingParameter(res, 'value');

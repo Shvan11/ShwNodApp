@@ -20,34 +20,12 @@ import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import LookupEditor from './LookupEditor';
 import { adminLookupTablesQuery } from '@/query/queries';
+import { httpErrorMessage } from '@/core/http';
 import styles from './LookupManagerModal.module.css';
 
-// The generic lookup editor styles (toolbar / table / popovers) are global; pull
+// The generic lookup editor styles (toolbar / table / dialog) are global; pull
 // the sheet in here so the editor is styled even if Settings was never opened.
 import '../../../css/components/lookup-editor.css';
-
-interface ReferenceConfig {
-  table: string;
-  idColumn: string;
-  displayColumn: string;
-}
-
-interface ColumnConfig {
-  name: string;
-  label: string;
-  type: string;
-  required?: boolean;
-  maxLength?: number;
-  reference?: ReferenceConfig;
-}
-
-interface TableConfig {
-  key: string;
-  displayName: string;
-  icon: string;
-  columns: ColumnConfig[];
-  idColumn: string;
-}
 
 interface LookupManagerModalProps {
   isOpen: boolean;
@@ -65,11 +43,15 @@ const TITLE_ID = 'lookup-manager-title';
 const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: LookupManagerModalProps) => {
   const { t } = useTranslation('common');
   // The config list is long-lived + shared with Settings; only fetch once open.
-  const { data } = useQuery({ ...adminLookupTablesQuery(), enabled: isOpen });
-  // `lookupAdmin.tables.response` is `anyArray` on purpose (config rows vary per
-  // registered table), so the shape is asserted once here, off `unknown[]`.
-  const tables = (data ?? []) as TableConfig[];
-  const config = tables.find((t) => t.key === tableKey) ?? null;
+  const { data, isError, error } = useQuery({ ...adminLookupTablesQuery(), enabled: isOpen });
+  const config = data?.find((table) => table.key === tableKey) ?? null;
+  // A failed read, or a table the server doesn't offer, is an answer — not a reason
+  // to spin for good (audit FE-F21-14).
+  const failure = isError
+    ? httpErrorMessage(error, t('lookups.loadFailed'))
+    : data && !config
+      ? t('lookups.loadFailed')
+      : null;
 
   const heading = title ?? (config ? t('lookups.manage', { name: config.displayName }) : t('lookups.manageValues'));
 
@@ -93,8 +75,14 @@ const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: Loo
             tableName={config.displayName}
             columns={config.columns}
             idColumn={config.idColumn}
+            protectedIds={config.protectedIds}
             onChanged={onChanged}
           />
+        ) : failure ? (
+          <div className={styles.loading} role="alert">
+            <i className="fas fa-exclamation-triangle" aria-hidden="true" />
+            <span>{failure}</span>
+          </div>
         ) : (
           <div className={styles.loading}>
             <i className="fas fa-spinner fa-spin" aria-hidden="true" />

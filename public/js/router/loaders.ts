@@ -13,6 +13,8 @@ import { fetchJSON, type HttpError } from '@/core/http';
 import { toLocalDateString } from '@/utils/calendarDate';
 import { queryClient } from '../query/client';
 import { loaderQuery } from '../query/loaderQuery';
+import type { WorkDetails } from '@shared/contracts/work.contract';
+import type { PatientInfo } from '@shared/contracts/patient.contract';
 import { preloadPatientPage } from '../components/react/ContentRenderer';
 import {
   patientInfoQuery,
@@ -41,32 +43,6 @@ function emptyOnHttpError<U>(p: Promise<U[]>): Promise<U[]> {
     if (typeof (err as HttpError).status === 'number') return [];
     throw err;
   });
-}
-
-/**
- * Patient data structure (snake_case from /api/patients/:id/info)
- */
-export interface PatientData {
-  person_id?: number;
-  patient_name?: string;
-  first_name?: string;
-  last_name?: string;
-  phone?: string;
-  phone2?: string;
-  email?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Work data structure
- */
-export interface WorkData {
-  work_id?: number;
-  person_id?: number;
-  type_name?: string;
-  doctor_name?: string;
-  status_name?: string;
-  [key: string]: unknown;
 }
 
 /**
@@ -225,8 +201,8 @@ export async function alignerDoctorsLoader(): Promise<AlignerDoctorsLoaderResult
  * Aligner patient work loader result
  */
 export interface AlignerPatientWorkLoaderResult {
-  work: WorkData;
-  patient: PatientData;
+  work: WorkDetails;
+  patient: PatientInfo;
 }
 
 /**
@@ -243,7 +219,7 @@ export async function alignerPatientWorkLoader({
     throw new Response('Invalid work ID', { status: 400 });
   }
 
-  const work = (await loaderQuery(workDetailsQuery(workId))) as WorkData;
+  const work = await loaderQuery(workDetailsQuery(workId));
 
   // Validate person_id before fetching patient data
   if (!work?.person_id) {
@@ -251,7 +227,7 @@ export async function alignerPatientWorkLoader({
   }
 
   // Also load patient info
-  const patient = (await loaderQuery(patientInfoQuery(work.person_id))) as PatientData;
+  const patient = await loaderQuery(patientInfoQuery(work.person_id));
 
   return {
     work,

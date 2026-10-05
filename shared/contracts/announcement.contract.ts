@@ -62,7 +62,16 @@ const announcementFields = {
   announcementType: z.enum(ANNOUNCEMENT_TYPES).optional(),
   targetDoctorId: z.union([z.literal(''), intId]).nullish(),
   isDismissible: z.boolean().optional(),
-  linkUrl: z.string().optional(),
+  // A portal page (`/case/123`) or a full http(s) URL. The portal renders anything
+  // not starting with `/` as an external <a href>, so `example.com/form` used to open
+  // as a broken relative link inside the portal (FE-F18-11).
+  linkUrl: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || v.startsWith('/') || /^https?:\/\//i.test(v), {
+      message: 'The link must start with / (a portal page) or with http:// or https://',
+    })
+    .optional(),
   linkText: z.string().optional(),
   expiresAt: optionalDateString,
 };

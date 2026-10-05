@@ -10,7 +10,7 @@
  * enumerated strict `z.object`s wired via `validate({ body })` on the routes
  * (server-side validation is independent of the client's response transport), and
  * the route's hand-written `Send*Body` interfaces are deleted in favour of these
- * `z.infer` exports. See docs/shared-contract-progress.md.
+ * `z.infer` exports.
  */
 import { z } from 'zod';
 import { dateString } from '../validation.js';
@@ -52,7 +52,34 @@ export type SendMedia2Body = z.infer<typeof sendMedia2.body>;
 // connection-state field (qr/clientReady/status/…) the consumers read. Deliberately
 // not tightened — these fields vary across connection lifecycle and can't be
 // runtime-verified without a live WhatsApp client; tighten in Phase 3 if stable.
-export const initialState = { response: z.looseObject({}) } as const;
+//
+// `sendingProgress` IS modeled: it is the reminder batch's own progress (the same
+// object the three `whatsapp_sending_*` SSE frames carry, which the send page
+// parses with `batchProgress` too), so a tab opened mid-batch joins it (FE-F16-2).
+export const batchProgress = z.object({
+  started: z.boolean(),
+  finished: z.boolean(),
+  total: z.number(),
+  sent: z.number(),
+  failed: z.number(),
+  date: z.string().nullable(),
+  /** Why the batch stopped early, null on a normal finish. */
+  error: z.string().nullable(),
+  /** initial-state only: the service's one-batch guard is held right now. */
+  active: z.boolean().optional(),
+});
+export type BatchProgress = z.infer<typeof batchProgress>;
+
+export const initialState = {
+  response: z.looseObject({
+    clientReady: z.boolean().optional(),
+    qr: z.string().nullable().optional(),
+    needsRelink: z.boolean().optional(),
+    restoring: z.boolean().optional(),
+    sendingProgress: batchProgress.optional(),
+  }),
+} as const;
+export type InitialStateResponse = z.infer<typeof initialState.response>;
 export const qr = { response: z.looseObject({}) } as const;
 
 // POST /api/wa/send — start the whole-day reminder batch. It was a GET taking

@@ -80,7 +80,8 @@
   border-bottom: none;
 }
 
-.dropdownItem:hover {
+.dropdownItem:hover,
+.dropdownItemActive {
   background-color: var(--blue-50);
 }
 
@@ -128,6 +129,12 @@
 
 .itemStockOut {
   font-size: var(--font-size-xs);
+  color: var(--error-color);
+}
+
+.itemExpired {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
   color: var(--error-color);
 }
 

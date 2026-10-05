@@ -24,10 +24,36 @@ export type TableIdParams = z.infer<typeof tableIdParams>;
 const lookupItemBody = z.looseObject({});
 export type LookupItemBody = z.infer<typeof lookupItemBody>;
 
-// GET /api/admin/lookups/tables → LookupTableConfig[].
-// Intentionally loose: config rows vary per registered table — no static schema.
+// GET /api/admin/lookups/tables → one descriptor per registered table
+// (`LOOKUP_TABLE_CONFIG`). The column SET varies per table, but every descriptor and
+// every column has this one shape, so it is modeled (it was a loose array of anything,
+// and four client files each re-declared the shape by hand — audit FE-F21-15).
+const lookupColumn = z.object({
+  name: z.string(),
+  label: z.string(),
+  type: z.enum(['int', 'varchar', 'nvarchar', 'bit', 'uniqueidentifier', 'date', 'reference']),
+  maxLength: z.number().optional(),
+  required: z.boolean().optional(),
+  reference: z
+    .object({ table: z.string(), idColumn: z.string(), displayColumn: z.string() })
+    .optional(),
+});
+export type LookupColumn = z.infer<typeof lookupColumn>;
+
+const lookupTable = z.object({
+  key: z.string(),
+  displayName: z.string(),
+  icon: z.string(),
+  idColumn: z.string(),
+  columns: z.array(lookupColumn),
+  // Rows the code names by id: the editor offers no Delete for them, and the server
+  // refuses one anyway (FE-F21-2/-12).
+  protectedIds: z.array(z.number()),
+});
+export type LookupTableInfo = z.infer<typeof lookupTable>;
+
 export const tables = {
-  response: anyArray,
+  response: z.array(lookupTable),
 } as const;
 
 // GET /api/admin/lookups/:tableName → item[].

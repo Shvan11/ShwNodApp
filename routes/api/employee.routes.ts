@@ -13,6 +13,8 @@ import {
   updateEmployee,
   deleteEmployee,
   employeeEmailExists,
+  getEmployeeName,
+  countEmployeeHistory,
   listEmployees,
   listPositions,
 } from '../../services/database/queries/employee-queries.js';
@@ -21,6 +23,13 @@ import { validate } from '../../middleware/validate.js';
 import { authorize } from '../../middleware/auth.js';
 import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import * as employee from '../../shared/contracts/employee.contract.js';
+import { isForeignKeyViolation } from '../../utils/pg-errors.js';
+import { CLINIC_DOCTOR_NAME, isClinicDoctorName } from '../../shared/clinic-doctor.js';
+
+// The 'Clinic' pseudo-doctor is a bucket the code finds BY NAME for X-ray/Consult
+// intake works (`PatientService.resolveClinicDoctorId`); renaming it, marking it as
+// quit or deleting it made every such intake fail (audit FE-F21-12).
+const CLINIC_ROW_LOCKED = `'${CLINIC_DOCTOR_NAME}' is the pseudo-doctor X-ray and Consult intake works are filed under. It can't be renamed, marked as quit or deleted.`;
 import { log } from '../../utils/logger.js';
 
 const router = Router();
@@ -154,6 +163,16 @@ router.put('/employees/:id', authorize(ADMIN_ROLES), validate({ params: employee
       return;
     }
 
+    const currentName = await getEmployeeName(parseInt(id, 10));
+    if (currentName === undefined) {
+      ErrorResponses.notFound(res, 'Employee');
+      return;
+    }
+    if (isClinicDoctorName(currentName) && (!isClinicDoctorName(employee_name.trim()) || is_active === false)) {
+      ErrorResponses.conflict(res, CLINIC_ROW_LOCKED);
+      return;
+    }
+
     // Check if email already exists for another employee (if provided)
     if (email && email.trim() !== '') {
       if (await employeeEmailExists(email.trim(), parseInt(id, 10))) {
@@ -192,13 +211,45 @@ router.put('/employees/:id', authorize(ADMIN_ROLES), validate({ params: employee
  */
 router.delete('/employees/:id', authorize(ADMIN_ROLES), validate({ params: employee.deleteEmployee.params }), async (req: Request<EmployeeParams>, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
 
-    await deleteEmployee(parseInt(id, 10));
+    const name = await getEmployeeName(id);
+    if (name === undefined) {
+      ErrorResponses.notFound(res, 'Employee');
+      return;
+    }
+    if (isClinicDoctorName(name)) {
+      ErrorResponses.conflict(res, CLINIC_ROW_LOCKED);
+      return;
+    }
+
+    // An employee with any history can't be deleted (NO ACTION FKs); say what holds
+    // them and what to do instead. This was a 500 "Failed to delete employee" with the
+    // raw PG message (audit FE-F21-6).
+    const history = await countEmployeeHistory(id);
+    const held = [
+      history.works && `${history.works} work${history.works === 1 ? '' : 's'}`,
+      history.appointments && `${history.appointments} appointment${history.appointments === 1 ? '' : 's'}`,
+      history.expenses && `${history.expenses} expense${history.expenses === 1 ? '' : 's'}`,
+    ].filter(Boolean);
+    if (held.length > 0) {
+      ErrorResponses.conflict(
+        res,
+        `${name} can't be deleted: they have ${held.join(', ')}. To take them off every list, edit them and untick "Currently employed".`
+      );
+      return;
+    }
+
+    await deleteEmployee(id);
 
     sendSuccess(res, null, 'Employee deleted successfully');
 
   } catch (error) {
+    // A row added between the count and the delete.
+    if (isForeignKeyViolation(error)) {
+      ErrorResponses.conflict(res, 'This employee has history and can\'t be deleted. Untick "Currently employed" instead.');
+      return;
+    }
     log.error('Error deleting employee:', error);
     ErrorResponses.internalError(res, 'Failed to delete employee', error as Error);
   }

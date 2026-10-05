@@ -7,6 +7,7 @@
  * not re-exported from here.
  */
 import type { PhotoViewCode } from '@shared/photo-views';
+import type { FramingArea } from '@shared/contracts/photo-editor.contract';
 
 // =============================================================================
 // PRIMITIVE STRING ALIASES (documentation-only — structurally just `string`)
@@ -105,6 +106,12 @@ export interface SlotRenderSpec {
      * so `extract` is in proxy space — the server scales it to source space.
      */
     cropSpace?: { width: number; height: number };
+    /**
+     * The editor's own record of this framing (frame % + zoom). Sent with `extract`,
+     * the render embeds it in the saved photo so "Continue editing" can reopen the
+     * view where it was left. Never drives the pixels.
+     */
+    framing?: { area: FramingArea; zoom: number };
 }
 
 /**
@@ -143,26 +150,6 @@ export type PhotoPrepareResult =
 // The patient-facing portal response shapes are external/untrusted input, so
 // they're validated at the fetch boundary with Zod and live (as the single
 // source of truth, via `z.infer`) in `public/js/portal/portal.schemas.ts`.
-
-// =============================================================================
-// MESSAGING / WHATSAPP (HTTP only — SSE payloads are not in scope)
-// =============================================================================
-
-/** POST /api/messages/reset/:date. Distinct from PortalPinResetResponse. */
-export interface WhatsAppResetResponse {
-    success: boolean;
-    data?: {
-        appointmentsReset?: number;
-    };
-    error?: string;
-}
-
-/** POST /api/email/send/:date. */
-export interface EmailResponse {
-    success: boolean;
-    appointmentCount?: number;
-    error?: string;
-}
 
 // =============================================================================
 // FILE EXPLORER (/api/patients/:id/files*)

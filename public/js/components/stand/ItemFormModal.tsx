@@ -4,10 +4,11 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import type { StandItem, StandItemCreateData } from '../../hooks/useStand';
+import type { StandItem, CreateItemBody, UpdateItemBody } from '../../hooks/useStand';
 import { useStandCategories } from '../../hooks/useStand';
 import { useToast } from '../../contexts/ToastContext';
 import { formatNumber } from '../../utils/formatters';
+import { normalizeScannedExpiry } from '../../utils/expiryDate';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { scanVision, type VisionScanResult } from '@shared/contracts/stand.contract';
 import Modal from '../react/Modal';
@@ -18,7 +19,9 @@ interface ItemFormModalProps {
   isOpen: boolean;
   item: StandItem | null;
   onClose: () => void;
-  onSave: (data: StandItemCreateData) => void | Promise<void>;
+  onCreate: (data: CreateItemBody) => void | Promise<void>;
+  /** Only the fields that differ from `item` (empty when nothing changed). */
+  onUpdate: (changes: UpdateItemBody) => void | Promise<void>;
 }
 
 interface FormData {
@@ -115,7 +118,27 @@ const DEFAULT_FORM: FormData = {
   notes: '',
 };
 
-export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFormModalProps) {
+/**
+ * The fields of an edit that differ from the row the form was opened on. *Update
+ * Item* used to send all ten, so it rewrote anything changed elsewhere since the
+ * form opened (FE-F19-13, FE-F17-1's family).
+ */
+function changedFields(item: StandItem, data: CreateItemBody): UpdateItemBody {
+  const changes: UpdateItemBody = {};
+  if (data.itemName !== item.item_name) changes.itemName = data.itemName;
+  if ((data.sku ?? null) !== item.sku) changes.sku = data.sku ?? null;
+  if ((data.barcode ?? null) !== item.barcode) changes.barcode = data.barcode ?? null;
+  if ((data.categoryId ?? null) !== item.category_id) changes.categoryId = data.categoryId ?? null;
+  if (data.costPrice !== item.cost_price) changes.costPrice = data.costPrice;
+  if (data.sellPrice !== item.sell_price) changes.sellPrice = data.sellPrice;
+  if (data.reorderLevel !== undefined && data.reorderLevel !== item.reorder_level) changes.reorderLevel = data.reorderLevel;
+  if ((data.expiryDate ?? null) !== item.expiry_date) changes.expiryDate = data.expiryDate ?? null;
+  if ((data.unit ?? null) !== item.unit) changes.unit = data.unit ?? null;
+  if ((data.notes ?? null) !== item.notes) changes.notes = data.notes ?? null;
+  return changes;
+}
+
+export default function ItemFormModal({ isOpen, item, onClose, onCreate, onUpdate }: ItemFormModalProps) {
   const { categories } = useStandCategories();
   const toast = useToast();
   const [formData, setFormData] = useState<FormData>({ ...DEFAULT_FORM });
@@ -347,12 +370,19 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
 
       // Prefer local BarcodeDetector result over Gemini's AI-read barcode
       const barcode = localBarcode || scan.barcode;
+      // The model is asked for YYYY-MM-DD, but packaging usually prints a month
+      // ("05/2027"); an unread value went into the date box (which showed it blank)
+      // and 500-ed on Save (FE-F19-10).
+      const expiry = normalizeScannedExpiry(scan.expiry_date);
+      if (scan.expiry_date && !expiry) {
+        toast.warning(`Couldn't read the expiry date ("${scan.expiry_date}") — enter it by hand.`);
+      }
 
       setFormData((prev) => ({
         ...prev,
         itemName: scan.item_name || prev.itemName,
         barcode: barcode || prev.barcode,
-        expiryDate: scan.expiry_date || prev.expiryDate,
+        expiryDate: expiry || prev.expiryDate,
         unit: UNIT_OPTIONS.includes(scan.unit?.toLowerCase()) ? scan.unit.toLowerCase() : prev.unit,
         notes: scan.notes || prev.notes,
         categoryId: matchCategory(scan.CategorySuggestion) || prev.categoryId,
@@ -390,7 +420,7 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
     e.preventDefault();
     if (submitting || !validateForm()) return;
 
-    const data: StandItemCreateData = {
+    const data: CreateItemBody = {
       itemName: formData.itemName.trim(),
       sku: formData.sku.trim() || null,
       barcode: formData.barcode.trim() || null,
@@ -403,13 +433,10 @@ export default function ItemFormModal({ isOpen, item, onClose, onSave }: ItemFor
       notes: formData.notes.trim() || null,
     };
 
-    if (!isEditMode) {
-      data.currentStock = formData.currentStock;
-    }
-
     setSubmitting(true);
     try {
-      await onSave(data);
+      if (item) await onUpdate(changedFields(item, data));
+      else await onCreate({ ...data, currentStock: formData.currentStock });
     } finally {
       setSubmitting(false);
     }

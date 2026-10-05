@@ -71,7 +71,38 @@ export async function getClinicNames(): Promise<ClinicNames> {
   }
 }
 
+/** The header name (Settings → General, `CLINIC_NAME`). */
+const CLINIC_NAME_OPTION = 'CLINIC_NAME';
+
+let displayCache: { value: string; at: number } | null = null;
+
+/**
+ * The clinic's DISPLAY name — the header's `CLINIC_NAME` row — for the few outbound
+ * texts that have always opened with it rather than with the message name: the
+ * booking confirmation, the staff task notice and the staff schedule email. They
+ * carried this clinic's name as a literal (audit FE-F16 / RX1 notes); reading the
+ * row keeps this clinic's wording byte-identical while a new deployment gets its
+ * own. Falls back to the English message name when the row is empty. Never throws.
+ */
+export async function getClinicDisplayName(): Promise<string> {
+  const now = Date.now();
+  if (displayCache && now - displayCache.at < CACHE_TTL_MS) return displayCache.value;
+
+  try {
+    const rows = await getOptions([CLINIC_NAME_OPTION]);
+    const value = (rows.get(CLINIC_NAME_OPTION) ?? '').trim() || (await getClinicNames()).en;
+    displayCache = { value, at: now };
+    return value;
+  } catch (err) {
+    log.warn('Could not read the clinic name; using the message name', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return (await getClinicNames()).en;
+  }
+}
+
 /** Drop the cache — called by the branding route after a rename so it takes effect immediately. */
 export function invalidateClinicIdentity(): void {
   cache = null;
+  displayCache = null;
 }

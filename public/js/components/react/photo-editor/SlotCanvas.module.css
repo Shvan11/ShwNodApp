@@ -90,3 +90,19 @@
   bottom: 0;
   border-left: 1.5px solid rgba(0, 224, 255, 0.9);
 }
+
+/* Another session's saved photo of this view, laid faintly over the slot as an
+   alignment guide (PhotoEditor's Overlay control). Stretched to the slot box — the
+   box is the view's frame and a saved view is exactly that frame — under the guide
+   lines, and never in the way of pan/zoom. */
+.ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+}

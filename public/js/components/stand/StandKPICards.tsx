@@ -3,7 +3,6 @@
  * KPI tile grid for the Stand dashboard showing today's sales metrics,
  * low stock count, inventory value, and an expiring-soon badge.
  */
-import React from 'react';
 import type { StandDashboardKPIs } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
 import styles from './StandKPICards.module.css';
@@ -13,7 +12,7 @@ interface StandKPICardsProps {
   loading: boolean;
 }
 
-const StandKPICards: React.FC<StandKPICardsProps> = ({ kpis, loading }) => {
+export default function StandKPICards({ kpis, loading }: StandKPICardsProps) {
   if (loading) {
     return (
       <div className={styles.container}>
@@ -92,15 +91,19 @@ const StandKPICards: React.FC<StandKPICardsProps> = ({ kpis, loading }) => {
         </div>
       </div>
 
-      {/* Expiring Soon Badge */}
+      {/* Expiry badges — expired stock is counted too, it used to vanish (FE-F19-2) */}
+      {kpis.expiredCount > 0 && (
+        <div className={`${styles.expiringBadge} ${styles.expiredBadge}`}>
+          <i className="fas fa-ban" aria-hidden="true" />
+          {kpis.expiredCount} expired item{kpis.expiredCount !== 1 ? 's' : ''} still in stock
+        </div>
+      )}
       {kpis.expiringSoonCount > 0 && (
         <div className={styles.expiringBadge}>
-          <i className="fas fa-clock" />
+          <i className="fas fa-clock" aria-hidden="true" />
           {kpis.expiringSoonCount} item{kpis.expiringSoonCount !== 1 ? 's' : ''} expiring soon
         </div>
       )}
     </div>
   );
-};
-
-export default React.memo(StandKPICards);
+}

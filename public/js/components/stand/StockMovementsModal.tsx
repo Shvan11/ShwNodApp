@@ -4,7 +4,8 @@
  */
 import type { StandItem, StandStockMovement } from '../../hooks/useStand';
 import { useStockMovements } from '../../hooks/useStand';
-import { formatNumber, formatLocaleDate } from '../../utils/formatters';
+import { formatNumber } from '../../utils/formatters';
+import { formatStandDateTime } from './standFormat';
 import Modal from '../react/Modal';
 import ModalHeader from '../react/ModalHeader';
 import styles from './StockMovementsModal.module.css';
@@ -15,24 +16,25 @@ interface StockMovementsModalProps {
   onClose: () => void;
 }
 
-function formatDate(dateString: string | null): string {
-  return formatLocaleDate(dateString, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }) || '-';
-}
 
-function getTypeBadgeClass(type: string): string {
-  const lower = type.toLowerCase();
-  if (lower === 'purchase' || lower === 'initial') return styles.typePurchase;
-  if (lower === 'sale') return styles.typeSale;
-  if (lower === 'adjustment') return styles.typeAdjustment;
-  if (lower === 'return') return styles.typeReturn;
-  if (lower === 'restock') return styles.typeRestock;
-  return styles.typeDefault;
+/**
+ * The ledger's movement types (`stand-queries.ts`): `initial` (opening stock),
+ * `restock`, `sale`, `void` (a voided sale's stock coming back), `adjustment` (a
+ * manual increase) and `waste` (ANY manual decrease, mistakes included — so it is
+ * shown as "Removed"). The map used to style two types that don't exist and leave
+ * `void` and `waste` grey (FE-F19-15).
+ */
+const MOVEMENT_TYPES: Record<string, { label: string; className: string }> = {
+  initial: { label: 'Opening stock', className: styles.typePurchase },
+  restock: { label: 'Restock', className: styles.typeRestock },
+  sale: { label: 'Sale', className: styles.typeSale },
+  void: { label: 'Sale voided', className: styles.typeReturn },
+  adjustment: { label: 'Added', className: styles.typeAdjustment },
+  waste: { label: 'Removed', className: styles.typeRemoved },
+};
+
+function movementType(type: string): { label: string; className: string } {
+  return MOVEMENT_TYPES[type.toLowerCase()] ?? { label: type, className: styles.typeDefault };
 }
 
 function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
@@ -54,14 +56,13 @@ function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
           {movements.map((mov) => {
             const qtyClass = mov.quantity >= 0 ? styles.quantityPositive : styles.quantityNegative;
             const qtyDisplay = mov.quantity > 0 ? `+${formatNumber(mov.quantity)}` : formatNumber(mov.quantity);
+            const type = movementType(mov.movement_type);
 
             return (
               <tr key={mov.movement_id}>
-                <td>{formatDate(mov.movement_date)}</td>
+                <td>{formatStandDateTime(mov.movement_date) || '-'}</td>
                 <td>
-                  <span className={`${styles.typeBadge} ${getTypeBadgeClass(mov.movement_type)}`}>
-                    {mov.movement_type}
-                  </span>
+                  <span className={`${styles.typeBadge} ${type.className}`}>{type.label}</span>
                 </td>
                 <td className={qtyClass}>{qtyDisplay}</td>
                 <td>{mov.total_cost != null ? formatNumber(mov.total_cost) : '-'}</td>

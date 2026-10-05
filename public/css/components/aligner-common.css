@@ -208,6 +208,48 @@
     height: 38px;
 }
 
+/* A batch date: the value with its Set/Edit/Clear buttons beside it, or the date
+   picker with Apply/Cancel. These classes had no rule, so the buttons fell under
+   the input (FE-F17-13). */
+.date-display-with-actions,
+.date-edit-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.date-display-with-actions > input,
+.date-edit-inline > input {
+    flex: 1 1 8rem;
+    min-width: 0;
+    height: 38px;
+}
+
+.date-display-with-actions .field-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+    background: var(--surface-hover);
+}
+
+.btn-outline.btn-danger {
+    border-color: var(--error-color);
+    color: var(--error-color);
+}
+
+.btn-outline.btn-danger:hover:not(:disabled) {
+    background: var(--error-50);
+}
+
 /* Date input with Today checkbox */
 
 .form-field-checkbox {
@@ -1114,6 +1156,21 @@
 
 .pdf-btn i {
     font-size: 0.95rem;
+}
+
+/* PDF / video / Archform are links now (they open a URL or a protocol), styled
+   like the header's buttons. */
+a.pdf-btn,
+a.video-btn,
+a.archform-btn {
+    text-decoration: none;
+}
+
+.folder-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .set-badge {
@@ -2537,17 +2594,54 @@
     transform: scale(1.1);
 }
 
+/* The card's own view/download control — a real button or link, a sibling of the
+   delete button rather than its parent (FE-F17-4). */
+.aligner-photo-view {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.aligner-photo-view:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}
+
+.aligner-photo-card:focus-within .aligner-photo-delete-btn {
+    opacity: 1;
+}
+
 .aligner-photo-info-overlay {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
     background: rgba(0, 0, 0, 0.6);
     color: white;
     padding: 4px 8px;
     font-size: 0.72rem;
+    text-align: start;
+}
+
+/* Name and upload time each truncate on their own line. */
+.aligner-photo-info-name,
+.aligner-photo-info-date {
     text-overflow: ellipsis;
     white-space: nowrap;
     overflow: hidden;
+}
+
+.aligner-photo-info-date {
+    font-size: 0.65rem;
+    opacity: 0.85;
 }
 

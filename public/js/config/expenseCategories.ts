@@ -1,15 +1,5 @@
 /**
- * Special expense categories whose sub-level is a first-class ENTITY, not a generic
- * subcategory: "Employees" expenses reference `employees`, "Lab" expenses reference
- * `labs` (via expenses.employee_id / expenses.lab_id). The expense form swaps its
- * sub-level dropdown based on these.
- *
- * Hardcoded ids, so every deployment must have these two rows at exactly these ids:
- * migrations/pg/1789460500000_seed-product-constants.sql seeds them on a new install
- * (before it, an empty install handed 5 and 7 to whatever category was typed first),
- * and services/database/fresh-install.test.ts holds the two in step. The same posture
- * as the backend constant these mirror (see the labs-normalization migration; the old
- * backend EMPLOYEE_EXPENSE_CATEGORY = 5).
+ * The two expense categories the expense form keys its employee / lab pickers on.
+ * The ids live in `shared/expense-categories.ts` (the server protects the rows too).
  */
-export const EMPLOYEE_EXPENSE_CATEGORY = 5;
-export const LAB_EXPENSE_CATEGORY = 7;
+export { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '@shared/expense-categories';

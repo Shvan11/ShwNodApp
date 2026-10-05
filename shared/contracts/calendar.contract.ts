@@ -164,6 +164,30 @@ export const regenerate = {
   response: z.looseObject({ message: z.string() }),
 } as const;
 
+// 'HH:MM' (24-hour) — one configured calendar time, as the slot options store it.
+const slotTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected a 24-hour HH:MM time');
+
+// PUT /api/calendar/slot-settings — which configured times are "early" / "late" (hidden
+// unless the calendar's toggle shows them) and the toggle's default, written together in
+// one transaction. Either list may be empty: the single-option PUT refuses an empty value,
+// so moving every early slot back to Main could not be saved, and the three separate PUTs
+// could half-save (audit FE-F21-5). `admin|front_desk` — they also add and remove the
+// slots themselves (owner decision, RF1).
+export const updateSlotSettings = {
+  body: z.object({
+    earlySlots: z.array(slotTime).max(96),
+    lateSlots: z.array(slotTime).max(96),
+    showExtendedDefault: z.boolean(),
+  }),
+  response: z.object({
+    earlySlots: z.array(slotTime),
+    lateSlots: z.array(slotTime),
+    showExtendedDefault: z.boolean(),
+  }),
+} as const;
+export type UpdateSlotSettingsBody = z.infer<typeof updateSlotSettings.body>;
+export type UpdateSlotSettingsResponse = z.infer<typeof updateSlotSettings.response>;
+
 // GET /api/calendar/available-slots?date= → { date, slots, … }.
 export const availableSlots = {
   query: z.object({ date: dateString }),

@@ -191,7 +191,12 @@ export async function updateDoctor(drID: number, doctorData: DoctorData): Promis
         .set({
           doctor_name: doctor_name.trim(),
           doctor_email: doctor_email && doctor_email.trim() !== '' ? doctor_email.trim() : null,
-          logo_path: logo_path && logo_path.trim() !== '' ? logo_path.trim() : null,
+          // Only when sent. The doctor body doesn't carry it (the contract strips it),
+          // so writing it unconditionally wiped the one stored logo on every edit of
+          // that doctor (found in RE1, beside FE-F18-10).
+          ...(logo_path !== undefined
+            ? { logo_path: logo_path && logo_path.trim() !== '' ? logo_path.trim() : null }
+            : {}),
         })
         .where('dr_id', '=', drID)
         .execute();

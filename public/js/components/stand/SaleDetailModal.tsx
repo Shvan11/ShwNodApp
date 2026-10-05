@@ -3,9 +3,9 @@
  * Full-detail modal for a single sale, including line items table,
  * financial totals, patient/cashier info, and a void action.
  */
-import React from 'react';
 import type { StandSaleWithItems } from '../../hooks/useStand';
 import { formatNumber } from '../../utils/formatters';
+import { formatStandDateTime } from './standFormat';
 import Modal from '../react/Modal';
 import ModalHeader from '../react/ModalHeader';
 import styles from './SaleDetailModal.module.css';
@@ -14,30 +14,16 @@ interface SaleDetailModalProps {
   isOpen: boolean;
   sale: StandSaleWithItems | null;
   loading: boolean;
+  /** A failed read: shown with Retry instead of an endless "Loading…" (FE-F19-11). */
+  error: string | null;
+  onRetry: () => void;
+  /** Voiding is admin-only on the server (FE-F19-7). */
+  canVoid: boolean;
   onClose: () => void;
   onVoid: (saleId: number) => void;
 }
 
-/**
- * Format an ISO date string as DD/MM/YYYY HH:mm.
- */
-function formatDateTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
-}
-
-const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
-  isOpen,
-  sale,
-  loading,
-  onClose,
-  onVoid,
-}) => {
+export default function SaleDetailModal({ isOpen, sale, loading, error, onRetry, canVoid, onClose, onVoid }: SaleDetailModalProps) {
   const isVoided = sale?.voided_date != null;
 
   return (
@@ -55,7 +41,7 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
           subtitle={
             sale ? (
               <span className={styles.headerMeta}>
-                <span>{formatDateTime(sale.sale_date)}</span>
+                <span>{formatStandDateTime(sale.sale_date)}</span>
                 <span
                   className={`${styles.statusBadge} ${
                     isVoided ? styles.statusVoided : styles.statusCompleted
@@ -70,7 +56,14 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
         />
 
         {/* Body */}
-        {loading || !sale ? (
+        {error && !sale ? (
+          <div className={styles.loadingState}>
+            <span>{error}</span>
+            <button type="button" className="btn btn-secondary" onClick={onRetry}>
+              Retry
+            </button>
+          </div>
+        ) : loading || !sale ? (
           <div className={styles.loadingState}>
             <div className={styles.spinner} />
             <span>Loading sale details...</span>
@@ -186,7 +179,7 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
 
             {/* Footer */}
             <div className={styles.modalFooter}>
-              {!isVoided && (
+              {!isVoided && canVoid && (
                 <button
                   className={styles.btnVoid}
                   onClick={() => onVoid(sale.sale_id)}
@@ -208,6 +201,4 @@ const SaleDetailModal: React.FC<SaleDetailModalProps> = ({
         )}
     </Modal>
   );
-};
-
-export default React.memo(SaleDetailModal);
+}

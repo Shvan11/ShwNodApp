@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { postJSON } from '@/core/http';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
+import { useAuthUser } from '../contexts/GlobalStateContext';
 import { useWhatsAppAuth, AUTH_STATES } from '../hooks/useWhatsAppAuth';
 import { StatusDisplay } from '../components/whatsapp-auth/StatusDisplay';
 import { QRCodeDisplay } from '../components/whatsapp-auth/QRCodeDisplay';
@@ -17,8 +19,17 @@ export default function WhatsAppAuth() {
     authState,
     qrCode,
     error,
+    streamDown,
+    afterPairing,
     actions
   } = useWhatsAppAuth();
+
+  // Pairing, restarting and re-linking are front-desk/admin (the server gates
+  // them, and withholds the QR from other roles). A doctor or assistant sees the
+  // client's state and who to ask, not buttons that 403 and a QR that never
+  // comes (FE-F16-4; owner decision 2026-10-04).
+  const user = useAuthUser();
+  const canPair = roleCaps(user?.role as UserRole | undefined).manageWhatsApp;
 
   // Dev-only: kick off backend init once on page mount. Server-boot
   // auto-init is off in dev (.env.development sets WHATSAPP_AUTO_INIT=false)
@@ -34,14 +45,14 @@ export default function WhatsAppAuth() {
   // is exempt from csurf while the session cookie is sameSite: 'lax').
   const initRequestedRef = useRef(false);
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!import.meta.env.DEV || !canPair) return;
     if (initRequestedRef.current) return;
     initRequestedRef.current = true;
     // Fire-and-forget: response ignored, so a non-2xx (now thrown by postJSON) just logs.
     postJSON('/api/wa/initialize', {}).catch((err) => {
       console.error('[WhatsAppAuth] dev auto-init request failed:', err);
     });
-  }, []);
+  }, [canPair]);
 
   const renderContent = (): ReactNode => {
     switch (authState) {
@@ -51,19 +62,16 @@ export default function WhatsAppAuth() {
       case AUTH_STATES.DISCONNECTED:
       case AUTH_STATES.RESTORING:
       case AUTH_STATES.NEEDS_RELINK:
-        return <StatusDisplay authState={authState} />;
+        return <StatusDisplay authState={authState} canPair={canPair} />;
 
       case AUTH_STATES.QR_REQUIRED:
-        return <QRCodeDisplay qrCode={qrCode} />;
+        return canPair ? <QRCodeDisplay qrCode={qrCode} /> : <StatusDisplay authState={authState} canPair={false} />;
 
       case AUTH_STATES.AUTHENTICATED:
-        return <SuccessDisplay />;
+        return <SuccessDisplay afterPairing={afterPairing} />;
 
       case AUTH_STATES.ERROR:
         return <ErrorDisplay error={error} />;
-
-      default:
-        return <StatusDisplay authState={authState} />;
     }
   };
 
@@ -71,15 +79,17 @@ export default function WhatsAppAuth() {
     <div className={styles.authContainer}>
       <header className={styles.authHeader}>
         <h1>WhatsApp Authentication</h1>
-        <p className={styles.authSubtitle}>Connect your WhatsApp to send messages</p>
+        <p className={styles.authSubtitle}>
+          {canPair ? 'Connect your WhatsApp to send messages' : "The clinic's WhatsApp connection"}
+        </p>
       </header>
 
       <main className={styles.authContent}>
         {renderContent()}
-        <ControlButtons authState={authState} actions={actions} />
+        <ControlButtons authState={authState} actions={actions} canPair={canPair} />
       </main>
 
-      <ConnectionStatusFooter authState={authState} />
+      <ConnectionStatusFooter authState={authState} streamDown={streamDown} />
 
       {/* Fallback for JavaScript disabled */}
       <noscript>

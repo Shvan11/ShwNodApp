@@ -4,9 +4,13 @@
  * matches GridComponent + services/imaging getImageSizes.
  */
 import type { PhotoViewCode, SlotRenderSpec } from '@/types/api.types';
+import type { FramingArea, SavedFraming } from '@shared/contracts/photo-editor.contract';
 import { VIEW_CODES, parseViewTag, viewLabel } from '@shared/photo-views';
 
-export type { PhotoViewCode, SlotRenderSpec };
+export type { PhotoViewCode, SlotRenderSpec, FramingArea, SavedFraming };
+
+/** The part of a recorded framing that the editor re-applies (see `SavedFraming`). */
+export type SlotFraming = Pick<SavedFraming, 'rotation' | 'flipH' | 'flipV' | 'zoom' | 'area'>;
 
 /** A grid cell is one of the 8 view slots, or the centre logo (non-editable). */
 export type GridCell = PhotoViewCode | 'logo';
@@ -78,7 +82,7 @@ export const ZOOM_MAX = 3;
 export const ZOOM_SPEED = 0.1;
 
 /** Occlusal views (Upper/Lower) are shot through a mirror → default to a flip. */
-function defaultFlipV(view: PhotoViewCode): boolean {
+export function defaultFlipV(view: PhotoViewCode): boolean {
   return view === 'i23' || view === 'i24';
 }
 
@@ -148,6 +152,8 @@ export interface SlotState {
   rotation: number;
   flipH: boolean;
   flipV: boolean;
+  /** The frame in % of the flipped + rotated photo (react-easy-crop's croppedAreaPercentages). */
+  croppedArea: FramingArea | null;
   croppedAreaPixels: CropArea | null;
   /**
    * Natural size of the media the cropper is currently framing (post-EXIF) —
@@ -156,26 +162,63 @@ export interface SlotState {
    * self-consistent (the proxy/original toggle just reloads the media).
    */
   mediaSize: { width: number; height: number } | null;
-  /** When set AND sourceRelPath is null, the slot shows this baked crop read-only. */
+  // ── The SAVED half (what is on disk), seeded by HYDRATE. It survives a live edit, so
+  // "Discard changes" can put the saved photo back. ──
+  /** The saved view's image (a thumbnail URL); shown read-only while there is no live edit. */
   savedImageUrl: string | null;
+  /** The saved view's pixel size — the saved-photo resolution readout. */
+  savedSize: { width: number; height: number } | null;
+  /** The framing the saved view was rendered with, when its render recorded one. */
+  savedFraming: SavedFraming | null;
   /** True when a tagged source original still exists to reload for re-editing. */
   canReEdit: boolean;
-  /** The tagged original to reload on "Restore original" (patient-root-relative path + clean name + mtime). */
+  /** True when `savedFraming` was cut from the view's CURRENT tagged original — the only
+   *  case in which "Continue editing" can rebuild the saved photo. */
+  canContinue: boolean;
+  /** The tagged original to reload on re-edit (patient-root-relative path + clean name + mtime). */
   reEditRelPath: string | null;
   reEditName: string | null;
   reEditVersion: string | null;
+
+  // ── Live-edit bookkeeping ──
+  /** The saved framing a live edit of the saved view's own original is measured against,
+   *  so re-opening it untouched is not an unsaved change. Null → any live edit is one. */
+  baseline: SlotFraming | null;
+  /** Where "Reset framing" returns: the saved framing after "Continue editing", else null
+   *  (the default framing). */
+  resetTo: SlotFraming | null;
+  /** A framing to apply on the cropper's next media load ("Continue editing", a reset). */
+  pendingFraming: SlotFraming | null;
+  /** Bumped to remount the cropper, so a framing jump starts from a fresh media load —
+   *  the one moment react-easy-crop reports both the frame and the media size. */
+  framingKey: number;
 }
 
 export type SlotMap = Record<PhotoViewCode, SlotState>;
 
-/** The read-only display + re-edit info seeded into a slot when a timepoint is opened. */
+/** The saved half of a slot (see SlotState) — what HYDRATE seeds from the session's renders. */
 export interface SlotHydration {
   savedImageUrl: string | null;
+  savedSize: { width: number; height: number } | null;
+  savedFraming: SavedFraming | null;
   canReEdit: boolean;
+  canContinue: boolean;
   reEditRelPath: string | null;
   reEditName: string | null;
   reEditVersion: string | null;
 }
+
+/** A slot with nothing saved. */
+export const EMPTY_HYDRATION: SlotHydration = {
+  savedImageUrl: null,
+  savedSize: null,
+  savedFraming: null,
+  canReEdit: false,
+  canContinue: false,
+  reEditRelPath: null,
+  reEditName: null,
+  reEditVersion: null,
+};
 
 export function makeInitialSlot(view: PhotoViewCode): SlotState {
   return {
@@ -188,13 +231,14 @@ export function makeInitialSlot(view: PhotoViewCode): SlotState {
     rotation: 0,
     flipH: false,
     flipV: defaultFlipV(view),
+    croppedArea: null,
     croppedAreaPixels: null,
     mediaSize: null,
-    savedImageUrl: null,
-    canReEdit: false,
-    reEditRelPath: null,
-    reEditName: null,
-    reEditVersion: null,
+    ...EMPTY_HYDRATION,
+    baseline: null,
+    resetTo: null,
+    pendingFraming: null,
+    framingKey: 0,
   };
 }
 

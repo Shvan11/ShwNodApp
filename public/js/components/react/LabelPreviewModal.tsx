@@ -9,23 +9,30 @@
  *
  * @module LabelPreviewModal
  */
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { groupByPatient, type PatientGroupOf, type PrintQueueItem } from '../../contexts/PrintQueueContext';
 import { prefetchCsrfToken } from '../../core/http';
-import { buildLabelsFromRanges, type AlignerLabel } from '../../utils/aligner-labels';
+import { qk } from '../../query/keys';
+import { alignerLabelSettingsQuery } from '../../query/queries';
+import { buildLabelsFromRanges, doctorLabel, type AlignerLabel } from '../../utils/aligner-labels';
 import Modal from './Modal';
+import ModalHeader from './ModalHeader';
 import styles from './LabelPreviewModal.module.css';
 import { PDF_ARABIC_FONTS, DEFAULT_PDF_ARABIC_FONT, type PdfArabicFont } from '@shared/pdf-fonts';
 
 const LABELS_PER_SHEET = 12;
 
-// Available Arabic fonts
+/** The server's own request timeout; a PDF that takes longer is not coming. */
+const GENERATE_TIMEOUT_MS = 30_000;
+
+const NO_LOGO_HINT = 'Upload a clinic logo (PNG or JPEG) in Settings → General to print it on labels.';
 
 type Label = AlignerLabel;
 
-interface Batch {
+interface LabelBatch {
     batch_sequence?: number;
     upper_aligner_start_sequence?: number | null;
     upper_aligner_end_sequence?: number | null;
@@ -33,19 +40,27 @@ interface Batch {
     lower_aligner_end_sequence?: number | null;
 }
 
-interface Set {
+interface LabelSet {
     set_sequence?: number | null;
 }
 
-interface Patient {
+interface LabelPatient {
     patient_name?: string;
     first_name?: string;
     last_name?: string;
 }
 
-/** A queued batch as this modal edits it: the context's item + its labels as queued (for Reset). */
+/** A queued batch as this modal edits it: the context's item + its labels and logo choice as queued (for Reset and the unsaved guard). */
 interface QueueBatch extends PrintQueueItem {
     originalLabels: string[];
+    originalIncludeLogo: boolean;
+}
+
+/** What the single-batch form was seeded with — the unsaved guard compares against it. */
+interface SingleSeed {
+    patientName: string;
+    doctorName: string;
+    labels: string;
 }
 
 interface QueueStats {
@@ -65,12 +80,10 @@ interface LabelPreviewModalProps {
     // Single batch mode props
     isOpen?: boolean;
     onClose?: () => void;
-    onGenerate?: () => void;
-    batch?: Batch | null;
-    set?: Set | null;
-    patient?: Patient | null;
+    batch?: LabelBatch | null;
+    set?: LabelSet | null;
+    patient?: LabelPatient | null;
     doctorName?: string;
-    isGenerating?: boolean;
     // Queue mode props
     queueMode?: boolean;
     queuedItems?: PrintQueueItem[];
@@ -104,27 +117,47 @@ function getLabelType(text: string): 'U' | 'L' | 'UL' | 'custom' {
     return 'custom';
 }
 
+/** The label texts as one comparable string. */
+const joinLabels = (labels: readonly string[]): string => labels.join('\n');
+
+/** The file name the server gave the PDF (Content-Disposition), for the download fallback. */
+function pdfFileName(response: Response): string {
+    const match = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '');
+    return match?.[1] ?? 'Labels.pdf';
+}
+
 const LabelPreviewModal = ({
     // Single batch mode props
     isOpen = false,
     onClose,
-    onGenerate: _onGenerate,
     batch,
     set,
     patient,
     doctorName: initialDoctorName = '',
-    isGenerating = false,
     // Queue mode props
     queueMode = false,
     queuedItems = [],
     onQueuePrintSuccess
 }: LabelPreviewModalProps) => {
     const toast = useToast();
+    const queryClient = useQueryClient();
 
-    // Shared state
-    const [startingPosition, setStartingPosition] = useState(1);
+    // Determine if modal should show
+    const isModalOpen = queueMode ? queuedItems.length > 0 : isOpen;
+
+    // Where the last print ended on the sheet, and whether a logo can print. Always
+    // stale, and enabled only while open, so every opening re-reads it (another
+    // workstation may have printed since).
+    const { data: labelSettings } = useQuery({ ...alignerLabelSettingsQuery(), enabled: isModalOpen });
+    const logoAvailable = labelSettings?.logo === true;
+
+    // Shared state. `null` = the stored next position (FE-F20-5: every print used to
+    // start at 1, so a part-used sheet was printed over); a click picks another.
+    const [chosenPosition, setStartingPosition] = useState<number | null>(null);
+    const startingPosition = chosenPosition ?? labelSettings?.nextPosition ?? 1;
     const [arabicFont, setArabicFont] = useState<PdfArabicFont>(DEFAULT_PDF_ARABIC_FONT);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const generatingRef = useRef(false);
 
     // Single batch mode state
     const [patientName, setPatientName] = useState('');
@@ -135,15 +168,14 @@ const LabelPreviewModal = ({
     const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
     const [editLabelText, setEditLabelText] = useState('');
 
+    const [singleSeed, setSingleSeed] = useState<SingleSeed | null>(null);
+
     // Queue mode state
     const [queueBatches, setQueueBatches] = useState<QueueBatch[]>([]);
     const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
     const [queueNewLabelText, setQueueNewLabelText] = useState('');
     const [queueEditingLabel, setQueueEditingLabel] = useState<{ batchId: string; labelIndex: number } | null>(null);
     const [queueEditLabelText, setQueueEditLabelText] = useState('');
-
-    // Determine if modal should show
-    const isModalOpen = queueMode ? queuedItems.length > 0 : isOpen;
 
     // Initialize single batch mode. Adjust-during-render keyed on the open state +
     // the batch/patient/doctor identity, so opening (or re-targeting) the modal
@@ -161,8 +193,10 @@ const LabelPreviewModal = ({
                     : 'Unknown Patient');
             setPatientName(name);
 
-            const drName = initialDoctorName || '';
-            setDoctorName(drName.startsWith('Dr.') || drName.startsWith('Dr ') ? drName : `Dr. ${drName}`);
+            // The shared rule (FE-F20-10): with no doctor the field used to hold
+            // "Dr. ", which passed validation and printed as a doctor line.
+            const drName = doctorLabel(initialDoctorName);
+            setDoctorName(drName);
             setIncludeLogo(true);
 
             const defaultLabels = buildLabelsFromRanges(
@@ -172,8 +206,9 @@ const LabelPreviewModal = ({
                 batch.lower_aligner_end_sequence
             );
             setLabels(defaultLabels);
-            setStartingPosition(1);
-            setArabicFont('cairo');
+            setSingleSeed({ patientName: name, doctorName: drName, labels: joinLabels(defaultLabels.map(l => l.text)) });
+            setStartingPosition(null);
+            setArabicFont(DEFAULT_PDF_ARABIC_FONT);
             setNewLabelText('');
             setEditingLabelId(null);
         }
@@ -187,11 +222,12 @@ const LabelPreviewModal = ({
         setSeededQueuedItems(queuedItems);
         const batches: QueueBatch[] = queuedItems.map(item => ({
             ...item,
-            originalLabels: [...item.labels] // Store original for reset
+            originalLabels: [...item.labels], // Store original for reset
+            originalIncludeLogo: item.includeLogo,
         }));
         setQueueBatches(batches);
-        setStartingPosition(1);
-        setArabicFont('cairo');
+        setStartingPosition(null);
+        setArabicFont(DEFAULT_PDF_ARABIC_FONT);
         setExpandedBatchId(null);
         setQueueNewLabelText('');
         setQueueEditingLabel(null);
@@ -204,10 +240,27 @@ const LabelPreviewModal = ({
 
     const { pages: totalPages, nextPosition } = calculateStats(totalLabels, startingPosition);
 
-    // Validation
+    // Validation. The doctor is optional: a label without one prints no doctor line.
     const isValid = queueMode
         ? queueBatches.length > 0 && totalLabels > 0
-        : patientName.trim() !== '' && doctorName.trim() !== '' && labels.length > 0;
+        : patientName.trim() !== '' && labels.length > 0;
+
+    // Unsaved work: Escape, the backdrop, ✕ and Cancel threw an edited queue or
+    // label list away without a word (FE-F20-10). Most edits here are clicks
+    // (remove a label, toggle the logo), which `watchInput` can't see, so the
+    // state is compared with what the dialog was opened with.
+    const isDirty = queueMode
+        ? queueNewLabelText.trim() !== ''
+            || queueBatches.length !== queuedItems.length
+            || queueBatches.some(b => b.includeLogo !== b.originalIncludeLogo
+                || joinLabels(b.labels) !== joinLabels(b.originalLabels))
+        : singleSeed !== null && (
+            newLabelText.trim() !== ''
+            || patientName !== singleSeed.patientName
+            || doctorName !== singleSeed.doctorName
+            || !includeLogo
+            || joinLabels(labels.map(l => l.text)) !== singleSeed.labels
+        );
 
     // Group queue batches by patient
     const groupedQueueBatches = useMemo(
@@ -374,7 +427,7 @@ const LabelPreviewModal = ({
                         text: labelText,
                         patientName: batch.patientName,
                         doctorName: batch.doctorName || '',
-                        includeLogo: batch.includeLogo
+                        includeLogo: batch.includeLogo && logoAvailable
                     });
                 });
             });
@@ -385,19 +438,32 @@ const LabelPreviewModal = ({
                 text: label.text,
                 patientName: patientName.trim(),
                 doctorName: doctorName.trim(),
-                includeLogo
+                includeLogo: includeLogo && logoAvailable
             }));
         }
-    }, [queueMode, queueBatches, labels, patientName, doctorName, includeLogo]);
+    }, [queueMode, queueBatches, labels, patientName, doctorName, includeLogo, logoAvailable]);
 
     /**
      * Unified generate handler for both modes
      */
-    const handleGenerate = useCallback(async () => {
-        if (!isValid) return;
-
+    const handleGenerate = async (): Promise<void> => {
+        if (!isValid || generatingRef.current) return;
+        generatingRef.current = true;
         setIsSubmitting(true);
 
+        // Open the PDF's window NOW, inside the click. Opened after the response it
+        // was no longer the user's gesture: a popup blocker returned null, nothing
+        // looked, the toast said the labels were generated and queue mode cleared
+        // the queue (FE-F20-4).
+        const pdfWindow = window.open('', '_blank');
+        if (pdfWindow) {
+            pdfWindow.opener = null;
+            pdfWindow.document.title = 'Preparing labels…';
+            pdfWindow.document.body.textContent = 'Preparing labels…';
+        }
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS);
         try {
             const richLabels = buildRichLabels();
 
@@ -412,38 +478,56 @@ const LabelPreviewModal = ({
                     labels: richLabels,
                     startingPosition,
                     arabicFont
-                })
+                }),
+                signal: controller.signal,
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Failed to generate labels');
+                // The server's message, not its raw JSON body (FE-F20-4).
+                const body = await response.json().catch(() => null) as { error?: string } | null;
+                throw new Error(body?.error || `the server answered ${response.status}`);
             }
 
-            // Open PDF in new tab
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
-            window.open(url, '_blank');
-            // Release the blob URL once the new tab has had a chance to load it.
+            // Release the blob URL once the PDF has had a chance to load.
             setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            if (pdfWindow && !pdfWindow.closed) {
+                pdfWindow.location.href = url;
+            } else {
+                // Blocked even inside the click, or the user closed the tab: save it.
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = pdfFileName(response);
+                link.click();
+                toast.info('Pop-ups are blocked here, so the labels PDF was downloaded instead.', 6000);
+            }
 
             const totalLabelsHeader = response.headers.get('X-Total-Labels');
             const totalPagesHeader = response.headers.get('X-Total-Pages');
             toast.success(`Generated ${totalLabelsHeader || richLabels.length} labels on ${totalPagesHeader || '?'} page(s)`);
+            // The server stored where this print ended; the next opening starts there.
+            void queryClient.invalidateQueries({ queryKey: qk.aligner.labelSettings() });
 
-            // Close modal and clear queue if in queue mode
+            // Close modal and clear queue if in queue mode — only now that the PDF is
+            // on screen or saved. Any failure keeps the dialog and the queue.
             if (queueMode && onQueuePrintSuccess) {
                 onQueuePrintSuccess();
             } else if (onClose) {
                 onClose();
             }
         } catch (error) {
-            console.error('Generate error:', error);
-            toast.error('Failed to generate labels: ' + (error instanceof Error ? error.message : 'Unknown error'));
+            pdfWindow?.close();
+            const message = controller.signal.aborted
+                ? 'it took too long. Try again, or print fewer labels at once.'
+                : error instanceof Error ? error.message : 'unknown error';
+            toast.error(`Failed to generate labels: ${message}`);
         } finally {
+            clearTimeout(timer);
+            generatingRef.current = false;
             setIsSubmitting(false);
         }
-    }, [isValid, buildRichLabels, startingPosition, arabicFont, queueMode, onQueuePrintSuccess, onClose, toast]);
+    };
 
     // Key handlers - Single batch mode
     const handleNewLabelKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -453,11 +537,14 @@ const LabelPreviewModal = ({
         }
     };
 
+    // Escape cancels the label edit — and only that: preventDefault tells the
+    // Modal the key is used, or the same keypress closed the whole dialog.
     const handleEditLabelKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             saveEditLabel();
         } else if (e.key === 'Escape') {
+            e.preventDefault();
             setEditingLabelId(null);
             setEditLabelText('');
         }
@@ -476,6 +563,7 @@ const LabelPreviewModal = ({
             e.preventDefault();
             saveQueueLabelEdit();
         } else if (e.key === 'Escape') {
+            e.preventDefault();
             cancelQueueLabelEdit();
         }
     };
@@ -496,11 +584,13 @@ const LabelPreviewModal = ({
         return styles.labelItemCustom;
     };
 
-    const currentIsGenerating = isSubmitting || isGenerating;
+    const currentIsGenerating = isSubmitting;
 
     const handleClose = useCallback(() => {
         if (onClose) onClose();
     }, [onClose]);
+
+    const unsavedGuard = { isDirty };
 
     // Shared: Position selector and stats
     const renderPositionAndStats = () => (
@@ -579,22 +669,18 @@ const LabelPreviewModal = ({
     // Queue mode render
     if (queueMode) {
         return (
-            <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`} ariaLabelledBy="label-queue-modal-title">
-                    {/* Header */}
-                    {/* data-modal-drag-handle: scopes dragging to the header so the
-                        label list below stays selectable (see Modal.tsx). */}
-                    <div className={`${styles.header} ${styles.queueModeHeader}`} data-modal-drag-handle>
-                        <h2 id="label-queue-modal-title">
-                            <i className="fas fa-layer-group"></i>
-                            Print Queue
-                            <span className={styles.queueHeaderStats}>
-                                {queueStats?.patientCount} {queueStats?.patientCount === 1 ? 'patient' : 'patients'} &bull; {queueStats?.batchCount} {queueStats?.batchCount === 1 ? 'batch' : 'batches'} &bull; {queueStats?.totalLabels} labels
-                            </span>
-                        </h2>
-                        <button className={styles.closeBtn} onClick={handleClose}>
-                            <i className="fas fa-times"></i>
-                        </button>
-                    </div>
+            <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`} ariaLabelledBy="label-queue-modal-title" unsavedGuard={unsavedGuard}>
+                {(dismiss) => (<>
+                    {/* The shared header is the drag grip, so the label list below stays selectable. */}
+                    <ModalHeader
+                        title="Print Queue"
+                        titleId="label-queue-modal-title"
+                        icon={<i className="fas fa-layer-group" />}
+                        subtitle={<>
+                            {queueStats?.patientCount} {queueStats?.patientCount === 1 ? 'patient' : 'patients'} &bull; {queueStats?.batchCount} {queueStats?.batchCount === 1 ? 'batch' : 'batches'} &bull; {queueStats?.totalLabels} labels
+                        </>}
+                        onClose={dismiss}
+                    />
 
                     {/* Content */}
                     <div className={`${styles.content} ${styles.queueModeContent}`}>
@@ -605,6 +691,12 @@ const LabelPreviewModal = ({
                                 <i className="fas fa-info-circle"></i>
                                 Click batch to expand and edit labels. Labels are printed in order shown.
                             </p>
+                            {labelSettings && !logoAvailable && (
+                                <p className={styles.queueHint}>
+                                    <i className="far fa-image"></i>
+                                    {NO_LOGO_HINT}
+                                </p>
+                            )}
 
                             <div className={styles.queuePatientGroups}>
                                 {groupedQueueBatches.map(group => (
@@ -635,15 +727,16 @@ const LabelPreviewModal = ({
                                                                 )}
                                                             </div>
                                                             <div className={styles.queueBatchActions} role="button" tabIndex={0} onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); } }}>
-                                                                <label className={styles.queueLogoToggle} title="Include logo">
+                                                                <label className={styles.queueLogoToggle} title={logoAvailable ? 'Include logo' : NO_LOGO_HINT}>
                                                                     <input
                                                                         type="checkbox"
                                                                         aria-label="Include logo"
-                                                                        checked={batchItem.includeLogo}
+                                                                        checked={batchItem.includeLogo && logoAvailable}
+                                                                        disabled={!logoAvailable}
                                                                         onChange={() => toggleQueueBatchLogo(batchItem.id)}
                                                                     />
                                                                     <span className={styles.checkboxIcon}>
-                                                                        <i className={batchItem.includeLogo ? 'fas fa-image' : 'far fa-image'}></i>
+                                                                        <i className={batchItem.includeLogo && logoAvailable ? 'fas fa-image' : 'far fa-image'}></i>
                                                                     </span>
                                                                 </label>
                                                                 <button
@@ -784,10 +877,10 @@ const LabelPreviewModal = ({
 
                     {/* Footer */}
                     <div className={styles.footer}>
-                        <button className={styles.btnCancel} onClick={handleClose}>Cancel</button>
+                        <button className={styles.btnCancel} onClick={dismiss}>Cancel</button>
                         <button
                             className={styles.btnGenerate}
-                            onClick={handleGenerate}
+                            onClick={() => void handleGenerate()}
                             disabled={!isValid || currentIsGenerating}
                         >
                             {currentIsGenerating ? (
@@ -797,23 +890,21 @@ const LabelPreviewModal = ({
                             )}
                         </button>
                     </div>
+                </>)}
             </Modal>
         );
     }
 
     // Single batch mode render
     return (
-        <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`} ariaLabelledBy="label-preview-modal-title">
-                {/* Header */}
-                <div className={styles.header} data-modal-drag-handle>
-                    <h2 id="label-preview-modal-title">
-                        <i className="fas fa-print"></i>
-                        Print Aligner Labels
-                    </h2>
-                    <button className={styles.closeBtn} onClick={handleClose}>
-                        <i className="fas fa-times"></i>
-                    </button>
-                </div>
+        <Modal isOpen={isModalOpen} onClose={handleClose} contentClassName={`${styles.modal} ${styles.modalWide}`} ariaLabelledBy="label-preview-modal-title" unsavedGuard={unsavedGuard}>
+            {(dismiss) => (<>
+                <ModalHeader
+                    title="Print Aligner Labels"
+                    titleId="label-preview-modal-title"
+                    icon={<i className="fas fa-print" />}
+                    onClose={dismiss}
+                />
 
                 {/* Content */}
                 <div className={styles.content}>
@@ -840,21 +931,27 @@ const LabelPreviewModal = ({
                                 type="text"
                                 value={doctorName}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => setDoctorName(e.target.value)}
-                                placeholder="Enter doctor name"
-                                className={!doctorName.trim() ? styles.inputError : ''}
+                                placeholder="Optional"
                             />
                         </div>
 
                         <div className={`${styles.formGroup} ${styles.formGroupInline}`}>
-                            <label className={styles.checkboxLabel}>
+                            <label className={styles.checkboxLabel} title={logoAvailable ? undefined : NO_LOGO_HINT}>
                                 <input
                                     type="checkbox"
-                                    checked={includeLogo}
+                                    checked={includeLogo && logoAvailable}
+                                    disabled={!logoAvailable}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => setIncludeLogo(e.target.checked)}
                                 />
                                 <span className={styles.checkboxText}>Include Logo on Labels</span>
                             </label>
                         </div>
+                        {labelSettings && !logoAvailable && (
+                            <p className={styles.labelsHint}>
+                                <i className="far fa-image"></i>
+                                {NO_LOGO_HINT}
+                            </p>
+                        )}
 
                         <div className={styles.formGroup}>
                             <label htmlFor="label-source-batch">Source Batch</label>
@@ -962,10 +1059,10 @@ const LabelPreviewModal = ({
 
                 {/* Footer */}
                 <div className={styles.footer}>
-                    <button className={styles.btnCancel} onClick={handleClose}>Cancel</button>
+                    <button className={styles.btnCancel} onClick={dismiss}>Cancel</button>
                     <button
                         className={styles.btnGenerate}
-                        onClick={handleGenerate}
+                        onClick={() => void handleGenerate()}
                         disabled={!isValid || currentIsGenerating}
                     >
                         {currentIsGenerating ? (
@@ -975,6 +1072,7 @@ const LabelPreviewModal = ({
                         )}
                     </button>
                 </div>
+            </>)}
         </Modal>
     );
 };

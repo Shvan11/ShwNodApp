@@ -8,6 +8,7 @@
 import { Router, type Request, type Response } from 'express';
 import {
   getStandCategories,
+  getStandCategoryByName,
   addStandCategory,
   updateStandCategory,
   deactivateStandCategory,
@@ -17,6 +18,8 @@ import {
   addStandItem,
   updateStandItem,
   softDeleteStandItem,
+  setStandItemActive,
+  getStandItemOwning,
   getLowStockItems,
   getExpiringItems,
   getStandSales,
@@ -40,6 +43,7 @@ import { authenticate, authorize } from '../../middleware/auth.js';
 import { ADMIN_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import { ErrorResponses, sendData, sendError, sendSuccess } from '../../utils/error-response.js';
 import { validate } from '../../middleware/validate.js';
+import { isUniqueViolation } from '../../utils/pg-errors.js';
 import * as standContract from '../../shared/contracts/stand.contract.js';
 import { log } from '../../utils/logger.js';
 
@@ -72,11 +76,46 @@ const router = Router();
 
 function handleStandError(res: Response, error: unknown, fallbackMessage: string): void {
   if (error instanceof StandValidationError) {
-    ErrorResponses.badRequest(res, error.message, { code: error.code, ...error.details });
+    // A price that moved under the till is a conflict with the cart, not a bad request.
+    const send = error.code === 'PRICE_CHANGED' ? ErrorResponses.conflict : ErrorResponses.badRequest;
+    send(res, error.message, { code: error.code, ...error.details });
     return;
   }
   log.error(fallbackMessage, error);
   ErrorResponses.internalError(res, fallbackMessage, error as Error);
+}
+
+/**
+ * A create/edit that collides with `ux_standitems_barcode` / `ux_standitems_sku`.
+ * Both indexes cover DEACTIVATED items too, so the answer names the owner and says
+ * when it is deactivated (reactivate it instead of re-adding it) — it used to be a
+ * bare 500 "Failed to create stand item" (FE-F19-8). Returns false when the error
+ * is something else.
+ */
+async function sendItemUniqueConflict(
+  res: Response,
+  error: unknown,
+  body: { barcode?: string | null; sku?: string | null }
+): Promise<boolean> {
+  const column = isUniqueViolation(error, 'ux_standitems_barcode')
+    ? 'barcode'
+    : isUniqueViolation(error, 'ux_standitems_sku')
+      ? 'sku'
+      : null;
+  if (!column) return false;
+  const value = body[column] ?? '';
+  const owner = value ? await getStandItemOwning(column, value) : null;
+  const label = column === 'barcode' ? 'Barcode' : 'SKU';
+  const message = owner
+    ? `${label} ${value} already belongs to "${owner.item_name}"${owner.is_active ? '' : ' (a deleted item — show inactive items and reactivate it instead)'}`
+    : `${label} ${value} is already used by another item`;
+  ErrorResponses.conflict(res, message, {
+    code: column === 'barcode' ? 'DUPLICATE_BARCODE' : 'DUPLICATE_SKU',
+    itemId: owner?.item_id,
+    itemName: owner?.item_name,
+    isActive: owner?.is_active,
+  });
+  return true;
 }
 
 // ============================================================================
@@ -112,14 +151,30 @@ router.post(
   validate({ body: standContract.createCategory.body }),
   async (req: Request<unknown, unknown, standContract.CreateCategoryBody>, res: Response): Promise<void> => {
     try {
-      const { name } = req.body;
-      if (!name || !name.trim()) {
+      const name = req.body.name.trim();
+      if (!name) {
         ErrorResponses.badRequest(res, 'category name is required');
         return;
       }
-      const result = await addStandCategory(name.trim());
-      sendData(res, standContract.createCategory.response, result, null, 201);
+      // `category_name` is unique across deactivated rows too: re-adding a
+      // deactivated name brings that row back instead of a 500 (FE-F19-8).
+      const existing = await getStandCategoryByName(name);
+      if (existing?.is_active) {
+        ErrorResponses.conflict(res, `A category named "${existing.category_name}" already exists`, { code: 'DUPLICATE_CATEGORY' });
+        return;
+      }
+      if (existing) {
+        await updateStandCategory(existing.category_id, { isActive: true });
+        sendData(res, standContract.createCategory.response, { category_id: existing.category_id, reactivated: true }, null, 201);
+        return;
+      }
+      const result = await addStandCategory(name);
+      sendData(res, standContract.createCategory.response, { ...result, reactivated: false }, null, 201);
     } catch (error) {
+      if (isUniqueViolation(error, 'stand_categories_categoryname_key')) {
+        ErrorResponses.conflict(res, `A category named "${req.body.name.trim()}" already exists`, { code: 'DUPLICATE_CATEGORY' });
+        return;
+      }
       handleStandError(res, error, 'Failed to create stand category');
     }
   }
@@ -143,6 +198,10 @@ router.put(
       await updateStandCategory(id, req.body);
       sendSuccess(res, null);
     } catch (error) {
+      if (isUniqueViolation(error, 'stand_categories_categoryname_key')) {
+        ErrorResponses.conflict(res, `A category named "${req.body.categoryName ?? ''}" already exists`, { code: 'DUPLICATE_CATEGORY' });
+        return;
+      }
       handleStandError(res, error, 'Failed to update stand category');
     }
   }
@@ -370,6 +429,7 @@ router.post(
       const result = await addStandItem({ ...req.body, createdBy: userId });
       sendData(res, standContract.createItem.response, result, null, 201);
     } catch (error) {
+      if (await sendItemUniqueConflict(res, error, req.body)) return;
       handleStandError(res, error, 'Failed to create stand item');
     }
   }
@@ -393,6 +453,7 @@ router.put(
       await updateStandItem(id, req.body);
       sendSuccess(res, null);
     } catch (error) {
+      if (await sendItemUniqueConflict(res, error, req.body)) return;
       handleStandError(res, error, 'Failed to update stand item');
     }
   }
@@ -411,6 +472,22 @@ router.delete(
       sendSuccess(res, null);
     } catch (error) {
       handleStandError(res, error, 'Failed to delete stand item');
+    }
+  }
+);
+
+router.post(
+  '/stand/items/:id/reactivate',
+  authenticate,
+  authorize(ADMIN_ROLES),
+  validate({ params: standContract.reactivateItem.params }),
+  async (req: Request<{ id: string }>, res: Response): Promise<void> => {
+    try {
+      const id = Number(req.params.id);
+      if (!(await setStandItemActive(id, true))) { ErrorResponses.notFound(res, 'Item'); return; }
+      sendSuccess(res, null);
+    } catch (error) {
+      handleStandError(res, error, 'Failed to reactivate stand item');
     }
   }
 );
@@ -435,8 +512,8 @@ router.post(
       // `quantity` and `unitCost` are already numbers (contract-coerced; `unitCost`
       // through `moneyInt`). The `parseInt(String(...), 10)` that stood here truncated a
       // fractional restock cost into `stand_stock_movements.unit_cost` unnoticed.
-      await validateAndRestockItem(id, quantity, unitCost, userId);
-      sendSuccess(res, null);
+      const result = await validateAndRestockItem(id, quantity, unitCost, userId);
+      sendData(res, standContract.restock.response, result);
     } catch (error) {
       handleStandError(res, error, 'Failed to restock item');
     }
@@ -572,16 +649,13 @@ router.post(
 router.get(
   '/stand/reports/summary',
   authorize(FINANCE_ROLES),
+  validate({ query: standContract.reportSummary.query }),
   async (
-    req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string }>,
+    req: Request<unknown, unknown, unknown, standContract.ReportSummaryQuery>,
     res: Response
   ): Promise<void> => {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) {
-        ErrorResponses.badRequest(res, 'Missing required parameters: startDate, endDate');
-        return;
-      }
       const [salesSummary, purchases] = await Promise.all([
         getStandSalesSummary(startDate, endDate),
         getStandPurchasesSummary(startDate, endDate),
@@ -596,17 +670,14 @@ router.get(
 router.get(
   '/stand/reports/top-items',
   authorize(FINANCE_ROLES),
+  validate({ query: standContract.reportTopItems.query }),
   async (
-    req: Request<unknown, unknown, unknown, { startDate?: string; endDate?: string; limit?: string }>,
+    req: Request<unknown, unknown, unknown, standContract.ReportTopItemsQuery>,
     res: Response
   ): Promise<void> => {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) {
-        ErrorResponses.badRequest(res, 'Missing required parameters: startDate, endDate');
-        return;
-      }
-      const limit = parseInt(req.query.limit || '10', 10);
+      const limit = Math.min(Math.max(Number(req.query.limit ?? 10), 1), 100);
       const topItems = await getTopSellingItems(startDate, endDate, limit);
       sendData(res, standContract.reportTopItems.response, topItems);
     } catch (error) {

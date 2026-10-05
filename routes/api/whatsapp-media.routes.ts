@@ -39,6 +39,18 @@ const upload = createUpload();
 interface SendMediaResult {
   result: string;
   sentMessages?: number;
+  error?: string;
+}
+
+/**
+ * `/sendmedia2`'s answer. `result`/`error` used to be the LAST file's only, so
+ * three files where only the last failed read as a plain failure, with no hint
+ * that two had gone (FE-F16-6). `sentMessages` of `total`, plus every file's
+ * error, is what the page reports now.
+ */
+interface SendMedia2Result extends SendMediaResult {
+  total: number;
+  errors: string[];
 }
 
 /** Thrown by `/sendmedia2` when a requested path escapes the clinic volume. */
@@ -146,6 +158,7 @@ router.post(
 
       let sentMessages = 0;
       let state: SendMediaResult = { result: '' };
+      const errors: string[] = [];
 
       if (prog === 'WhatsApp') {
         phone = PhoneFormatter.forWhatsApp(phone);
@@ -159,6 +172,8 @@ router.post(
           log.info(`WhatsApp result:`, state);
           if (state.result === 'OK') {
             sentMessages += 1;
+          } else if (state.error) {
+            errors.push(state.error);
           }
         }
       } else if (prog === 'Telegram') {
@@ -176,6 +191,8 @@ router.post(
           log.info(`Telegram result:`, state);
           if (state.result === 'OK') {
             sentMessages += 1;
+          } else if (state.error) {
+            errors.push(state.error);
           }
         }
       } else {
@@ -186,12 +203,14 @@ router.post(
         return;
       }
 
-      state.sentMessages = sentMessages;
-      log.info(
-        `Final result - Sent: ${sentMessages}/${paths.length}, state:`,
-        state
-      );
-      res.json(state);
+      const body: SendMedia2Result = {
+        ...state,
+        sentMessages,
+        total: paths.length,
+        errors: [...new Set(errors)],
+      };
+      log.info(`Final result - Sent: ${sentMessages}/${paths.length}`, body);
+      res.json(body);
     } catch (error) {
       if (error instanceof OutOfTreePathError) {
         ErrorResponses.badRequest(res, 'Invalid file path', {

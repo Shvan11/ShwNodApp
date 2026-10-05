@@ -23,7 +23,8 @@ function DesignerToolbar({ templateName, onBack, onPreview, onSave, isSaving, st
                 <button className="btn btn-secondary" onClick={onBack}>
                     <i className="fas fa-arrow-left"></i> Back
                 </button>
-                <h1>Receipt Template Designer</h1>
+                {/* Every document type is designed here, not only receipts (FE-F20-9c). */}
+                <h1>Template Designer</h1>
                 <div className={styles.templateInfo}>
                     <i className="fas fa-file-invoice"></i>
                     <span>{templateName}</span>

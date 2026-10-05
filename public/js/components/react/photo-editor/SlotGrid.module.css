@@ -43,6 +43,7 @@
 }
 
 .cellHeader {
+  position: relative;
   font-size: 0.72rem;
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
@@ -51,6 +52,35 @@
   background: var(--background-secondary);
   color: var(--text-primary);
   text-align: center;
+}
+
+/* The slot's status — what Save would do with it — pinned to the title bar's end so
+   the view name stays centred. */
+.mark {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--spacing-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+}
+
+.markUnsaved {
+  color: var(--warning-700);
+}
+
+.markUnsaved::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.markSaved {
+  color: var(--success-700);
 }
 
 .cellBody {

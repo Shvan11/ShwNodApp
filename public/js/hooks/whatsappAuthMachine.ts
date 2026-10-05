@@ -14,7 +14,6 @@
 export const AUTH_STATES = {
   INITIALIZING: 'initializing',
   CONNECTING: 'connecting',
-  CONNECTED: 'connected',
   CHECKING_SESSION: 'checking_session',
   QR_REQUIRED: 'qr_required',
   AUTHENTICATED: 'authenticated',
@@ -25,19 +24,19 @@ export const AUTH_STATES = {
   // budget — it's poisoned and parked. The only fix is an explicit Re-link.
   NEEDS_RELINK: 'needs_relink',
   ERROR: 'error',
+  /** The page's SSE stream dropped and is being retried (while the client isn't ready). */
   DISCONNECTED: 'disconnected',
 } as const;
 
 export type AuthState = (typeof AUTH_STATES)[keyof typeof AUTH_STATES];
 
-/** `/api/wa/initial-state` as the page reads it. */
+/** `/api/wa/initial-state` as the page reads it (the contract's shape, the fields the machine uses). */
 export interface InitialStateResponse {
-  qr?: string;
+  qr?: string | null;
   clientReady?: boolean;
   needsRelink?: boolean;
   restoring?: boolean;
-  error?: string;
-  [key: string]: unknown;
+  error?: unknown;
 }
 
 export interface AuthModel {
@@ -46,6 +45,12 @@ export interface AuthModel {
   /** Mirrored from the WhatsApp status context (SSE + REST reconcile). */
   clientReady: boolean;
   qrCode: string | null;
+  /**
+   * The page's own SSE stream is down and being retried. Kept apart from
+   * `authState` because a ready client stays AUTHENTICATED (the invariant below)
+   * while its live updates have stopped — the footer says so (FE-F16-12).
+   */
+  streamDown: boolean;
 }
 
 export type AuthEvent =
@@ -55,6 +60,7 @@ export type AuthEvent =
   | { type: 'initialState'; data: InitialStateResponse }
   /** CHECKING_SESSION has settled for 3 s with nothing arriving — assume a QR is coming. */
   | { type: 'settleCheck' }
+  /** `disconnected` = the stream dropped and is being retried (the channel's `reconnecting`). */
   | { type: 'transport'; event: 'connecting' | 'connected' | 'disconnected' }
   /** The `whatsapp_client_ready` DATA frame (server park / re-link / restart). */
   | { type: 'clientFrame'; clientReady?: boolean; state?: string }
@@ -66,7 +72,7 @@ export type AuthEvent =
 const S = AUTH_STATES;
 
 export function initialAuthModel(clientReady: boolean, qrCode: string | null): AuthModel {
-  return enforce({ authState: S.INITIALIZING, error: null, clientReady, qrCode });
+  return enforce({ authState: S.INITIALIZING, error: null, clientReady, qrCode, streamDown: false });
 }
 
 /**
@@ -109,7 +115,7 @@ function step(m: AuthModel, e: AuthEvent): AuthModel {
       if (d.qr) return unless([S.AUTHENTICATED], S.QR_REQUIRED);
       // Live client mid-restore — show a restoring state, NOT a forever-empty QR box.
       if (d.restoring) return unless([S.QR_REQUIRED, S.AUTHENTICATED], S.RESTORING);
-      if (d.error) return { ...m, authState: S.ERROR, error: d.error };
+      if (typeof d.error === 'string' && d.error) return { ...m, authState: S.ERROR, error: d.error };
       // No client, no QR yet (a brand-new setup before the first QR) — settle
       // briefly (the hook fires `settleCheck` after 3 s), then expect a QR.
       return unless([S.QR_REQUIRED, S.AUTHENTICATED, S.NEEDS_RELINK], S.CHECKING_SESSION);
@@ -119,8 +125,20 @@ function step(m: AuthModel, e: AuthEvent): AuthModel {
       return m.authState === S.CHECKING_SESSION ? to(S.QR_REQUIRED) : m;
 
     case 'transport':
-      if (e.event === 'connected') return to(S.CONNECTED);
-      if (e.event === 'disconnected') return to(S.DISCONNECTED);
+      // A (re)opened stream is not news about the client: keep whatever the page
+      // already knows and let the snapshot it triggers move it on. It used to go
+      // to a CONNECTED state that rendered nothing, so every reopen blanked a
+      // shown QR until `initial-state` answered — for good, if that read failed.
+      if (e.event === 'connected') {
+        return {
+          ...unless(
+            [S.QR_REQUIRED, S.AUTHENTICATED, S.RESTORING, S.NEEDS_RELINK, S.CHECKING_SESSION],
+            S.INITIALIZING
+          ),
+          streamDown: false,
+        };
+      }
+      if (e.event === 'disconnected') return { ...to(S.DISCONNECTED), streamDown: true };
       return unless([S.AUTHENTICATED, S.QR_REQUIRED], S.CONNECTING);
 
     case 'clientFrame':

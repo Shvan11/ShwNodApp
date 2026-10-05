@@ -3,38 +3,21 @@
  * Modal for creating new templates
  */
 
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import type { CreateTemplateBody, DocumentTypeRow } from '@shared/contracts/template.contract';
 import Modal from '../react/Modal';
 import ModalHeader from '../react/ModalHeader';
 
-interface DocumentType {
-    type_id: number;
-    type_name: string;
-    icon: string;
-}
-
+/** The form as typed — numbers arrive from inputs as strings until submit. */
 interface TemplateFormData {
     template_name: string;
     description: string;
     document_type_id: string | number;
-    paper_width: number;
-    paper_height: number;
+    paper_width: number | string;
+    paper_height: number | string;
     paper_orientation: 'portrait' | 'landscape';
     is_default: boolean;
     is_active: boolean;
-    created_by: string;
-}
-
-interface TemplateSubmissionData {
-    template_name: string;
-    description: string;
-    document_type_id: number;
-    paper_width: number;
-    paper_height: number;
-    paper_orientation: 'portrait' | 'landscape';
-    is_default: boolean;
-    is_active: boolean;
-    created_by: string;
 }
 
 interface ModalStyles {
@@ -42,10 +25,11 @@ interface ModalStyles {
 }
 
 interface CreateTemplateModalProps {
-    documentTypes: DocumentType[];
+    documentTypes: DocumentTypeRow[];
     currentDocumentType: number | null;
     onClose: () => void;
-    onCreate: (data: TemplateSubmissionData) => void;
+    /** Resolves when the create settled (either way), so the form can take another submit. */
+    onCreate: (data: CreateTemplateBody) => Promise<void>;
     styles: ModalStyles;
 }
 
@@ -59,8 +43,10 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
         paper_orientation: 'portrait',
         is_default: false,
         is_active: true,
-        created_by: 'user'
     });
+    // One create at a time: a double submit made two templates (FE-F20-9d).
+    const [isCreating, setIsCreating] = useState(false);
+    const creatingRef = useRef(false);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
@@ -71,18 +57,27 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
         }));
     };
 
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (creatingRef.current) return;
+        creatingRef.current = true;
+        setIsCreating(true);
 
-        // Convert string values to numbers
-        const submissionData: TemplateSubmissionData = {
+        // Convert string values to numbers. No `created_by`: the server records the
+        // session's user (the literal 'user' this sent was what every card showed).
+        const submissionData: CreateTemplateBody = {
             ...formData,
             document_type_id: parseInt(String(formData.document_type_id), 10),
             paper_width: Number(formData.paper_width),
             paper_height: Number(formData.paper_height)
         };
 
-        onCreate(submissionData);
+        try {
+            await onCreate(submissionData);
+        } finally {
+            creatingRef.current = false;
+            setIsCreating(false);
+        }
     };
 
     return (
@@ -91,14 +86,16 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
             onClose={onClose}
             contentClassName={styles.modalDialog}
             ariaLabelledBy="create-template-modal-title"
+            unsavedGuard={{ watchInput: true }}
         >
+            {(dismiss) => (<>
                 <ModalHeader
                     titleId="create-template-modal-title"
                     icon={<i className="fas fa-plus" />}
                     title="Create New Template"
-                    onClose={onClose}
+                    onClose={dismiss}
                 />
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={(e) => void handleSubmit(e)}>
                     <div className={styles.modalBody}>
                         <div className={styles.formGroup}>
                             <label htmlFor="template_name">
@@ -209,17 +206,19 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                         </div>
                     </div>
                     <div className={styles.modalFooter}>
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        <button type="button" className="btn btn-secondary" onClick={dismiss}>
                             Cancel
                         </button>
-                        <button type="submit" className="btn btn-primary">
-                            <i className="fas fa-check"></i> Create & Open Designer
+                        <button type="submit" className="btn btn-primary" disabled={isCreating}>
+                            <i className={`fas ${isCreating ? 'fa-spinner fa-spin' : 'fa-check'}`}></i>
+                            {isCreating ? ' Creating…' : ' Create & Open Designer'}
                         </button>
                     </div>
                 </form>
+            </>)}
         </Modal>
     );
 }
 
 export default CreateTemplateModal;
-export type { DocumentType, TemplateFormData, TemplateSubmissionData, CreateTemplateModalProps };
+export type { TemplateFormData, CreateTemplateModalProps };

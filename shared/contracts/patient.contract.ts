@@ -201,6 +201,7 @@ const patientByIdRow = z.looseObject({
 
 // GET /api/patients/:personId/info — rich patient info (service-typed object).
 export const patientInfo = { response: patientInfoRow } as const;
+export type PatientInfo = z.infer<typeof patientInfoRow>;
 
 // GET /api/settings/patients-folder — { patientsFolder }.
 export const patientsFolder = {

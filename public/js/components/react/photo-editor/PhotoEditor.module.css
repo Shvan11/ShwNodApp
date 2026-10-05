@@ -42,12 +42,21 @@
 .count {
   color: var(--text-muted);
   font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* "· 2 unsaved" — the slots Save would write (each marked in its title bar too). */
+.unsavedCount {
+  color: var(--warning-700);
+  font-weight: var(--font-weight-semibold);
 }
 
 .rightTools {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  /* When the bar wraps (the Overlay controls open), stay at the end of the new row. */
+  margin-inline-start: auto;
 }
 
 /* View-only zoom cluster. Drives the --pe-zoom custom property to shrink the slot
@@ -123,6 +132,27 @@
   cursor: not-allowed;
 }
 
+/* Leave without saving — the quiet sibling of Save. */
+.cancelBtn {
+  background: var(--background-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: calc(var(--spacing-sm) - 1px) var(--spacing-lg);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: var(--background-secondary);
+}
+
+.cancelBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Original / Fast-proxy editing-quality toggle. Same chip styling as the zoom
    cluster so the topbar reads as one tool row. */
 .qualityToggle {
@@ -141,6 +171,44 @@
 
 .qualityToggle:hover {
   background: var(--background-secondary);
+}
+
+/* The Overlay tool: its toggle shares the quality toggle's chip look; the session
+   picker and strength slider appear beside it only while it is on. */
+.overlayControls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.overlayToggle {
+  composes: qualityToggle;
+}
+
+.overlayToggle[aria-pressed='true'] {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.overlayToggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.overlaySelect {
+  max-width: 13rem;
+  padding: 3px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--background-primary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.overlayRange {
+  width: 5.5rem;
+  accent-color: var(--primary-color);
+  cursor: pointer;
 }
 
 .body {

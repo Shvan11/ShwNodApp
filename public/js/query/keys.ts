@@ -52,6 +52,10 @@ export const qk = {
     galleryAll: (id: Id) => ['patient', normId(id), 'gallery'] as const,
     /** GET /api/patients/:id/gallery/:tpCode — one timepoint's gallery images. */
     gallery: (id: Id, tpCode: Id) => ['patient', normId(id), 'gallery', normId(tpCode)] as const,
+    /** GET /api/photo-editor/:id/framing/:tpCode — the framing each saved view was rendered
+     *  with. A CHILD of that session's `gallery` key: it is read out of the same renders, so
+     *  every gallery invalidation (each photo write, via `invalidatePatientPhotos`) refreshes it. */
+    framing: (id: Id, tpCode: Id) => ['patient', normId(id), 'gallery', normId(tpCode), 'framing'] as const,
     /** Prefix over every file listing for a patient (any path/flat) — broad reload. */
     filesAll: (id: Id) => ['patient', normId(id), 'files'] as const,
     /** GET /api/patients/:id/files?path=&flat= — file-explorer listing for a folder. */
@@ -62,6 +66,10 @@ export const qk = {
      *  re-tag originals, renames move the folder) refreshes it with the listings. */
     takenDates: (id: Id, folder: string, scope: 'views' | 'all') =>
       ['patient', normId(id), 'files', folder, 'taken-dates', scope] as const,
+    /** GET /api/photo-editor/:id/source-size?path= — an original's post-EXIF pixel size.
+     *  Keyed by the file's version (listing mtime), so a replaced file is a new key. */
+    sourceSize: (id: Id, relPath: string, version: string | null) =>
+      ['patient', normId(id), 'files', relPath, 'source-size', version ?? ''] as const,
     /** GET /api/patients/:id/working-files — working-files listing. */
     workingFiles: (id: Id) => ['patient', normId(id), 'working-files'] as const,
     /** GET /api/patients/:id/photos/visibility — per-photo private-flag list. */
@@ -117,6 +125,10 @@ export const qk = {
     messages: (date: string) => ['whatsapp', 'messages', date] as const,
     /** GET message-count for a date (WhatsApp send screen). */
     messageCount: (date: string) => ['whatsapp', 'message-count', date] as const,
+    /** GET /api/wa/initial-state — client ready/QR + the running batch. One read
+     *  for the status provider, the send page and the auth page; every SSE
+     *  (re)open invalidates it (audit FE-F16-16). */
+    initialState: () => ['whatsapp', 'initial-state'] as const,
   },
   templates: {
     /** Parent — invalidates the list and every single-template entry. */
@@ -127,11 +139,29 @@ export const qk = {
     documentTypes: () => ['templates', 'document-types'] as const,
   },
   aligner: {
+    /** Parent — every aligner read. Every aligner write (and the work lifecycle
+     *  writes) invalidates it via `invalidateAligner()`: the lists show a set's
+     *  lab status, unread notes and payments, so a write anywhere stales them all
+     *  (audit FE-F17-6 / FE-F18-10). */
+    all: () => ['aligner'] as const,
+    /** GET /api/aligner/sets/:workId — one work's sets (the patient's sets page). */
+    sets: (workId: Id) => ['aligner', 'sets', normId(workId)] as const,
+    /** GET /api/aligner/batches/:setId. */
+    batches: (setId: Id) => ['aligner', 'batches', normId(setId)] as const,
+    /** GET /api/aligner/notes/:setId — the lab ↔ doctor messages. */
+    notes: (setId: Id) => ['aligner', 'notes', normId(setId)] as const,
+    /** GET /api/aligner/sets/:setId/photos — the doctor's portal uploads (R2 listing). */
+    photos: (setId: Id) => ['aligner', 'photos', normId(setId)] as const,
     doctors: () => ['aligner', 'doctors'] as const,
+    /** GET /api/aligner/features — which optional integrations (Archform, portal) this install uses. */
+    features: () => ['aligner', 'features'] as const,
+    /** GET /api/aligner/labels/settings — the label sheet's next position + whether a logo can print. */
+    labelSettings: () => ['aligner', 'label-settings'] as const,
     /** GET /api/aligner-doctors — the admin doctors list (a different endpoint/shape from doctors()). */
     doctorsAdmin: () => ['aligner', 'doctors-admin'] as const,
-    /** GET /api/aligner/all-sets — all sets across doctors. */
-    allSets: () => ['aligner', 'all-sets'] as const,
+    /** GET /api/aligner/all-sets — sets across doctors; the history is opt-in (FE-F18-13). */
+    allSets: (opts: { inactive: boolean; finished: boolean }) =>
+      ['aligner', 'all-sets', opts.inactive, opts.finished] as const,
     /** GET /api/aligner/patients/all — all aligner patients. */
     allPatients: () => ['aligner', 'patients', 'all'] as const,
     /** GET /api/aligner/patients/by-doctor/:doctorId. */
@@ -172,6 +202,8 @@ export const qk = {
     googleContacts: (source: string) => ['lookups', 'google-contacts', source] as const,
     /** GET /api/settings/patients-folder — client-facing patients folder UNC path. */
     patientsFolder: () => ['lookups', 'patients-folder'] as const,
+    /** Prefix of every `employees(query)` variant — an employee write refreshes them all. */
+    employeesAll: () => ['lookups', 'employees'] as const,
     /** GET /api/employees<query> — keyed by query so param variants don't collide. */
     employees: (query = '') => ['lookups', 'employees', query] as const,
     /** GET /api/positions — employee-position options. */
@@ -208,6 +240,8 @@ export const qk = {
       ['reports', 'yearly', startMonth, startYear] as const,
     multiYear: (startYear: number, endYear: number) =>
       ['reports', 'multi-year', startYear, endYear] as const,
+    /** Prefix of every commissions range (a doctor's rate edit refreshes them all). */
+    commissionsAll: () => ['reports', 'commissions'] as const,
     /** GET /api/statistics/commissions?startDate=&endDate= — per-doctor commission. */
     commissions: (startDate: string, endDate: string) =>
       ['reports', 'commissions', startDate, endDate] as const,
@@ -254,6 +288,8 @@ export const qk = {
     all: () => ['expenses'] as const,
     list: (filters: object = {}) => ['expenses', 'list', filters] as const,
     categories: () => ['expenses', 'categories'] as const,
+    /** Prefix of every per-category subcategory list (a lookup edit refreshes them all). */
+    subcategoriesAll: () => ['expenses', 'subcategories'] as const,
     subcategories: (categoryId: Id) => ['expenses', 'subcategories', categoryId] as const,
     /** GET /api/expenses/:id — single expense (edit form; disabled until an id is set). */
     byId: (id: Id) => ['expenses', 'by-id', normId(id)] as const,

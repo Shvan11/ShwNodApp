@@ -25,6 +25,8 @@ import { useTranslation } from 'react-i18next';
 import type { QueryKey } from '@tanstack/react-query';
 import LookupContextMenu from '../components/react/LookupContextMenu';
 import LookupManagerModal from '../components/react/LookupManagerModal';
+import { useAuthUser } from '../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 
 interface UseLookupManagerOptions {
   /** Whitelist key of the lookup table to manage (e.g. 'tblLabs'). */
@@ -63,7 +65,14 @@ export function useLookupManager({
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // The lookup tables are `admin|front_desk` on the server. Clinical users reach two
+  // of these selects (work items, lab cases); for them the right-click stays the
+  // browser's own menu instead of opening a manager whose every read 403s (FE-F21-3).
+  const user = useAuthUser();
+  const canManage = roleCaps(user?.role as UserRole | undefined).manageLookups;
+
   const handleContextMenu = (event: MouseEvent): void => {
+    if (!canManage) return;
     event.preventDefault();
     setMenuPos({ x: event.clientX, y: event.clientY });
   };
@@ -87,7 +96,7 @@ export function useLookupManager({
     },
   ];
 
-  const overlay = (
+  const overlay = canManage && (
     <>
       {menuPos && (
         <LookupContextMenu

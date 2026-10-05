@@ -338,6 +338,22 @@ export async function updateTemplate(
  * this wording, and the `as Error` cast made every OTHER failure here — a pg
  * SQLSTATE from the delete — eligible to have its raw text forwarded too.
  */
+/**
+ * Does another template row point at this file? Two rows sharing one file means
+ * saving either overwrites the other's design (the old name-only file naming made
+ * that happen — audit FE-F20-2); the designer's save gives the saving template
+ * its own file when this returns true.
+ */
+export async function isTemplateFileShared(filePath: string, exceptTemplateId: number): Promise<boolean> {
+  const row = await getKysely()
+    .selectFrom('document_templates')
+    .select('template_id')
+    .where('template_file_path', '=', filePath)
+    .where('template_id', '<>', exceptTemplateId)
+    .executeTakeFirst();
+  return !!row;
+}
+
 export class SystemTemplateError extends Error {
   constructor(message = 'Cannot delete system templates') {
     super(message);

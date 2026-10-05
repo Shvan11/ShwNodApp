@@ -56,3 +56,14 @@ export function buildLabelsFromRanges(
 
     return labels;
 }
+
+/**
+ * A doctor's display name: "Dr. Name", except the lab's own `Admin` account,
+ * which is shown as is. The rule was written out by hand in six places and
+ * missing from the Archform matcher's labels and its auto-rename (FE-F18-14).
+ */
+export function doctorLabel(name: string | null | undefined): string {
+    const trimmed = (name ?? '').trim();
+    if (!trimmed) return '';
+    return trimmed === 'Admin' ? trimmed : `Dr. ${trimmed}`;
+}

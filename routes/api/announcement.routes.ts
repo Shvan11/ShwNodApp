@@ -99,7 +99,11 @@ router.put(
     try {
       const updated = await updateAnnouncement(parseInt(req.params.id, 10), toInput(req.body));
       if (!updated) {
-        ErrorResponses.notFound(res, 'Announcement not found');
+        ErrorResponses.notFound(res, 'Announcement');
+        return;
+      }
+      if (updated === 'auto') {
+        ErrorResponses.conflict(res, 'System announcements (batch manufactured / delivered) cannot be edited — delete it instead.');
         return;
       }
       sendData(res, announcementContract.updateAnnouncement.response, updated);
@@ -121,7 +125,7 @@ router.delete(
       const id = parseInt(req.params.id, 10);
       const deleted = await deleteAnnouncement(id);
       if (!deleted) {
-        ErrorResponses.notFound(res, 'Announcement not found');
+        ErrorResponses.notFound(res, 'Announcement');
         return;
       }
       sendData(res, announcementContract.deleteAnnouncement.response, { announcement_id: id });
@@ -141,7 +145,7 @@ router.get(
     try {
       const id = parseInt(req.params.id, 10);
       if (!(await getAnnouncementById(id))) {
-        ErrorResponses.notFound(res, 'Announcement not found');
+        ErrorResponses.notFound(res, 'Announcement');
         return;
       }
       const receipts = await getAnnouncementReceipts(id);

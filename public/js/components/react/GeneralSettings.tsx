@@ -1,9 +1,9 @@
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useEffect, useState, ChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
-import Modal from './Modal';
-import ModalHeader from './ModalHeader';
+import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import storage from '../../core/storage';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemePreference } from '../../core/theme';
@@ -16,7 +16,10 @@ import { allOptionsQuery, brandingQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
 import * as brandingContract from '@shared/contracts/branding.contract';
-import { WORK_CURRENCIES, DEFAULT_WORK_CURRENCY_OPTION } from '@shared/work-currency';
+import { WORK_CURRENCIES } from '@shared/work-currency';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
+import { SYSTEM_OPTIONS, findSystemOption, isManagedOption, type SystemOption } from '../../config/systemOptions';
 import styles from './SettingsSection.module.css';
 
 // Per-device appearance options, mirrored by the header toggle.
@@ -42,12 +45,6 @@ interface OptionsMap {
     [key: string]: string;
 }
 
-interface ModalState {
-    show: boolean;
-    title: string;
-    message: string;
-}
-
 interface GeneralSettingsProps {
     onChangesUpdate?: (hasChanges: boolean) => void;
 }
@@ -55,7 +52,10 @@ interface GeneralSettingsProps {
 const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const [options, setOptions] = useState<OptionsMap>({});
     const [pendingChanges, setPendingChanges] = useState<OptionsMap>({});
-    const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
+    // Saves and refreshes answer with a toast; they used to open a dialog that had to
+    // be dismissed every time (FE-F21-13).
+    const toast = useToast();
+    const confirm = useConfirm();
     const [chairIdInput, setChairIdInput] = useState<string>(storage.chairId() ?? '');
     const [chairIdSaved, setChairIdSaved] = useState<string | null>(storage.chairId());
     const { preference: themePreference, setPreference: setThemePreference } = useTheme();
@@ -63,8 +63,15 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const { arabicFont, setArabicFont } = useArabicFont();
     const { t } = useTranslation('common');
     const queryClient = useQueryClient();
+    // The clinic-wide sections (branding + system options) are admin-only on the server,
+    // and the options list is never fetched for anyone else (FE-F21-1).
+    const user = useAuthUser();
+    const canManageSettings = roleCaps(user?.role as UserRole | undefined).manageSettings;
 
-    const { data: optionsData, isLoading, isError, error: loadError, refetch } = useQuery(allOptionsQuery());
+    const { data: optionsData, isLoading, isError, error: loadError, refetch } = useQuery({
+        ...allOptionsQuery(),
+        enabled: canManageSettings,
+    });
 
     // Clinic branding (logo + display name) — header customization, shared by all
     // users. The name buffers in local state (seeded below, render-phase guard); a
@@ -102,32 +109,10 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         setOptions(optionsMap);
     }
 
-    // Surface a load failure once per error transition. setModal is called directly
-    // (the later-declared showModal would trip react-hooks/immutability).
-    const [prevIsError, setPrevIsError] = useState(isError);
-    if (isError !== prevIsError) {
-        setPrevIsError(isError);
-        if (isError) {
-            setModal({ show: true, title: 'Error', message: 'Failed to load settings: ' + httpErrorMessage(loadError, 'Unknown error') });
-        }
-    }
-
+    // Surface a load failure once per error transition.
     useEffect(() => {
-        // Notify parent component about changes
-        if (onChangesUpdate) {
-            onChangesUpdate(Object.keys(pendingChanges).length > 0);
-        }
-        // onChangesUpdate intentionally excluded — parent should provide a stable ref
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingChanges]);
-
-    const showModal = (title: string, message: string) => {
-        setModal({ show: true, title, message });
-    };
-
-    const hideModal = () => {
-        setModal({ show: false, title: '', message: '' });
-    };
+        if (isError) toast.error('Failed to load settings: ' + httpErrorMessage(loadError, 'Unknown error'));
+    }, [isError, loadError, toast]);
 
     const onLogoPick = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] ?? null;
@@ -173,9 +158,9 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             setLogoFile(null);
             setLogoPreview(null);
             setRemoveLogoFlag(false);
-            showModal('Success', 'Clinic branding updated.');
+            toast.success('Clinic branding updated.');
         } catch (error) {
-            showModal('Error', 'Failed to update branding: ' + httpErrorMessage(error, 'Unknown error'));
+            toast.error('Failed to update branding: ' + httpErrorMessage(error, 'Unknown error'));
         } finally {
             setSavingBranding(false);
         }
@@ -199,10 +184,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     };
 
     const saveAllChanges = async () => {
-        if (Object.keys(pendingChanges).length === 0) {
-            showModal('Info', 'No changes to save.');
-            return;
-        }
+        if (Object.keys(pendingChanges).length === 0) return;
 
         try {
             const optionsArray = Object.entries(pendingChanges).map(([name, value]) => ({
@@ -225,22 +207,32 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             for (const name of Object.keys(pendingChanges)) {
                 queryClient.invalidateQueries({ queryKey: qk.settings.option(name) });
             }
+            // The patient page's "open folder" reads PatientsFolder through its own feed,
+            // cached for an hour (FE-F21-11).
+            if (Object.keys(pendingChanges).some(name => name.toLowerCase() === 'patientsfolder')) {
+                queryClient.invalidateQueries({ queryKey: qk.lookups.patientsFolder() });
+            }
 
-            const message = data.failed && data.failed.length > 0
-                ? `Settings saved successfully! ${data.updated} updated, ${data.failed.length} failed: ${data.failed.join(', ')}`
-                : `All settings saved successfully! ${data.updated} options updated.`;
-
-            showModal('Success', message);
+            if (data.failed && data.failed.length > 0) {
+                toast.warning(`${data.updated} saved; ${data.failed.length} not saved: ${data.failed.join(', ')}`);
+            } else {
+                toast.success(`Settings saved (${data.updated} changed).`);
+            }
         } catch (error) {
-            console.error('Error saving settings:', error);
-            showModal('Error', 'Failed to save settings: ' + httpErrorMessage(error, 'Unknown error'));
+            toast.error('Failed to save settings: ' + httpErrorMessage(error, 'Unknown error'));
         }
     };
 
     const refreshSettings = async () => {
+        if (Object.keys(pendingChanges).length > 0 && !(await confirm(
+            'Reloading discards the changes you have not saved. Reload anyway?',
+            { title: 'Unsaved changes', confirmText: 'Discard and reload', danger: true }
+        ))) {
+            return;
+        }
         setPendingChanges({});
         await refetch();
-        showModal('Info', 'Settings refreshed successfully.');
+        toast.info('Settings reloaded.');
     };
 
     const saveChairId = () => {
@@ -248,15 +240,15 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         if (trimmed === '') {
             storage.setChairId(null);
             setChairIdSaved(null);
-            showModal('Saved', 'Chair ID cleared on this PC.');
+            toast.success('Chair ID cleared on this PC.');
             return;
         }
         if (!storage.setChairId(trimmed)) {
-            showModal('Invalid', 'Chair ID must be a whole number between 1 and 10.');
+            toast.warning('Chair ID must be a whole number between 1 and 10.');
             return;
         }
         setChairIdSaved(trimmed);
-        showModal('Saved', `This PC is now configured as Chair ${trimmed}.`);
+        toast.success(`This PC is now configured as Chair ${trimmed}.`);
     };
 
     const chairIdDirty = (chairIdInput.trim() || null) !== chairIdSaved;
@@ -264,42 +256,21 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const secondaryDisplayUrl = `${origin}/chair-display?chair=N`;
 
-    const formatSettingName = (key: string): string => {
-        // Check if the key is ALL_UPPERCASE_WITH_UNDERSCORES (database option format)
-        if (key === key.toUpperCase() && key.includes('_')) {
-            // Convert CALENDAR_EARLY_SLOTS to "Calendar Early Slots"
-            return key
-                .split('_')
-                .map(word => word.charAt(0) + word.slice(1).toLowerCase())
-                .join(' ');
-        }
-        // Handle camelCase or PascalCase with proper acronym handling
-        // "OldOPG" → "Old OPG", "myAPIKey" → "My API Key"
-        return key
-            .replace(/([a-z])([A-Z])/g, '$1 $2')           // lowercase to uppercase: "oldOPG" → "old OPG"
-            .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')     // acronym to word: "OPGNew" → "OPG New"
-            .replace(/^./, str => str.toUpperCase())       // capitalize first letter
-            .replace(/_/g, ' ')                            // replace underscores
-            .trim();
-    };
-
-    const renderSettingInput = (key: string, value: string) => {
+    const renderSettingInput = (option: SystemOption, key: string, value: string) => {
         const settingId = `setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        const isBoolean = value === 'true' || value === 'false';
-        const isNumber = !isNaN(Number(value)) && !isNaN(parseFloat(value)) && value !== '';
         const currentValue = pendingChanges[key] !== undefined ? pendingChanges[key] : value;
-        const hasChanges = pendingChanges[key] !== undefined;
+        const className = pendingChanges[key] !== undefined ? styles.pendingChange : '';
 
         // The work form's starting currency (shared/work-currency.ts). A closed list, not
         // free text: a typo here would silently mean "no default". Blank = no default —
         // staff pick the currency on every new work.
-        if (key === DEFAULT_WORK_CURRENCY_OPTION) {
+        if (option.kind === 'currency') {
             return (
                 <select
                     id={settingId}
                     value={currentValue.trim().toUpperCase()}
                     onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange(key, e.target.value)}
-                    className={hasChanges ? styles.pendingChange : ''}
+                    className={className}
                 >
                     <option value="">Not set — choose on each new work</option>
                     {WORK_CURRENCIES.map(c => (
@@ -309,51 +280,28 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             );
         }
 
-        if (isBoolean) {
-            return (
-                <select
-                    id={settingId}
-                    value={currentValue}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange(key, e.target.value)}
-                    className={hasChanges ? styles.pendingChange : ''}
-                >
-                    <option value="true">True</option>
-                    <option value="false">False</option>
-                </select>
-            );
-        } else if (isNumber) {
-            return (
-                <input
-                    type="number"
-                    id={settingId}
-                    value={currentValue}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange(key, e.target.value)}
-                    step="any"
-                    className={hasChanges ? styles.pendingChange : ''}
-                />
-            );
-        } else if (value.length > 100) {
-            return (
-                <textarea
-                    id={settingId}
-                    value={currentValue}
-                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleInputChange(key, e.target.value)}
-                    rows={3}
-                    className={hasChanges ? styles.pendingChange : ''}
-                />
-            );
-        } else {
-            return (
-                <input
-                    type="text"
-                    id={settingId}
-                    value={currentValue}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange(key, e.target.value)}
-                    className={hasChanges ? styles.pendingChange : ''}
-                />
-            );
-        }
+        return (
+            <input
+                type={option.kind === 'number' ? 'number' : 'text'}
+                id={settingId}
+                value={currentValue}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange(key, e.target.value)}
+                step={option.kind === 'number' ? 1 : undefined}
+                min={option.kind === 'number' ? 1 : undefined}
+                className={className}
+            />
+        );
     };
+
+    // System Options (owner decision, RF1): the known settings in a fixed order, each
+    // under its stored name; everything else stored is listed read-only, collapsed.
+    const knownRows = SYSTEM_OPTIONS.flatMap(option => {
+        const key = Object.keys(options).find(k => k.toLowerCase() === option.name.toLowerCase());
+        return key === undefined ? [] : [{ option, key, value: options[key] }];
+    });
+    const otherRows = Object.entries(options).filter(
+        ([key]) => !findSystemOption(key) && !isManagedOption(key)
+    );
 
     const hasChanges = Object.keys(pendingChanges).length > 0;
 
@@ -366,6 +314,14 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         brandingName !== (brandingData?.clinicName ?? '') ||
         messageName !== (brandingData?.messageName ?? '') ||
         messageNameAr !== (brandingData?.messageNameAr ?? '');
+
+    // Every unsaved edit on this tab — options, branding and the chair ID — so the
+    // Settings shell can ask before a tab switch or a navigation drops it (FE-F21-4;
+    // only the options used to be reported).
+    const tabDirty = hasChanges || brandingDirty || chairIdDirty;
+    useEffect(() => {
+        onChangesUpdate?.(tabDirty);
+    }, [tabDirty, onChangesUpdate]);
 
     return (
         <div>
@@ -517,194 +473,189 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                 </div>
             </section>
 
-            <section className={styles.subsection}>
-                <h3 className={styles.pageTitle}>
-                    <i className="fas fa-image"></i>
-                    Clinic Branding
-                </h3>
-                <p className={styles.sectionDescription}>
-                    The logo and name shown in the app header. Saved for the whole clinic (all users).
-                </p>
+            {canManageSettings && (<>
+                <section className={styles.subsection}>
+                    <h3 className={styles.pageTitle}>
+                        <i className="fas fa-image"></i>
+                        Clinic Branding
+                    </h3>
+                    <p className={styles.sectionDescription}>
+                        The logo and name shown in the app header. Saved for the whole clinic (all users).
+                    </p>
 
-                <div className={styles.settingGroup}>
-                    <label htmlFor="logo_input">Logo</label>
-                    <div className={styles.brandingLogoRow}>
-                        <div className={styles.brandingLogoPreview}>
-                            {shownLogo ? (
-                                <img src={shownLogo} alt="Clinic logo preview" />
-                            ) : (
-                                <span className={styles.brandingLogoEmpty}>
-                                    <i className="fas fa-image" aria-hidden="true" /> No logo
-                                </span>
-                            )}
+                    <div className={styles.settingGroup}>
+                        <label htmlFor="logo_input">Logo</label>
+                        <div className={styles.brandingLogoRow}>
+                            <div className={styles.brandingLogoPreview}>
+                                {shownLogo ? (
+                                    <img src={shownLogo} alt="Clinic logo preview" />
+                                ) : (
+                                    <span className={styles.brandingLogoEmpty}>
+                                        <i className="fas fa-image" aria-hidden="true" /> No logo
+                                    </span>
+                                )}
+                            </div>
+                            <div className={styles.brandingLogoActions}>
+                                <label className="btn btn-secondary">
+                                    <i className="fas fa-upload"></i>
+                                    Choose image
+                                    <input
+                                        id="logo_input"
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/webp"
+                                        onChange={onLogoPick}
+                                        hidden
+                                    />
+                                </label>
+                                {shownLogo && (
+                                    <button type="button" className="btn btn-secondary" onClick={clearLogo}>
+                                        <i className="fas fa-trash"></i>
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <div className={styles.brandingLogoActions}>
-                            <label className="btn btn-secondary">
-                                <i className="fas fa-upload"></i>
-                                Choose image
-                                <input
-                                    id="logo_input"
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp"
-                                    onChange={onLogoPick}
-                                    hidden
-                                />
-                            </label>
-                            {shownLogo && (
-                                <button type="button" className="btn btn-secondary" onClick={clearLogo}>
-                                    <i className="fas fa-trash"></i>
-                                    Remove
-                                </button>
-                            )}
+                        <div className={styles.settingDescription}>
+                            PNG, JPEG, or WebP, up to 2&nbsp;MB. Shown on the colored header — a transparent
+                            PNG works best. Replaces the clinic name when set.
                         </div>
                     </div>
-                    <div className={styles.settingDescription}>
-                        PNG, JPEG, or WebP, up to 2&nbsp;MB. Shown on the colored header — a transparent
-                        PNG works best. Replaces the clinic name when set.
-                    </div>
-                </div>
 
-                <div className={styles.settingGroup}>
-                    <label htmlFor="clinic_name_input">Clinic name</label>
-                    <input
-                        id="clinic_name_input"
-                        type="text"
-                        maxLength={80}
-                        value={brandingName}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setBrandingName(e.target.value)}
-                        placeholder="Shwan Orthodontics"
-                    />
-                    <div className={styles.settingDescription}>
-                        Shown when no logo is set, and used as the logo&apos;s text alternative.
-                    </div>
-                </div>
-
-                <div className={styles.settingGroup}>
-                    <label htmlFor="clinic_message_name_input">Clinic name in patient messages</label>
-                    <input
-                        id="clinic_message_name_input"
-                        type="text"
-                        maxLength={80}
-                        value={messageName}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setMessageName(e.target.value)}
-                        placeholder="Dr. Shwan orthodontic clinic"
-                    />
-                    <div className={styles.settingDescription}>
-                        Used inside appointment reminders sent by WhatsApp and SMS, e.g. &ldquo;Tomorrow
-                        &quot;Wednesday&quot; is your appointment with <em>this name</em> at 2:30&rdquo;.
-                        Kept separate from the header name above, which is usually shorter.
-                    </div>
-                </div>
-
-                <div className={styles.settingGroup}>
-                    <label htmlFor="clinic_message_name_ar_input">Clinic name in Arabic messages</label>
-                    <input
-                        id="clinic_message_name_ar_input"
-                        type="text"
-                        maxLength={80}
-                        dir="rtl"
-                        value={messageNameAr}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setMessageNameAr(e.target.value)}
-                        placeholder="عيادة د.شوان لتقويم الاسنان"
-                    />
-                    <div className={styles.settingDescription}>
-                        The same name for Arabic-language patients. Most patients receive the Arabic
-                        message, so this one matters most.
-                    </div>
-                </div>
-
-                <div className={styles.actions}>
-                    <button
-                        className="btn btn-primary"
-                        onClick={saveBranding}
-                        disabled={!brandingDirty || savingBranding}
-                    >
-                        <i className="fas fa-save"></i>
-                        {savingBranding ? 'Saving…' : 'Save Branding'}
-                    </button>
-                </div>
-            </section>
-
-            <section className={styles.subsection}>
-                <h3 className={styles.pageTitle}>
-                    <i className="fas fa-cog"></i>
-                    System Options
-                </h3>
-                <p className={styles.sectionDescription}>
-                    Configure general system settings and preferences
-                </p>
-
-                <div className={styles.form}>
-                    {isLoading ? (
-                        <div className={styles.loading}>
-                            <i className="fas fa-spinner fa-spin"></i>
-                            <span>Loading settings...</span>
+                    <div className={styles.settingGroup}>
+                        <label htmlFor="clinic_name_input">Clinic name</label>
+                        <input
+                            id="clinic_name_input"
+                            type="text"
+                            maxLength={80}
+                            value={brandingName}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setBrandingName(e.target.value)}
+                            placeholder="The clinic's name"
+                        />
+                        <div className={styles.settingDescription}>
+                            Shown when no logo is set, and used as the logo&apos;s text alternative.
                         </div>
-                    ) : (
-                        <div className={styles.formFields}>
-                            {Object.keys(options).length === 0 ? (
-                                <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
-                            ) : (
-                                Object.entries(options)
-                                    // Filter out settings that have their own dedicated tabs / sections.
-                                    // `gemini_*` is managed in Settings → Integrations (and the API key is
-                                    // a secret — never surface it as a plaintext field here).
-                                    .filter(([key]) => !key.startsWith('EMAIL_') && !key.startsWith('CALENDAR_') && !key.startsWith('CLINIC_') && !key.startsWith('gemini_'))
-                                    .map(([key, value]) => (
-                                    <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
-                                        <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
-                                            {formatSettingName(key)}
-                                        </label>
-                                        {renderSettingInput(key, value)}
-                                        <div className={styles.settingDescription}>Option: {key}</div>
-                                    </div>
-                                ))
-                            )}
+                    </div>
+
+                    <div className={styles.settingGroup}>
+                        <label htmlFor="clinic_message_name_input">Clinic name in patient messages</label>
+                        <input
+                            id="clinic_message_name_input"
+                            type="text"
+                            maxLength={80}
+                            value={messageName}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setMessageName(e.target.value)}
+                            placeholder="The name patients see in reminders"
+                        />
+                        <div className={styles.settingDescription}>
+                            Used inside appointment reminders sent by WhatsApp and SMS, e.g. &ldquo;Tomorrow
+                            &quot;Wednesday&quot; is your appointment with <em>this name</em> at 2:30&rdquo;.
+                            Kept separate from the header name above, which is usually shorter.
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                <div className={styles.actions}>
-                    <button
-                        className="btn btn-primary"
-                        onClick={saveAllChanges}
-                        disabled={!hasChanges}
-                    >
-                        <i className="fas fa-save"></i>
-                        {hasChanges
-                            ? `Save Changes (${Object.keys(pendingChanges).length})`
-                            : 'Save Changes'
-                        }
-                    </button>
-                    <button
-                        className="btn btn-secondary"
-                        onClick={refreshSettings}
-                    >
-                        <i className="fas fa-sync-alt"></i>
-                        Refresh Settings
-                    </button>
-                </div>
-            </section>
+                    <div className={styles.settingGroup}>
+                        <label htmlFor="clinic_message_name_ar_input">Clinic name in Arabic messages</label>
+                        <input
+                            id="clinic_message_name_ar_input"
+                            type="text"
+                            maxLength={80}
+                            dir="rtl"
+                            value={messageNameAr}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setMessageNameAr(e.target.value)}
+                            placeholder="اسم العيادة في الرسائل"
+                        />
+                        <div className={styles.settingDescription}>
+                            The same name for Arabic-language patients. Most patients receive the Arabic
+                            message, so this one matters most.
+                        </div>
+                    </div>
 
-            {/* Modal */}
-            <Modal
-                isOpen={modal.show}
-                onClose={hideModal}
-                contentClassName={styles.infoModal}
-                ariaLabelledBy="general-settings-modal-title"
-            >
-                <ModalHeader
-                    titleId="general-settings-modal-title"
-                    title={modal.title}
-                    onClose={hideModal}
-                />
-                <div className="modal-body">
-                    <p>{modal.message}</p>
-                </div>
-                <div className="modal-footer">
-                    <button className="btn btn-primary" onClick={hideModal}>OK</button>
-                </div>
-            </Modal>
+                    <div className={styles.actions}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={saveBranding}
+                            disabled={!brandingDirty || savingBranding}
+                        >
+                            <i className="fas fa-save"></i>
+                            {savingBranding ? 'Saving…' : 'Save Branding'}
+                        </button>
+                    </div>
+                </section>
+
+                <section className={styles.subsection}>
+                    <h3 className={styles.pageTitle}>
+                        <i className="fas fa-cog"></i>
+                        System Options
+                    </h3>
+                    <p className={styles.sectionDescription}>
+                        Configure general system settings and preferences
+                    </p>
+
+                    <div className={styles.form}>
+                        {isLoading ? (
+                            <div className={styles.loading}>
+                                <i className="fas fa-spinner fa-spin"></i>
+                                <span>Loading settings...</span>
+                            </div>
+                        ) : (
+                            <div className={styles.formFields}>
+                                {knownRows.length === 0 ? (
+                                    <p className={styles.noSettings}>No settings found. Please check your database configuration.</p>
+                                ) : (
+                                    knownRows.map(({ option, key, value }) => (
+                                        <div key={key} className={cn(styles.settingGroup, pendingChanges[key] !== undefined && styles.pendingChange)}>
+                                            <label htmlFor={`setting_${key.replace(/[^a-zA-Z0-9]/g, '_')}`}>
+                                                {option.label}
+                                            </label>
+                                            {renderSettingInput(option, key, value)}
+                                            <div className={styles.settingDescription}>{option.description}</div>
+                                        </div>
+                                    ))
+                                )}
+                                {otherRows.length > 0 && (
+                                    <details className={styles.otherOptions}>
+                                        <summary>Other stored values ({otherRows.length})</summary>
+                                        <p className={styles.settingDescription}>
+                                            Rows in the options table that this version of the app does not read.
+                                            Shown for reference only.
+                                        </p>
+                                        <dl className={styles.otherOptionsList}>
+                                            {otherRows.map(([key, value]) => (
+                                                <div key={key}>
+                                                    <dt>{key}</dt>
+                                                    <dd>{value === '' ? '(empty)' : value}</dd>
+                                                </div>
+                                            ))}
+                                        </dl>
+                                    </details>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className={styles.actions}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={saveAllChanges}
+                            disabled={!hasChanges}
+                        >
+                            <i className="fas fa-save"></i>
+                            {hasChanges
+                                ? `Save Changes (${Object.keys(pendingChanges).length})`
+                                : 'Save Changes'
+                            }
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={refreshSettings}
+                        >
+                            <i className="fas fa-sync-alt"></i>
+                            Refresh Settings
+                        </button>
+                    </div>
+                </section>
+            </>)}
+
         </div>
     );
 };

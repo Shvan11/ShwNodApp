@@ -4,9 +4,27 @@ import ModalHeader from './ModalHeader';
 import { copyToClipboard } from '../../core/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import { formatNumber } from '../../utils/formatters';
+import { doctorLabel } from '../../utils/aligner-labels';
 import type { AlignerDoctorMinimal, AlignerSet } from '../../pages/aligner/aligner.types';
 import { postJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
+import { invalidateAligner } from '@/query/aligner';
+
+/** The set types the form offers; a stored type outside them is kept as an extra option. */
+const SET_TYPES = ['Initial', 'Refinement', 'Revision'] as const;
+
+/** A cost as typed: digits and at most one '.' with two decimals (the column is numeric(10,2)). */
+function cleanCost(raw: string): string {
+    const kept = raw.replace(/[^\d.]/g, '');
+    const [whole, ...rest] = kept.split('.');
+    return rest.length > 0 ? `${whole}.${rest.join('').slice(0, 2)}` : whole;
+}
+
+/** "1,250.5" for display; the field shows the raw value while focused. */
+function displayCost(value: string): string {
+    if (value === '') return '';
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : value;
+}
 
 interface SetFormData {
     set_sequence: number | string;
@@ -18,7 +36,8 @@ interface SetFormData {
     set_url: string;
     set_pdf_url: string;
     set_video: string;
-    set_cost: number | string;
+    /** As typed ('' = no cost). */
+    set_cost: string;
     currency: string;
     notes: string;
     is_active: boolean;
@@ -39,6 +58,13 @@ interface SetFormDrawerProps {
     doctors?: AlignerDoctorMinimal[];
     allSets?: AlignerSet[];
     folderPath?: string | null;
+    /**
+     * `roleCaps().writeFinance`. Set prices are front-desk/admin (owner decision
+     * 2026-10-04, FE-F17-9); the server refuses the rest.
+     */
+    canPrice: boolean;
+    /** The work's currency: a price only on a USD work (FE-F17-9). */
+    workCurrency: string | null;
 }
 
 const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
@@ -49,7 +75,9 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     workId,
     doctors,
     allSets = [],
-    folderPath
+    folderPath,
+    canPrice,
+    workCurrency,
 }) => {
     const toast = useToast();
     const confirm = useConfirm();
@@ -71,7 +99,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
     // The drawer is mounted fresh each time it opens (parent renders it only while
     // open), so the initial form state IS the on-open reset — seed it lazily here
     // instead of syncing it in an effect.
-    const [formData, setFormData] = useState<SetFormData>(() => {
+    const [initialForm] = useState<SetFormData>(() => {
         if (set) {
             // Edit mode — populate from the existing set
             return {
@@ -84,7 +112,8 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                 set_url: set.set_url || '',
                 set_pdf_url: set.set_pdf_url || '',
                 set_video: set.set_video || '',
-                set_cost: set.set_cost || '',
+                // `!= null`: a 0 cost is a cost (FE-F17-8).
+                set_cost: set.set_cost != null ? String(set.set_cost) : '',
                 currency: set.currency || 'USD',
                 notes: set.notes || '',
                 is_active: set.is_active !== undefined ? set.is_active : true
@@ -110,13 +139,20 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             is_active: true
         };
     });
+    const [formData, setFormData] = useState<SetFormData>(initialForm);
 
     const [errors, setErrors] = useState<FormErrors>({});
     const [saving, setSaving] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<string>('details');
     const [pdfFile, setPdfFile] = useState<File | null>(null);
     const [deletingPdf, setDeletingPdf] = useState<boolean>(false);
-    const [displaySetCost, setDisplaySetCost] = useState(() => (set?.set_cost ? formatNumber(set.set_cost) : ''));
+    const [costFocused, setCostFocused] = useState(false);
+    // Why the price can't be edited here, or null when it can (FE-F17-9).
+    const priceLock = !canPrice
+        ? 'Only the front desk or an admin can set the price of an aligner set.'
+        : workCurrency !== 'USD'
+          ? `Aligner sets are priced in USD, but this treatment is billed in ${workCurrency ?? 'no currency'} — record the charge on the Works page.`
+          : null;
 
     // Check if an inactive set can be reactivated
     const cannotReactivate = (): boolean => {
@@ -174,6 +210,14 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
         if (!formData.set_sequence || formData.set_sequence === '') {
             newErrors.set_sequence = 'Set sequence is required';
+        } else if (
+            // The server's unique (work, set number) index answered this with a 500
+            // (FE-F17-13); it is a 409 now, and caught here before the round trip.
+            allSets.some(
+                (s) => s.aligner_set_id !== set?.aligner_set_id && String(s.set_sequence) === String(formData.set_sequence)
+            )
+        ) {
+            newErrors.set_sequence = `Set #${formData.set_sequence} already exists for this treatment`;
         }
 
         if (!formData.aligner_dr_id || formData.aligner_dr_id === '' || isNaN(parseInt(String(formData.aligner_dr_id), 10))) {
@@ -191,21 +235,36 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
             return;
         }
 
+        // An empty cost box is "no cost" (null) — it used to save 0 (FE-F17-8).
+        const costValue = formData.set_cost === '' ? null : Number(formData.set_cost);
+        let dataToSend: Record<string, unknown>;
+        if (set) {
+            // An edit sends only what changed. The form is seeded from the page's read,
+            // so sending the whole row would revert whatever changed since (the
+            // inline-edit half of FE-F17-1, and RB4's note on the work form).
+            dataToSend = {};
+            for (const key of Object.keys(formData) as (keyof SetFormData)[]) {
+                if (String(formData[key]) !== String(initialForm[key])) {
+                    dataToSend[key] = key === 'set_cost' ? costValue : formData[key];
+                }
+            }
+            if (Object.keys(dataToSend).length === 0 && !pdfFile) {
+                toast.info('Nothing changed');
+                onClose();
+                return;
+            }
+        } else {
+            dataToSend = { ...formData, set_cost: costValue, work_id: workId };
+        }
+
         setSaving(true);
 
         try {
-            const dataToSend = {
-                ...formData,
-                work_id: workId
-            };
-
-            const url = set
-                ? `/api/aligner/sets/${set.aligner_set_id}`
-                : '/api/aligner/sets';
-
             const result = set
-                ? await putJSON<{ setId?: number }>(url, dataToSend)
-                : await postJSON<{ setId?: number }>(url, dataToSend);
+                ? Object.keys(dataToSend).length > 0
+                    ? await putJSON<{ setId?: number }>(`/api/aligner/sets/${set.aligner_set_id}`, dataToSend)
+                    : {}
+                : await postJSON<{ setId?: number }>('/api/aligner/sets', dataToSend);
 
             // If there's a PDF file to upload, do it after saving (success — a
             // non-2xx would have thrown).
@@ -268,9 +327,11 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
             await deleteJSON(`/api/aligner/sets/${set.aligner_set_id}/pdf`);
 
-            // Update form data to reflect deletion
+            // The deletion is immediate (not on Save), so the card's View PDF must
+            // follow now — Cancel used to leave it on the deleted file (FE-F17-13).
             setFormData(prev => ({ ...prev, set_pdf_url: '' }));
             toast.success('PDF deleted successfully');
+            void invalidateAligner();
         } catch (error) {
             console.error('Error deleting PDF:', error);
             toast.error(httpErrorMessage(error, 'Failed to delete PDF'));
@@ -455,9 +516,14 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             onChange={handleChange}
                                         >
                                             <option value="">Select Type</option>
-                                            <option value="Initial">Initial</option>
-                                            <option value="Refinement">Refinement</option>
-                                            <option value="Revision">Revision</option>
+                                            {SET_TYPES.map((t) => (
+                                                <option key={t} value={t}>{t}</option>
+                                            ))}
+                                            {/* A stored type outside the list (live: 'Correction')
+                                                showed as "Select Type" (FE-F17-13). */}
+                                            {formData.type && !(SET_TYPES as readonly string[]).includes(formData.type) && (
+                                                <option value={formData.type}>{formData.type}</option>
+                                            )}
                                         </select>
                                     </div>
 
@@ -487,7 +553,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                             <option value="">Select Doctor</option>
                                             {doctors && doctors.map(doctor => (
                                                 <option key={doctor.dr_id} value={doctor.dr_id}>
-                                                    {doctor.doctor_name === 'Admin' ? doctor.doctor_name : `Dr. ${doctor.doctor_name}`}
+                                                    {doctorLabel(doctor.doctor_name)}
                                                 </option>
                                             ))}
                                         </select>
@@ -611,21 +677,24 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
 
                                 <div className="form-column">
                                     <div className="form-field">
-                                        <label htmlFor="SetCost">Set Cost</label>
+                                        <label htmlFor="SetCost">Set Cost (USD)</label>
                                         <input
                                             type="text"
+                                            inputMode="decimal"
                                             id="SetCost"
                                             name="set_cost"
-                                            value={displaySetCost}
-                                            onChange={(e) => {
-                                                const digits = e.target.value.replace(/[^\d]/g, '');
-                                                const num = parseInt(digits, 10) || 0;
-                                                setDisplaySetCost(num ? num.toLocaleString('en-US') : '');
-                                                setFormData(prev => ({ ...prev, set_cost: num }));
-                                            }}
-                                            onBlur={() => setDisplaySetCost(formData.set_cost ? formatNumber(formData.set_cost) : '')}
-                                            placeholder="Enter cost"
+                                            value={costFocused ? formData.set_cost : displayCost(formData.set_cost)}
+                                            onFocus={() => setCostFocused(true)}
+                                            onBlur={() => setCostFocused(false)}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, set_cost: cleanCost(e.target.value) }))}
+                                            placeholder={priceLock ? 'Not set' : 'Enter cost'}
+                                            disabled={!!priceLock}
+                                            title={priceLock ?? undefined}
+                                            aria-describedby={priceLock ? 'SetCostLock' : undefined}
                                         />
+                                        {priceLock && (
+                                            <small id="SetCostLock" className="pdf-upload-info">{priceLock}</small>
+                                        )}
                                     </div>
 
                                     {/* Aligner sets are USD-only (the lab bills external

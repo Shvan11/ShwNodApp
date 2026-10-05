@@ -1,7 +1,7 @@
 /**
  * useBatchDrawer - Hook for managing BatchFormDrawer state
  */
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import type {
     AlignerBatch,
     AlignerSetForBatch,
@@ -14,31 +14,30 @@ export function useBatchDrawer({ onRefresh }: UseBatchDrawerProps): UseBatchDraw
     const [editingBatch, setEditingBatch] = useState<AlignerBatch | null>(null);
     const [currentSetForBatch, setCurrentSetForBatch] = useState<AlignerSetForBatch | null>(null);
 
-    const openAddBatchDrawer = useCallback((set: AlignerSetForBatch): void => {
+    const openAddBatchDrawer = (set: AlignerSetForBatch): void => {
         setCurrentSetForBatch(set);
         setEditingBatch(null);
         setShowBatchDrawer(true);
-    }, []);
+    };
 
-    const openEditBatchDrawer = useCallback((batch: AlignerBatch, set: AlignerSetForBatch): void => {
+    const openEditBatchDrawer = (batch: AlignerBatch, set: AlignerSetForBatch): void => {
         setCurrentSetForBatch(set);
         setEditingBatch(batch);
         setShowBatchDrawer(true);
-    }, []);
+    };
 
-    const closeBatchDrawer = useCallback((): void => {
+    const closeBatchDrawer = (): void => {
         setShowBatchDrawer(false);
         setEditingBatch(null);
         setCurrentSetForBatch(null);
-    }, []);
+    };
 
-    const handleBatchSaved = useCallback(async (): Promise<void> => {
+    /** A save (create/update) is done: close, and refresh what it changed. */
+    const handleBatchSaved = async (): Promise<void> => {
         const setId = currentSetForBatch?.aligner_set_id;
-        setShowBatchDrawer(false);
-        setEditingBatch(null);
-        setCurrentSetForBatch(null);
+        closeBatchDrawer();
         if (setId) await onRefresh(setId);
-    }, [currentSetForBatch, onRefresh]);
+    };
 
     return {
         showBatchDrawer,

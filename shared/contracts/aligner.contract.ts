@@ -3,10 +3,10 @@
  * 24 `validate()` sites). Imported by BOTH the Express routes (relative `.js`)
  * and the React app (`@shared` alias). One exported `const <action> = { body?,
  * params?, response } as const` per endpoint (+ standalone param schemas shared
- * across many endpoints); types via `z.infer`. See docs/shared-contract-progress.md
- * + the plan.
+ * across many endpoints); types via `z.infer`. (The rollout tracker this header
+ * used to cite is retired; `npm run gate` enforces the contract rules now.)
  *
- * Phase-5 scope decisions (see the dated Findings in the progress tracker):
+ * Phase-5 scope decisions:
  *
  *  - **`aligner.types.ts` is FOLDED into this contract** (the plan's named Phase-5
  *    goal). The canonical API-response ROW shapes (`AlignerDoctor`, `AlignerSet`,
@@ -261,6 +261,7 @@ export const alignerSetForMatchRow = z.looseObject({
   last_name: z.string().nullable(),
   set_sequence: z.number().nullable(),
   doctor_name: z.string(),
+  work_closed: z.boolean(),
 });
 export type AlignerSetForMatch = z.infer<typeof alignerSetForMatchRow>;
 
@@ -307,6 +308,8 @@ export const alignerPatientRow = z.looseObject({
   TotalSets: z.number().optional(),
   ActiveSets: z.number().optional(),
   UnreadDoctorNotes: z.number().optional(),
+  /** The first session's Smile thumbnail by its real file name, or null (the lists only). FE-F18-8. */
+  smile_file: z.string().nullable().optional(),
 });
 export type AlignerPatient = z.infer<typeof alignerPatientRow>;
 
@@ -322,10 +325,20 @@ export const alignerDoctors = {
 } as const;
 
 // GET /api/aligner/all-sets — v_allsets view rows (allSetsRow, not alignerSetRow).
-// No count fields: the client derives every count from `sets` itself.
+// By default only ACTIVE sets of OPEN works; `inactive=1` / `finished=1` opt into
+// the history (FE-F18-13: every set ever made was downloaded and filtered in the
+// browser). `hidden` counts what the default left out, for the two toggles.
 export const allSets = {
-  response: z.object({ sets: z.array(allSetsRow) }),
+  query: z.object({
+    inactive: z.enum(['0', '1']).optional(),
+    finished: z.enum(['0', '1']).optional(),
+  }),
+  response: z.object({
+    sets: z.array(allSetsRow),
+    hidden: z.object({ inactive: z.number(), finished: z.number() }),
+  }),
 } as const;
+export type AllSetsQuery = z.infer<typeof allSets.query>;
 
 // GET /api/aligner/patients/all — all aligner patients (all doctors).
 export const allPatients = {
@@ -378,12 +391,29 @@ export const archformPatients = {
   response: z.object({ patients: z.array(archformPatientRow), count: z.number() }),
 } as const;
 
-// GET /api/aligner/archform/status — { available, path, error? }.
+// GET /api/aligner/archform/status — { available, configured, path, error? }.
+// `configured` false = this install has no ARCHFORM_DB_PATH (FE-F18-4).
 export const archformStatus = {
-  response: z.object({ available: z.boolean(), path: z.string(), error: z.string().optional() }),
+  response: z.object({
+    available: z.boolean(),
+    configured: z.boolean(),
+    path: z.string(),
+    error: z.string().optional(),
+  }),
 } as const;
 
-// GET /api/aligner/archform/matches — sets carrying archform_id, for the match UI.
+// GET /api/aligner/features — which optional integrations this install uses, so the
+// aligner screens offer only those (owner decision 2026-10-04, FE-F18-4 / FE-F18-12):
+// `archform` = an ARCHFORM_DB_PATH is set; `portal` = a doctor-portal mirror
+// (SUPABASE_FAILOVER_DB_URL) is configured — without one, announcements and portal
+// access mean nothing.
+export const alignerFeatures = {
+  response: z.object({ archform: z.boolean(), portal: z.boolean() }),
+} as const;
+export type AlignerFeatures = z.infer<typeof alignerFeatures.response>;
+
+// GET /api/aligner/archform/matches — every aligner set (linked or not) with its
+// patient, for the match UI's dropdowns and its "linked" map.
 export const archformMatches = {
   response: z.object({ sets: z.array(alignerSetForMatchRow), count: z.number() }),
 } as const;
@@ -493,7 +523,16 @@ export const createNote = {
 } as const;
 export type CreateNoteBody = z.infer<typeof createNote.body>;
 
-// PATCH /api/aligner/notes/:noteId/toggle-read — sendSuccess(null).
+// PATCH /api/aligner/notes/read — SET the read state of the listed notes. It
+// replaced `/notes/:noteId/toggle-read`: a toggle flipped a note back to unread
+// whenever two tabs (or a double render) opened the same set (FE-F17-12). The
+// page marks a doctor's notes read when they are actually on screen, and the
+// checkbox sends the state it wants.
+export const markNotesRead = {
+  body: z.object({ noteIds: z.array(intId).min(1).max(500), isRead: z.boolean() }),
+  response: z.object({ updated: z.number() }),
+} as const;
+export type MarkNotesReadBody = z.infer<typeof markNotesRead.body>;
 
 // PATCH /api/aligner/notes/:noteId — fully enumerated → SSoT. { note_text }.
 export const updateNote = {
@@ -536,35 +575,38 @@ export const createBatch = {
   }),
 } as const;
 export type CreateBatchBody = z.infer<typeof createBatch.body>;
+export type CreateBatchResponse = z.infer<typeof createBatch.response>;
 
 // PUT /api/aligner/batches/:batchId — fully enumerated (mirrors BatchUpdateData).
-// Response is the handler's `Record<string, unknown>` (optional `deactivatedBatch`)
-// → open `looseObject({})` so the Record arg assigns and nothing is stripped.
 // Same server-derived fields as createBatch are absent here (see above) —
 // `updateBatch` recomputes sequences via resequenceSet and never reads them.
 //
-// This is a FULL REPLACE, not a partial patch: updateBatch writes every editable
-// column unconditionally, so an omitted count persists as 0 and an omitted
-// days/notes as NULL. `aligner_set_id` is therefore REQUIRED — it was `optInt`,
-// but the query layer rejects any value that differs from the stored one, and an
-// omitted field reads as `undefined`, so a genuinely partial PUT always 400'd with
-// a confusing "Cannot change aligner_set_id". It identifies the owning set (the
-// batch cannot be moved between sets); it is not an editable field.
+// A PARTIAL update: an omitted field is left as stored (FE-F17-1). It was a full
+// replace that the drawer seeded from the page's cached batch list, so an edit
+// made from a page loaded before the doctor changed `days` in the portal wrote the
+// old days back, logged a "days changed" flag and forward-synced the revert. The
+// drawer now sends only what the user changed. `days: null` clears the column
+// (clearableInt keeps a null distinct from an omission). `aligner_set_id` is
+// optional; when present it must equal the stored set — a batch cannot move.
+// Response: `deactivatedBatch` when activating this batch turned another one off.
 export const updateBatch = {
   body: z.object({
-    aligner_set_id: intId,
+    aligner_set_id: optInt,
     is_active: z.boolean().optional(),
     notes: z.string().optional(),
     upper_aligner_count: optInt,
     lower_aligner_count: optInt,
-    days: optInt,
+    days: clearableInt,
     is_last: z.boolean().optional(),
     has_upper_template: z.boolean().optional(),
     has_lower_template: z.boolean().optional(),
   }),
-  response: z.looseObject({}),
+  response: z.object({
+    deactivatedBatch: z.object({ batchId: z.number(), batchSequence: z.number() }).optional(),
+  }),
 } as const;
 export type UpdateBatchBody = z.infer<typeof updateBatch.body>;
+export type UpdateBatchResponse = z.infer<typeof updateBatch.response>;
 
 // Shared OPTIONAL targetDate body for manufacture/deliver (backdating). The
 // handlers read only `targetDate` → SSoT (strict; nothing else is read).
@@ -582,6 +624,8 @@ export const manufactureBatch = {
   }),
 } as const;
 
+export type ManufactureBatchResponse = z.infer<typeof manufactureBatch.response>;
+
 // PATCH /api/aligner/batches/:batchId/deliver.
 export const deliverBatch = {
   body: targetDateBody,
@@ -595,6 +639,7 @@ export const deliverBatch = {
     previouslyActiveBatchSequence: z.number().nullable(),
   }),
 } as const;
+export type DeliverBatchResponse = z.infer<typeof deliverBatch.response>;
 
 // Shared { batchId, batchSequence } result of the undo endpoints.
 const batchSeqResult = z.object({ batchId: z.number(), batchSequence: z.number() });
@@ -658,6 +703,20 @@ export const generateLabels = {
   }),
 } as const;
 export type GenerateLabelsBody = z.infer<typeof generateLabels.body>;
+
+// GET /api/aligner/labels/settings — what the label dialog opens with:
+// `nextPosition` is where the last print ended on the OL291 sheet (1–12; stored
+// after every generated PDF, so a part-used sheet is resumed instead of printed
+// over — FE-F20-5); `logo` says whether the clinic logo can go on the labels (one
+// is uploaded in Settings → General and is a PNG or JPEG, the formats PDFKit
+// draws — FE-F20-3).
+export const labelSettings = {
+  response: z.object({
+    nextPosition: z.number().int().min(1).max(12),
+    logo: z.boolean(),
+  }),
+} as const;
+export type LabelSettings = z.infer<typeof labelSettings.response>;
 
 // ===========================================================================
 // DOCTORS — CRUD

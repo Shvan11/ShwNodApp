@@ -17,7 +17,7 @@
  * save (`current*`) and after it (`next*`).
  */
 
-export type LastFlagPrompt = 'offer' | 'confirm' | null;
+type LastFlagPrompt = 'offer' | 'confirm' | null;
 
 export interface LastFlagInput {
     /** The form's "Last Batch" checkbox. */

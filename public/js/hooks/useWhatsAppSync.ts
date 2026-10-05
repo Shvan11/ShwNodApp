@@ -1,24 +1,28 @@
 /**
  * Custom hook for WhatsApp send-page state (replaces the WS waStatus channel).
- * Subscribes to the shared SSE singleton and primes initial state via REST.
+ * Subscribes to the shared SSE singleton; the initial state comes from the shared
+ * `whatsappInitialStateQuery` (the status provider reads the same one).
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchJSON } from '@/core/http';
-import * as whatsappContract from '@shared/contracts/whatsapp.contract';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { batchProgress, type BatchProgress } from '@shared/contracts/whatsapp.contract';
+import { whatsappInitialStateQuery } from '@/query/queries';
 import { useWhatsAppStatus } from '../contexts/GlobalStateContext';
 import { UI_STATES, type UIState } from '../utils/whatsapp-send-constants';
 import sseWhatsapp from '../services/sse-whatsapp';
 
-/**
- * Sending progress data
- */
-export interface SendingProgress {
-  started: boolean;
-  finished: boolean;
-  total: number;
-  sent: number;
-  failed: number;
-}
+/** The reminder batch's progress, as the server reports it (frames + initial-state). */
+export type SendingProgress = BatchProgress;
+
+export const IDLE_PROGRESS: SendingProgress = {
+  started: false,
+  finished: false,
+  total: 0,
+  sent: 0,
+  failed: 0,
+  date: null,
+  error: null,
+};
 
 /**
  * Message status update data from the WhatsApp channel
@@ -28,16 +32,6 @@ export interface MessageStatusUpdateData {
   patientId?: number;
   status?: number;
   messageId?: string;
-  [key: string]: unknown;
-}
-
-/**
- * Initial state response from server
- */
-interface InitialStateResponse {
-  clientReady?: boolean;
-  sendingProgress?: SendingProgress;
-  qr?: string;
   [key: string]: unknown;
 }
 
@@ -60,7 +54,17 @@ export interface UseWhatsAppSyncReturn {
   sendingProgress: SendingProgress;
   messageStatusUpdate: MessageStatusUpdateData | null;
   unconfirmedSend: UnconfirmedSendData | null;
-  requestInitialState: () => void;
+}
+
+/** A frame the batch's progress can be read from, or null if it isn't one. */
+function parseProgress(data: unknown): SendingProgress | null {
+  const parsed = batchProgress.safeParse(data);
+  if (!parsed.success) {
+    console.error('[useWhatsAppSync] unreadable batch progress frame', parsed.error);
+    return null;
+  }
+  const { active: _active, ...progress } = parsed.data;
+  return progress;
 }
 
 export function useWhatsAppSync(): UseWhatsAppSyncReturn {
@@ -70,97 +74,49 @@ export function useWhatsAppSync(): UseWhatsAppSyncReturn {
   // so this is the true first-paint state (and keeps that setState out of the
   // effect body — react-hooks/set-state-in-effect).
   const [connectionStatus, setConnectionStatus] = useState<UIState>(UI_STATES.CONNECTING);
-  const [sendingProgress, setSendingProgress] = useState<SendingProgress>({
-    started: false,
-    finished: false,
-    total: 0,
-    sent: 0,
-    failed: 0,
-  });
+  const [sendingProgress, setSendingProgress] = useState<SendingProgress>(IDLE_PROGRESS);
   const [messageStatusUpdate, setMessageStatusUpdate] = useState<MessageStatusUpdateData | null>(
     null
   );
   const [unconfirmedSend, setUnconfirmedSend] = useState<UnconfirmedSendData | null>(null);
 
-  // Single-flight guard for the initial-state read (true while one is in flight).
-  const inFlightRef = useRef(false);
-
-  const applyInitialState = useCallback((data: InitialStateResponse | null) => {
-    if (!data) return;
-    if (data.sendingProgress && data.sendingProgress.started && !data.sendingProgress.finished) {
-      setSendingProgress(data.sendingProgress);
-    } else if (data.sendingProgress && data.sendingProgress.finished) {
-      setSendingProgress({
-        started: false,
-        finished: false,
-        total: 0,
-        sent: 0,
-        failed: 0,
-      });
+  // Join a batch that is already running — this tab was reloaded, opened second,
+  // or came back to /send mid-batch (FE-F16-2: the server never sent this, so the
+  // page sat on "ready" over a running batch and offered Start again). Applied
+  // once per successful read; a batch that ended while the stream was down lands
+  // as its finished state, so the page doesn't sit on "Sending 7/22".
+  const { data: snapshot, dataUpdatedAt } = useQuery(whatsappInitialStateQuery());
+  const [appliedAt, setAppliedAt] = useState(0);
+  if (snapshot && dataUpdatedAt !== appliedAt) {
+    setAppliedAt(dataUpdatedAt);
+    const server = snapshot.sendingProgress;
+    if (server?.active) {
+      const { active: _active, ...progress } = server;
+      setSendingProgress(progress);
+    } else if (server && sendingProgress.started && !sendingProgress.finished && server.finished) {
+      const { active: _active, ...progress } = server;
+      setSendingProgress(progress);
     }
-  }, []);
-
-  // Fetch initial state via REST (replaces the WS RPC). `/api/wa/initial-state`
-  // takes no date — it reads only the session and the server's message state —
-  // so the only dedupe is single-flight: a call while one is in flight is
-  // dropped (the connect + mount triggers land together), and every later call
-  // refetches. It used to dedupe BY DATE, which made an explicit refresh after a
-  // finished send a permanent no-op until the date changed (audit FE-F3-11).
-  const requestInitialState = useCallback(() => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-
-    fetchJSON<InitialStateResponse>('/api/wa/initial-state', { schema: whatsappContract.initialState.response })
-      .then(applyInitialState)
-      .catch((err) => {
-        console.error('[useWhatsAppSync] initial-state fetch failed', err);
-      })
-      .finally(() => {
-        inFlightRef.current = false;
-      });
-  }, [applyInitialState]);
+  }
 
   // Subscribe to SSE lifecycle + event payloads on mount.
   useEffect(() => {
     const handleConnecting = () => setConnectionStatus(UI_STATES.CONNECTING);
-    const handleConnected = () => {
-      setConnectionStatus(UI_STATES.CONNECTED);
-      requestInitialState();
-    };
-    const handleDisconnected = () => setConnectionStatus(UI_STATES.DISCONNECTED);
+    const handleConnected = () => setConnectionStatus(UI_STATES.CONNECTED);
+    // A dropped stream is `reconnecting` (the channel is retrying); `disconnected`
+    // is only ever the last consumer letting go, which this page never sees while
+    // it holds the channel (FE-F16-12).
+    const handleReconnecting = () => setConnectionStatus(UI_STATES.DISCONNECTED);
     const handleError = () => setConnectionStatus(UI_STATES.ERROR);
-    const handleReconnected = () => requestInitialState();
 
     const handleMessageStatus = (data: unknown) => {
       setMessageStatusUpdate(data as MessageStatusUpdateData);
     };
 
-    const handleSendingStarted = (data: unknown) => {
-      const typed = data as Partial<SendingProgress>;
-      setSendingProgress({
-        started: true,
-        finished: false,
-        total: typed.total || 0,
-        sent: typed.sent || 0,
-        failed: typed.failed || 0,
-      });
-    };
-
-    const handleSendingProgress = (data: unknown) => {
-      const typed = data as Partial<SendingProgress>;
-      setSendingProgress((prev) => ({
-        ...prev,
-        sent: typed.sent || 0,
-        failed: typed.failed || 0,
-        finished: typed.finished || false,
-      }));
-    };
-
-    const handleSendingFinished = () => {
-      setSendingProgress((prev) => ({
-        ...prev,
-        finished: true,
-      }));
+    // All three frames carry the whole batch's progress, so each one replaces it.
+    const handleProgressFrame = (data: unknown) => {
+      const progress = parseProgress(data);
+      if (progress) setSendingProgress(progress);
     };
 
     const handleSendUnconfirmed = (data: unknown) => {
@@ -169,21 +125,17 @@ export function useWhatsAppSync(): UseWhatsAppSyncReturn {
 
     sseWhatsapp.on('connecting', handleConnecting);
     sseWhatsapp.on('connected', handleConnected);
-    sseWhatsapp.on('disconnected', handleDisconnected);
+    sseWhatsapp.on('reconnecting', handleReconnecting);
     sseWhatsapp.on('error', handleError);
-    sseWhatsapp.on('reconnected', handleReconnected);
     sseWhatsapp.on('whatsapp_message_status', handleMessageStatus);
-    sseWhatsapp.on('whatsapp_sending_started', handleSendingStarted);
-    sseWhatsapp.on('whatsapp_sending_progress', handleSendingProgress);
-    sseWhatsapp.on('whatsapp_sending_finished', handleSendingFinished);
+    sseWhatsapp.on('whatsapp_sending_started', handleProgressFrame);
+    sseWhatsapp.on('whatsapp_sending_progress', handleProgressFrame);
+    sseWhatsapp.on('whatsapp_sending_finished', handleProgressFrame);
     sseWhatsapp.on('whatsapp_send_unconfirmed', handleSendUnconfirmed);
 
     sseWhatsapp
       .ensureConnected()
-      .then(() => {
-        setConnectionStatus(UI_STATES.CONNECTED);
-        requestInitialState();
-      })
+      .then(() => setConnectionStatus(UI_STATES.CONNECTED))
       .catch((err) => {
         console.error('[useWhatsAppSync] Failed to open SSE:', err);
         setConnectionStatus(UI_STATES.ERROR);
@@ -192,17 +144,16 @@ export function useWhatsAppSync(): UseWhatsAppSyncReturn {
     return () => {
       sseWhatsapp.off('connecting', handleConnecting);
       sseWhatsapp.off('connected', handleConnected);
-      sseWhatsapp.off('disconnected', handleDisconnected);
+      sseWhatsapp.off('reconnecting', handleReconnecting);
       sseWhatsapp.off('error', handleError);
-      sseWhatsapp.off('reconnected', handleReconnected);
       sseWhatsapp.off('whatsapp_message_status', handleMessageStatus);
-      sseWhatsapp.off('whatsapp_sending_started', handleSendingStarted);
-      sseWhatsapp.off('whatsapp_sending_progress', handleSendingProgress);
-      sseWhatsapp.off('whatsapp_sending_finished', handleSendingFinished);
+      sseWhatsapp.off('whatsapp_sending_started', handleProgressFrame);
+      sseWhatsapp.off('whatsapp_sending_progress', handleProgressFrame);
+      sseWhatsapp.off('whatsapp_sending_finished', handleProgressFrame);
       sseWhatsapp.off('whatsapp_send_unconfirmed', handleSendUnconfirmed);
       sseWhatsapp.release();
     };
-  }, [requestInitialState]);
+  }, []);
 
   return {
     connectionStatus,
@@ -210,6 +161,5 @@ export function useWhatsAppSync(): UseWhatsAppSyncReturn {
     sendingProgress,
     messageStatusUpdate,
     unconfirmedSend,
-    requestInitialState,
   };
 }

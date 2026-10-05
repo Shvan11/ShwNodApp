@@ -7,14 +7,10 @@
 // DOCTOR TYPES
 // =============================================================================
 
-// Canonical API-boundary row types now live in the shared contract (the Phase-5
-// "fold aligner.types.ts" goal). The contract's Zod row schemas (`alignerDoctorRow`,
-// `alignerSetRow`, …) mirror these shapes EXACTLY via `z.infer`; the UI-only types
-// below (aliases, form data, hook returns) stay inline — UI state, not an API
-// boundary. We `import` them into local scope (the `WithAliases`/`Pick<>` helpers
-// below reference them) AND re-export so existing `from '.../aligner.types'`
-// imports keep resolving unchanged. See shared/contracts/aligner.contract.ts +
-// docs/shared-contract-progress.md.
+// Canonical API-boundary row types live in the shared contract. The contract's Zod
+// row schemas (`alignerDoctorRow`, `alignerSetRow`, …) define them via `z.infer`;
+// the UI-only types below (form data, hook returns) stay inline — UI state, not an
+// API boundary. They are re-exported so `from '.../aligner.types'` imports resolve.
 import type {
     AlignerDoctor,
     AlignerSet,
@@ -34,16 +30,6 @@ export type {
     AlignerSetForMatch,
     AlignerPhoto,
 };
-
-/**
- * Extended AlignerDoctor with UI-friendly aliases
- * Used in components that need both database fields and UI properties
- */
-export interface AlignerDoctorWithAliases extends AlignerDoctor {
-    id: number;      // Alias for dr_id
-    name: string;    // Alias for doctor_name
-    logoPath?: string | null;  // camelCase alias for logo_path
-}
 
 /**
  * Minimal doctor type for select dropdowns
@@ -68,10 +54,6 @@ export type AlignerSetForBatch = Pick<AlignerSet,
     | 'AlignerDoctorName'
     | 'is_active'
 >;
-
-// =============================================================================
-// NOTE TYPES
-// =============================================================================
 
 // =============================================================================
 // HOOK RETURN TYPES
@@ -114,18 +96,11 @@ export interface UseSetDrawerReturn {
     handleSetSaved: () => void;
 }
 
-// =============================================================================
-// ARCHFORM MATCHING TYPES
-// =============================================================================
-
-// =============================================================================
-// HOOK RETURN TYPES (continued)
-// =============================================================================
-
 /**
  * Props for useBatchDrawer hook
  */
 export interface UseBatchDrawerProps {
+    /** After a save: refresh what it changed (the page invalidates the aligner reads). */
     onRefresh: (setId: number) => Promise<void>;
 }
 

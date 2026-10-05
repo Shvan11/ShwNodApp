@@ -37,9 +37,10 @@ export default function CategoryManagerModal({ isOpen, onClose }: CategoryManage
     const name = newName.trim();
     if (!name) return;
     try {
-      await createCategory(name);
+      const { reactivated } = await createCategory(name);
       setNewName('');
-      toast.success(`Added "${name}"`);
+      // A deactivated category's name brings that category back (FE-F19-8).
+      toast.success(reactivated ? `Reactivated "${name}"` : `Added "${name}"`);
     } catch (err) {
       toast.error(httpErrorMessage(err, 'Failed to add category'));
     }

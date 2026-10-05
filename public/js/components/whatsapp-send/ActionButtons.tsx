@@ -5,7 +5,7 @@
 
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { DateSendability } from '../../hooks/useDateManager';
-import type { SendingProgress } from './ProgressBar';
+import type { SendingProgress } from '../../hooks/useWhatsAppSync';
 import styles from '../../routes/WhatsAppSend.module.css';
 
 interface ActionButtonsProps {
@@ -14,6 +14,11 @@ interface ActionButtonsProps {
   sendingInProgress: boolean;
   sendingProgress: SendingProgress;
   sendability: DateSendability;
+  /**
+   * The day's eligible count is known to be 0. Start used to stay enabled, toast
+   * "Messages sending started", and nothing followed (FE-F16-11).
+   */
+  nothingToSend: boolean;
 }
 
 export default function ActionButtons({
@@ -22,6 +27,7 @@ export default function ActionButtons({
   sendingInProgress,
   sendingProgress,
   sendability,
+  nothingToSend,
 }: ActionButtonsProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,15 +43,18 @@ export default function ActionButtons({
 
   const getButtonText = (): string => {
     if (sendingInProgress) {
-      return `Sending ${sendingProgress.sent}/${sendingProgress.total}`;
+      return `Sending ${sendingProgress.sent + sendingProgress.failed}/${sendingProgress.total}`;
     }
     if (!sendability.isSendable) {
       return 'Cannot Send - Date Out of Range';
     }
+    if (nothingToSend) {
+      return 'No Messages to Send';
+    }
     return 'Start Sending Messages';
   };
 
-  const isSendDisabled = sendingInProgress || !sendability.isSendable;
+  const isSendDisabled = sendingInProgress || !sendability.isSendable || nothingToSend;
 
   return (
     <div className={styles.actionSection}>

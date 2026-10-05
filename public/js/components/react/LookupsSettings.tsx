@@ -7,6 +7,7 @@ import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
 import PatientTypesReadOnly from './PatientTypesReadOnly';
+import type { LookupTableInfo } from '@shared/contracts/lookup-admin.contract';
 
 // The accordion shell is this tab's own module; the global sheet stays imported
 // for the editor internals it shares with LookupEditor/HolidayEditor/etc.
@@ -23,29 +24,7 @@ const COST_PRESETS_TABLE_KEY = 'tblEstimatedCostPresets';
 // the /api/patient-types feed, not the generic lookup CRUD.
 const PATIENT_TYPES_TABLE_KEY = 'patientTypesReadOnly';
 
-// Types
-interface ReferenceConfig {
-    table: string;
-    idColumn: string;
-    displayColumn: string;
-}
-
-interface ColumnConfig {
-    name: string;
-    label: string;
-    type: string;
-    required?: boolean;
-    maxLength?: number;
-    reference?: ReferenceConfig;
-}
-
-interface TableConfig {
-    key: string;
-    displayName: string;
-    icon: string;
-    columns: ColumnConfig[];
-    idColumn: string;
-}
+type TableConfig = LookupTableInfo;
 
 interface TableGroup {
     name: string;
@@ -77,6 +56,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         icon: 'fas fa-dollar-sign',
         idColumn: 'PresetID',
         columns: [],
+        protectedIds: [],
     };
     // Append the synthetic READ-ONLY patient-types entry (derived-not-editable).
     const patientTypesEntry: TableConfig = {
@@ -85,13 +65,9 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         icon: 'fas fa-user-tag',
         idColumn: 'id',
         columns: [],
+        protectedIds: [],
     };
-    // `lookupAdmin.tables.response` is `anyArray` on purpose — config rows vary per
-    // registered table, so there is no static schema — hence the assertion off
-    // `unknown[]`.
-    const tables = data
-        ? [...(data as TableConfig[]), costPresetsEntry, patientTypesEntry]
-        : [];
+    const tables = data ? [...data, costPresetsEntry, patientTypesEntry] : [];
 
     const toggleTable = (tableKey: string): void => {
         setExpandedTable(expandedTable === tableKey ? null : tableKey);
@@ -190,6 +166,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                             tableName={table.displayName}
                             columns={table.columns}
                             idColumn={table.idColumn}
+                            protectedIds={table.protectedIds}
                         />
                     )}
                 </div>

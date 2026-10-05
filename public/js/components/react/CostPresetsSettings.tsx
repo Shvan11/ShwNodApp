@@ -1,26 +1,28 @@
-import { useState, ChangeEvent, FormEvent } from 'react';
+import { useRef, useState, ChangeEvent, FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { costPresetsQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
+import type { GetPresetsResponse } from '@shared/contracts/cost-preset.contract';
 import styles from './CostPresetsSettings.module.css';
 
-type Currency = 'IQD' | 'USD' | 'EUR';
-
-interface CostPreset {
-    preset_id: number;
-    amount: number;
-    currency: Currency;
-    display_order: number;
-}
+type CostPreset = GetPresetsResponse[number];
+type Currency = CostPreset['currency'];
 
 interface FormData {
     amount: string;
-    currency: Currency;
     displayOrder: number;
 }
+
+const CURRENCIES: ReadonlyArray<{ value: Currency; icon: string }> = [
+    { value: 'IQD', icon: 'fas fa-coins' },
+    { value: 'USD', icon: 'fas fa-dollar-sign' },
+    { value: 'EUR', icon: 'fas fa-euro-sign' },
+];
 
 const CostPresetsSettings = () => {
     const toast = useToast();
@@ -28,14 +30,31 @@ const CostPresetsSettings = () => {
     const queryClient = useQueryClient();
     const { data, isLoading: loading } = useQuery(costPresetsQuery());
     const presets: CostPreset[] = data ?? [];
+    // The preset writes are admin-only on the server; everyone else gets the list
+    // read-only instead of a form that 403s at Save (FE-F21-3).
+    const user = useAuthUser();
+    const canEdit = roleCaps(user?.role as UserRole | undefined).manageSettings;
+    // The currency a new preset is saved in IS the tab being viewed. The form had its
+    // own currency select, starting at IQD and never following the tabs, so a preset
+    // added on the USD tab was saved as IQD (FE-F21-8).
     const [activeCurrency, setActiveCurrency] = useState<Currency>('IQD');
     const [editingPreset, setEditingPreset] = useState<CostPreset | null>(null);
-    const [formData, setFormData] = useState<FormData>({
-        amount: '',
-        currency: 'IQD',
-        displayOrder: 0
-    });
+    const [formData, setFormData] = useState<FormData>({ amount: '', displayOrder: 0 });
     const [displayAmount, setDisplayAmount] = useState('');
+    // One write at a time (a double-clicked Add made two presets).
+    const writingRef = useRef(false);
+    const [writing, setWriting] = useState(false);
+    const runWrite = async (fn: () => Promise<void>): Promise<void> => {
+        if (writingRef.current) return;
+        writingRef.current = true;
+        setWriting(true);
+        try {
+            await fn();
+        } finally {
+            writingRef.current = false;
+            setWriting(false);
+        }
+    };
 
     // Refresh the shared cost-presets cache after a write.
     const reloadPresets = () => queryClient.invalidateQueries({ queryKey: qk.lookups.costPresets() });
@@ -43,14 +62,24 @@ const CostPresetsSettings = () => {
     // Filter presets by currency
     const filteredPresets = presets.filter(p => p.currency === activeCurrency);
 
-    // Handle form input changes
-    const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+    const handleDisplayOrderChange = (e: ChangeEvent<HTMLInputElement>) => {
+        setFormData(prev => ({ ...prev, displayOrder: parseInt(e.target.value, 10) || 0 }));
     };
 
-    // Create new preset
-    const handleCreatePreset = async (e: FormEvent<HTMLFormElement>) => {
+    const resetForm = () => {
+        setEditingPreset(null);
+        setFormData({ amount: '', displayOrder: 0 });
+        setDisplayAmount('');
+    };
+
+    const switchCurrency = (currency: Currency) => {
+        // A half-typed edit belongs to the preset's own currency; leaving its tab ends it.
+        if (editingPreset && editingPreset.currency !== currency) resetForm();
+        setActiveCurrency(currency);
+    };
+
+    // Create or update a preset in the active tab's currency.
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!formData.amount || parseFloat(formData.amount) <= 0) {
@@ -58,85 +87,50 @@ const CostPresetsSettings = () => {
             return;
         }
 
-        try {
-            await postJSON('/api/settings/cost-presets', {
-                amount: parseFloat(formData.amount),
-                currency: formData.currency,
-                displayOrder: parseInt(String(formData.displayOrder), 10) || 0
-            });
-
-            toast.success('Preset created successfully');
-            setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
-            setDisplayAmount('');
-            reloadPresets();
-        } catch (error) {
-            console.error('Error creating preset:', error);
-            toast.error(httpErrorMessage(error, 'Failed to create preset'));
-        }
+        const editing = editingPreset;
+        const body = {
+            amount: parseFloat(formData.amount),
+            currency: activeCurrency,
+            displayOrder: formData.displayOrder,
+        };
+        void runWrite(async () => {
+            try {
+                if (editing) {
+                    await putJSON(`/api/settings/cost-presets/${editing.preset_id}`, body);
+                    toast.success('Preset updated successfully');
+                } else {
+                    await postJSON('/api/settings/cost-presets', body);
+                    toast.success('Preset created successfully');
+                }
+                resetForm();
+                reloadPresets();
+            } catch (error) {
+                toast.error(httpErrorMessage(error, editing ? 'Failed to update preset' : 'Failed to create preset'));
+            }
+        });
     };
 
-    // Edit preset
     const handleEditPreset = (preset: CostPreset) => {
+        setActiveCurrency(preset.currency);
         setEditingPreset(preset);
-        setFormData({
-            amount: String(preset.amount),
-            currency: preset.currency,
-            displayOrder: preset.display_order
-        });
+        setFormData({ amount: String(preset.amount), displayOrder: preset.display_order });
         setDisplayAmount(preset.amount ? formatNumber(preset.amount) : '');
     };
 
-    // Update preset
-    const handleUpdatePreset = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-
-        if (!formData.amount || parseFloat(formData.amount) <= 0) {
-            toast.warning('Please enter a valid amount');
-            return;
-        }
-
-        if (!editingPreset) return;
-
-        try {
-            await putJSON(`/api/settings/cost-presets/${editingPreset.preset_id}`, {
-                amount: parseFloat(formData.amount),
-                currency: formData.currency,
-                displayOrder: parseInt(String(formData.displayOrder), 10) || 0
-            });
-
-            toast.success('Preset updated successfully');
-            setEditingPreset(null);
-            setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
-            setDisplayAmount('');
-            reloadPresets();
-        } catch (error) {
-            console.error('Error updating preset:', error);
-            toast.error(httpErrorMessage(error, 'Failed to update preset'));
-        }
-    };
-
-    // Delete preset
     const handleDeletePreset = async (preset_id: number) => {
         if (!await confirm('Are you sure you want to delete this preset?', { title: 'Delete Preset', danger: true, confirmText: 'Delete' })) {
             return;
         }
-
-        try {
-            await deleteJSON(`/api/settings/cost-presets/${preset_id}`);
-
-            toast.success('Preset deleted successfully');
-            reloadPresets();
-        } catch (error) {
-            console.error('Error deleting preset:', error);
-            toast.error(httpErrorMessage(error, 'Failed to delete preset'));
-        }
-    };
-
-    // Cancel edit
-    const handleCancelEdit = () => {
-        setEditingPreset(null);
-        setFormData({ amount: '', currency: activeCurrency, displayOrder: 0 });
-        setDisplayAmount('');
+        await runWrite(async () => {
+            try {
+                await deleteJSON(`/api/settings/cost-presets/${preset_id}`);
+                toast.success('Preset deleted successfully');
+                if (editingPreset?.preset_id === preset_id) resetForm();
+                reloadPresets();
+            } catch (error) {
+                toast.error(httpErrorMessage(error, 'Failed to delete preset'));
+            }
+        });
     };
 
     // Format number with commas
@@ -157,94 +151,75 @@ const CostPresetsSettings = () => {
         <div className={styles.costPresetsSettings}>
             {/* Currency Tabs */}
             <div className={styles.currencyTabs}>
-                <button
-                    className={`${styles.currencyTab} ${activeCurrency === 'IQD' ? styles.active : ''}`}
-                    onClick={() => setActiveCurrency('IQD')}
-                >
-                    <i className="fas fa-coins"></i> IQD
-                </button>
-                <button
-                    className={`${styles.currencyTab} ${activeCurrency === 'USD' ? styles.active : ''}`}
-                    onClick={() => setActiveCurrency('USD')}
-                >
-                    <i className="fas fa-dollar-sign"></i> USD
-                </button>
-                <button
-                    className={`${styles.currencyTab} ${activeCurrency === 'EUR' ? styles.active : ''}`}
-                    onClick={() => setActiveCurrency('EUR')}
-                >
-                    <i className="fas fa-euro-sign"></i> EUR
-                </button>
+                {CURRENCIES.map(({ value, icon }) => (
+                    <button
+                        key={value}
+                        type="button"
+                        className={`${styles.currencyTab} ${activeCurrency === value ? styles.active : ''}`}
+                        aria-pressed={activeCurrency === value}
+                        onClick={() => switchCurrency(value)}
+                    >
+                        <i className={icon}></i> {value}
+                    </button>
+                ))}
             </div>
 
-            <div className={styles.presetsContent}>
-                {/* Add/Edit Form */}
-                <div className={styles.presetFormCard}>
-                    <h3>{editingPreset ? 'Edit Preset' : 'Add New Preset'}</h3>
-                    <form onSubmit={editingPreset ? handleUpdatePreset : handleCreatePreset}>
-                        <div className={styles.formGroup}>
-                            <label htmlFor="amount">Amount</label>
-                            <input
-                                type="text"
-                                id="amount"
-                                name="amount"
-                                value={displayAmount}
-                                onChange={(e) => {
-                                    const digits = e.target.value.replace(/[^\d]/g, '');
-                                    const num = parseInt(digits, 10) || 0;
-                                    setDisplayAmount(num ? num.toLocaleString('en-US') : '');
-                                    setFormData(prev => ({ ...prev, amount: String(num) }));
-                                }}
-                                onBlur={() => setDisplayAmount(formData.amount ? formatNumber(parseInt(formData.amount, 10)) : '')}
-                                placeholder="Enter amount"
-                                required
-                            />
-                        </div>
+            <div className={`${styles.presetsContent} ${canEdit ? '' : styles.presetsContentReadOnly}`}>
+                {/* Add/Edit Form — admin only */}
+                {canEdit && (
+                    <div className={styles.presetFormCard}>
+                        <h3>{editingPreset ? `Edit ${activeCurrency} Preset` : `Add ${activeCurrency} Preset`}</h3>
+                        <form onSubmit={handleSubmit}>
+                            <div className={styles.formGroup}>
+                                <label htmlFor="amount">Amount ({activeCurrency})</label>
+                                <input
+                                    type="text"
+                                    id="amount"
+                                    name="amount"
+                                    value={displayAmount}
+                                    onChange={(e) => {
+                                        const digits = e.target.value.replace(/[^\d]/g, '');
+                                        const num = parseInt(digits, 10) || 0;
+                                        setDisplayAmount(num ? num.toLocaleString('en-US') : '');
+                                        setFormData(prev => ({ ...prev, amount: String(num) }));
+                                    }}
+                                    onBlur={() => setDisplayAmount(formData.amount ? formatNumber(parseInt(formData.amount, 10)) : '')}
+                                    placeholder="Enter amount"
+                                    required
+                                />
+                            </div>
 
-                        <div className={styles.formGroup}>
-                            <label htmlFor="currency">Currency</label>
-                            <select
-                                id="currency"
-                                name="currency"
-                                value={formData.currency}
-                                onChange={handleInputChange}
-                            >
-                                <option value="IQD">IQD</option>
-                                <option value="USD">USD</option>
-                                <option value="EUR">EUR</option>
-                            </select>
-                        </div>
+                            <div className={styles.formGroup}>
+                                <label htmlFor="displayOrder">Display Order</label>
+                                <input
+                                    type="number"
+                                    id="displayOrder"
+                                    name="displayOrder"
+                                    value={formData.displayOrder}
+                                    onChange={handleDisplayOrderChange}
+                                    placeholder="0"
+                                />
+                            </div>
 
-                        <div className={styles.formGroup}>
-                            <label htmlFor="displayOrder">Display Order</label>
-                            <input
-                                type="number"
-                                id="displayOrder"
-                                name="displayOrder"
-                                value={formData.displayOrder}
-                                onChange={handleInputChange}
-                                placeholder="0"
-                            />
-                        </div>
-
-                        <div className={styles.formActions}>
-                            {editingPreset ? (
-                                <>
-                                    <button type="submit" className="btn btn-primary">
-                                        <i className="fas fa-save"></i> Update
+                            <div className={styles.formActions}>
+                                {editingPreset ? (
+                                    <>
+                                        <button type="submit" className="btn btn-primary" disabled={writing}>
+                                            <i className="fas fa-save"></i> Update
+                                        </button>
+                                        <button type="button" className="btn btn-secondary" onClick={resetForm} disabled={writing}>
+                                            <i className="fas fa-times"></i> Cancel
+                                        </button>
+                                    </>
+                                ) : (
+                                    <button type="submit" className="btn btn-primary" disabled={writing}>
+                                        <i className="fas fa-plus"></i> Add Preset
                                     </button>
-                                    <button type="button" className="btn btn-secondary" onClick={handleCancelEdit}>
-                                        <i className="fas fa-times"></i> Cancel
-                                    </button>
-                                </>
-                            ) : (
-                                <button type="submit" className="btn btn-primary">
-                                    <i className="fas fa-plus"></i> Add Preset
-                                </button>
-                            )}
-                        </div>
-                    </form>
-                </div>
+                                )}
+                            </div>
+                        </form>
+                    </div>
+                )}
 
                 {/* Presets Table */}
                 <div className={styles.presetsTableCard}>
@@ -256,7 +231,7 @@ const CostPresetsSettings = () => {
                                     <th>Amount</th>
                                     <th>Currency</th>
                                     <th>Display Order</th>
-                                    <th>Actions</th>
+                                    {canEdit && <th>Actions</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -265,22 +240,29 @@ const CostPresetsSettings = () => {
                                         <td>{formatNumber(preset.amount)}</td>
                                         <td>{preset.currency}</td>
                                         <td>{preset.display_order}</td>
-                                        <td className={styles.actions}>
-                                            <button
-                                                className={`${styles.btnIcon} ${styles.btnEdit}`}
-                                                onClick={() => handleEditPreset(preset)}
-                                                title="Edit"
-                                            >
-                                                <i className="fas fa-edit"></i>
-                                            </button>
-                                            <button
-                                                className={`${styles.btnIcon} ${styles.btnDelete}`}
-                                                onClick={() => handleDeletePreset(preset.preset_id)}
-                                                title="Delete"
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
-                                        </td>
+                                        {canEdit && (
+                                            <td className={styles.actions}>
+                                                <button
+                                                    type="button"
+                                                    className={`${styles.btnIcon} ${styles.btnEdit}`}
+                                                    onClick={() => handleEditPreset(preset)}
+                                                    title="Edit"
+                                                    aria-label="Edit"
+                                                >
+                                                    <i className="fas fa-edit" aria-hidden="true"></i>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`${styles.btnIcon} ${styles.btnDelete}`}
+                                                    onClick={() => handleDeletePreset(preset.preset_id)}
+                                                    disabled={writing}
+                                                    title="Delete"
+                                                    aria-label="Delete"
+                                                >
+                                                    <i className="fas fa-trash" aria-hidden="true"></i>
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -289,7 +271,7 @@ const CostPresetsSettings = () => {
                         <div className={styles.emptyState}>
                             <i className="fas fa-inbox fa-3x"></i>
                             <p>No presets found for {activeCurrency}</p>
-                            <p className={styles.hint}>Add a preset using the form above</p>
+                            {canEdit && <p className={styles.hint}>Add a preset using the form above</p>}
                         </div>
                     )}
                 </div>

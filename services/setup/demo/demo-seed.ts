@@ -438,7 +438,7 @@ async function playOrtho(personId: number, s: OrthoStory, ctx: StoryContext): Pr
       work_id: workId, aligner_dr_id: ctx.alignerDrId, set_sequence: 1, type: 'Moderate', is_active: true,
       upper_aligners_count: s.aligner.upper, lower_aligners_count: s.aligner.lower, days: s.aligner.days,
       set_cost: s.total, currency: s.currency,
-    });
+    }, { mayPrice: true });
     await getKysely().updateTable('aligner_sets').set({ creation_date: sql<string>`${ymd(start)}` }).where('aligner_set_id', '=', setId).execute();
   }
 

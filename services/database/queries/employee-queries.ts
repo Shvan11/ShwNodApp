@@ -78,6 +78,34 @@ export async function deleteEmployee(id: number): Promise<void> {
   await getKysely().deleteFrom('employees').where('id', '=', id).execute();
 }
 
+/** The employee's stored name, or `undefined` when there is no such row. */
+export async function getEmployeeName(id: number): Promise<string | undefined> {
+  const row = await getKysely()
+    .selectFrom('employees')
+    .select('employee_name')
+    .where('id', '=', id)
+    .executeTakeFirst();
+  return row?.employee_name;
+}
+
+/**
+ * The history that keeps an employee from being deleted: `works.dr_id`,
+ * `appointments.dr_id` and `expenses.employee_id` are NO ACTION foreign keys, so a
+ * delete with any of them fails. Counted up front so the refusal can say why
+ * (audit FE-F21-6) instead of surfacing the FK violation as a 500.
+ */
+export async function countEmployeeHistory(
+  id: number
+): Promise<{ works: number; appointments: number; expenses: number }> {
+  const db = getKysely();
+  const [works, appointments, expenses] = await Promise.all([
+    db.selectFrom('works').select((eb) => eb.fn.countAll<number>().as('n')).where('dr_id', '=', id).executeTakeFirstOrThrow(),
+    db.selectFrom('appointments').select((eb) => eb.fn.countAll<number>().as('n')).where('dr_id', '=', id).executeTakeFirstOrThrow(),
+    db.selectFrom('expenses').select((eb) => eb.fn.countAll<number>().as('n')).where('employee_id', '=', id).executeTakeFirstOrThrow(),
+  ]);
+  return { works: Number(works.n), appointments: Number(appointments.n), expenses: Number(expenses.n) };
+}
+
 /** Whether an employee with this email exists (optionally excluding one id). */
 export async function employeeEmailExists(email: string, excludeId?: number): Promise<boolean> {
   let q = getKysely().selectFrom('employees').select('id').where('email', '=', email);

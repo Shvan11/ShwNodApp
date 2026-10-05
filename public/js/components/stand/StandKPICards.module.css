@@ -81,12 +81,19 @@
   gap: var(--spacing-xs);
   margin-top: var(--spacing-md);
   padding: var(--spacing-xs) var(--spacing-sm);
-  background-color: var(--error-50);
-  color: var(--error-700);
-  border: 1px solid var(--error-200);
+  margin-inline-end: var(--spacing-sm);
+  background-color: var(--warning-50);
+  color: var(--warning-700);
+  border: 1px solid var(--warning-200);
   border-radius: var(--radius-full);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+}
+
+.expiredBadge {
+  background-color: var(--error-50);
+  color: var(--error-700);
+  border-color: var(--error-200);
 }
 
 .expiringBadge i {

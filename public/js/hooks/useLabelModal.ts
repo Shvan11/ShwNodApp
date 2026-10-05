@@ -1,7 +1,7 @@
 /**
  * useLabelModal - Hook for managing LabelPreviewModal state
  */
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import type {
     AlignerSet,
     AlignerBatch,
@@ -16,15 +16,16 @@ export function useLabelModal(): UseLabelModalReturn {
         set: null,
     });
 
-    const openLabelModal = useCallback((batch: AlignerBatch, set: AlignerSet): void => {
+    // Plain functions: the React Compiler memoizes them (FE-F20-11).
+    const openLabelModal = (batch: AlignerBatch, set: AlignerSet): void => {
         setLabelModalData({ batch, set });
         setShowLabelModal(true);
-    }, []);
+    };
 
-    const closeLabelModal = useCallback((): void => {
+    const closeLabelModal = (): void => {
         setShowLabelModal(false);
         setLabelModalData({ batch: null, set: null });
-    }, []);
+    };
 
     return {
         showLabelModal,

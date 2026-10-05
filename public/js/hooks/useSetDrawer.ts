@@ -1,7 +1,7 @@
 /**
  * useSetDrawer - Hook for managing SetFormDrawer state
  */
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import type {
     AlignerSet,
     UseSetDrawerProps,
@@ -12,26 +12,25 @@ export function useSetDrawer({ onRefresh }: UseSetDrawerProps): UseSetDrawerRetu
     const [showSetDrawer, setShowSetDrawer] = useState(false);
     const [editingSet, setEditingSet] = useState<AlignerSet | null>(null);
 
-    const openAddSetDrawer = useCallback((): void => {
+    const openAddSetDrawer = (): void => {
         setEditingSet(null);
         setShowSetDrawer(true);
-    }, []);
+    };
 
-    const openEditSetDrawer = useCallback((set: AlignerSet): void => {
+    const openEditSetDrawer = (set: AlignerSet): void => {
         setEditingSet(set);
         setShowSetDrawer(true);
-    }, []);
+    };
 
-    const closeSetDrawer = useCallback((): void => {
+    const closeSetDrawer = (): void => {
         setShowSetDrawer(false);
         setEditingSet(null);
-    }, []);
+    };
 
-    const handleSetSaved = useCallback((): void => {
-        setShowSetDrawer(false);
-        setEditingSet(null);
+    const handleSetSaved = (): void => {
+        closeSetDrawer();
         onRefresh();
-    }, [onRefresh]);
+    };
 
     return {
         showSetDrawer,

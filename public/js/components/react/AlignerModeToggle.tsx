@@ -7,9 +7,12 @@ import styles from './AlignerModeToggle.module.css';
 export type AlignerMode = 'doctors' | 'all-sets' | 'search' | 'archform-match';
 
 interface AlignerModeToggleProps {
-    activeMode: AlignerMode;
+    /** The list route on screen, or null on a page that isn't one of them (a patient's sets, announcements). */
+    activeMode: AlignerMode | null;
     /** Pin under the universal header while the page scrolls (off in a viewport-locked shell). */
     sticky: boolean;
+    /** Show the Archform tab — only on an install with an Archform path (FE-F18-4). */
+    showArchform: boolean;
 }
 
 const MODES: ReadonlyArray<{ mode: AlignerMode; to: string; icon: string; label: string }> = [
@@ -29,12 +32,13 @@ const MODES: ReadonlyArray<{ mode: AlignerMode; to: string; icon: string; label:
  * `styles` prop (with a global `'active'` fallback), a prop-drilled sheet no
  * dead-class scan could follow (audit FE-F4-14).
  */
-const AlignerModeToggle: React.FC<AlignerModeToggleProps> = ({ activeMode, sticky }) => {
+const AlignerModeToggle: React.FC<AlignerModeToggleProps> = ({ activeMode, sticky, showArchform }) => {
     const navigate = useNavigate();
+    const modes = showArchform ? MODES : MODES.filter((m) => m.mode !== 'archform-match');
 
     return (
         <nav className={cn(styles.modeToggle, sticky && styles.sticky)} aria-label="Aligner views">
-            {MODES.map(({ mode, to, icon, label }) => (
+            {modes.map(({ mode, to, icon, label }) => (
                 <button
                     key={mode}
                     type="button"

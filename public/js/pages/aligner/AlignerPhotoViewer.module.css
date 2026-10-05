@@ -28,13 +28,84 @@
     border-radius: 0;
 }
 
+/*
+ * The photo's frame. Wheel zoom happens INSIDE the stage (clipped), so a zoomed
+ * photo never paints over the caption or the fixed close/prev/next buttons. The
+ * stage shrink-wraps the photo, so its centre is the photo's centre — the zoom
+ * math in AlignerPhotoViewer.tsx relies on that.
+ */
+.frame {
+    position: relative;
+    max-width: 100%;
+}
+
+.stage {
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 6px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    cursor: zoom-in;
+}
+
+.zoomed {
+    cursor: grab;
+    touch-action: none;
+}
+
+.dragging {
+    cursor: grabbing;
+}
+
 .image {
+    display: block;
     max-width: 100%;
     max-height: 70vh;
     object-fit: contain;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     border-radius: 6px;
     border: 2px solid rgba(255, 255, 255, 0.1);
+    transform-origin: center;
+    user-select: none;
+    /* Eases each wheel notch; a drag follows the pointer directly. */
+    transition: transform 0.08s ease-out;
+}
+
+.dragging .image {
+    transition: none;
+}
+
+/* Zoom level + reset, over the bottom of the photo while zoomed. */
+.zoomBar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 4px 6px 4px 12px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 999px;
+    color: white;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.zoomReset {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    color: white;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.zoomReset:hover {
+    background: rgba(255, 255, 255, 0.28);
 }
 
 .details {
@@ -59,6 +130,19 @@
 .counter {
     margin-top: var(--spacing-sm);
     letter-spacing: 0.03em;
+}
+
+.hint {
+    margin-top: var(--spacing-sm);
+    font-size: 0.75rem;
+    color: #a0aec0;
+}
+
+/* Touch screens have no wheel; the hint would only mislead there. */
+@media (hover: none) {
+    .hint {
+        display: none;
+    }
 }
 
 .close {

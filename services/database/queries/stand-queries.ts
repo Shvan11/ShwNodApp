@@ -190,6 +190,7 @@ interface DashboardKPIs {
   todayProfit: number;
   lowStockCount: number;
   expiringSoonCount: number;
+  expiredCount: number;
   totalInventoryValue: number;
 }
 
@@ -245,6 +246,16 @@ export async function getStandCategories(): Promise<StandCategoryRow[]> {
     .where('is_active', '=', true)
     .orderBy('category_name')
     .execute();
+}
+
+/** The category with this name, active or not (`category_name` is citext, so case-insensitive). */
+export async function getStandCategoryByName(name: string): Promise<StandCategoryRow | null> {
+  const row = await getKysely()
+    .selectFrom('stand_categories')
+    .select(['category_id', 'category_name', 'is_active'])
+    .where('category_name', '=', name)
+    .executeTakeFirst();
+  return row ?? null;
 }
 
 export async function addStandCategory(name: string): Promise<{ category_id: number }> {
@@ -423,11 +434,34 @@ export async function updateStandItem(id: number, data: StandItemUpdateData): Pr
 }
 
 export async function softDeleteStandItem(id: number): Promise<void> {
-  await getKysely()
+  await setStandItemActive(id, false);
+}
+
+/** Flip `is_active`. `false` is the soft delete; `true` undoes it (FE-F19-8). Returns whether a row matched. */
+export async function setStandItemActive(id: number, active: boolean): Promise<boolean> {
+  const result = await getKysely()
     .updateTable('stand_items')
-    .set({ is_active: false })
+    .set({ is_active: active })
     .where('item_id', '=', id)
-    .execute();
+    .executeTakeFirst();
+  return Number(result.numUpdatedRows) === 1;
+}
+
+/**
+ * The item already holding a barcode or SKU, active or not. The two unique indexes
+ * (`ux_standitems_barcode`, `ux_standitems_sku`) cover deactivated rows too, so a
+ * create/edit that collides is answered with WHICH item owns the value.
+ */
+export async function getStandItemOwning(
+  column: 'barcode' | 'sku',
+  value: string
+): Promise<{ item_id: number; item_name: string; is_active: boolean } | null> {
+  const row = await getKysely()
+    .selectFrom('stand_items')
+    .select(['item_id', 'item_name', 'is_active'])
+    .where(column, '=', value)
+    .executeTakeFirst();
+  return row ?? null;
 }
 
 export async function getLowStockItems(): Promise<StandItemRow[]> {
@@ -441,6 +475,13 @@ export async function getLowStockItems(): Promise<StandItemRow[]> {
     .execute();
 }
 
+/**
+ * Active items expiring within `daysAhead` days, plus every active item already PAST
+ * its expiry that still has stock on the shelf (FE-F19-2). The list used to stop at
+ * `expiry_date >= current_date`, so an item dropped out of the only expiry warning on
+ * the day it expired — and stayed sellable. An expired item with nothing left in
+ * stock needs no action and stays out. Expired rows sort first (oldest expiry first).
+ */
 export async function getExpiringItems(daysAhead: number = 30): Promise<StandItemRow[]> {
   return getKysely()
     .selectFrom('stand_items as i')
@@ -448,8 +489,8 @@ export async function getExpiringItems(daysAhead: number = 30): Promise<StandIte
     .select(selectStandItemColumns())
     .where('i.is_active', '=', true)
     .where('i.expiry_date', 'is not', null)
-    .where('i.expiry_date', '>=', sql<string>`current_date`)
     .where('i.expiry_date', '<=', sql<string>`current_date + (${daysAhead} * interval '1 day')`)
+    .where((eb) => eb.or([eb('i.expiry_date', '>=', sql<string>`current_date`), eb('i.current_stock', '>', 0)]))
     .orderBy('i.expiry_date', 'asc')
     .execute();
 }
@@ -731,20 +772,34 @@ async function addStockMovement(
     .execute();
 }
 
+/**
+ * Add a delivery to stock. The item's `cost_price` becomes the WEIGHTED AVERAGE of
+ * the stock on hand and the delivery (owner decision 2026-10-04, FE-F19-9):
+ * `(stock × cost + qty × unitCost) / (stock + qty)`, rounded to the whole IQD the
+ * column holds; with nothing on hand it is simply `unitCost`. Every later sale books
+ * its cost from `cost_price`, so a delivery at a new price now reaches the profit
+ * figures — before, the typed cost was recorded on the ledger row and nowhere else.
+ * The SET expressions read the row's PRE-update values (one statement). Returns the
+ * new cost.
+ */
 export async function restockItem(
   itemId: number,
   quantity: number,
   unitCost: number,
   userId: number | null
-): Promise<void> {
+): Promise<{ costPrice: number }> {
   return withPgTransaction(async (trx) => {
-    await trx
+    const updated = await trx
       .updateTable('stand_items')
       .set((eb) => ({
         current_stock: eb('current_stock', '+', quantity),
+        cost_price: sql<number>`CASE WHEN "current_stock" > 0
+          THEN round(("current_stock"::numeric * "cost_price" + ${quantity}::numeric * ${unitCost}) / ("current_stock" + ${quantity}))::int
+          ELSE ${unitCost}::int END`,
       }))
       .where('item_id', '=', itemId)
-      .execute();
+      .returning('cost_price')
+      .executeTakeFirstOrThrow();
 
     await trx
       .insertInto('stand_stock_movements')
@@ -757,6 +812,8 @@ export async function restockItem(
         performed_by: userId,
       })
       .execute();
+
+    return { costPrice: updated.cost_price };
   });
 }
 
@@ -862,13 +919,19 @@ export async function getStandDashboardKPIs(): Promise<DashboardKPIs> {
     .where((eb) => eb('current_stock', '<=', eb.ref('reorder_level')))
     .executeTakeFirstOrThrow();
 
+  // Same window as getExpiringItems(30): "soon" = today .. +30 days; "expired" =
+  // already past it with stock still on the shelf (FE-F19-2).
   const expiring = await db
     .selectFrom('stand_items')
-    .select((eb) => eb.fn.countAll().as('cnt'))
+    .select((eb) => [
+      eb.fn
+        .countAll()
+        .filterWhere(sql<boolean>`"expiry_date" >= current_date AND "expiry_date" <= current_date + interval '30 day'`)
+        .as('cnt'),
+      eb.fn.countAll().filterWhere(sql<boolean>`"expiry_date" < current_date AND "current_stock" > 0`).as('expired'),
+    ])
     .where('is_active', '=', true)
     .where('expiry_date', 'is not', null)
-    .where('expiry_date', '>=', sql<string>`current_date`)
-    .where('expiry_date', '<=', sql<string>`current_date + interval '30 day'`)
     .executeTakeFirstOrThrow();
 
   const inventoryValue = await db
@@ -887,6 +950,7 @@ export async function getStandDashboardKPIs(): Promise<DashboardKPIs> {
     todayProfit: Number(todayStats.TodayProfit),
     lowStockCount: Number(lowStock.cnt),
     expiringSoonCount: Number(expiring.cnt),
+    expiredCount: Number(expiring.expired),
     totalInventoryValue: Number(inventoryValue.TotalInventoryValue),
   };
 }

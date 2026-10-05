@@ -3,28 +3,9 @@
  * Shared configuration and constants for the WhatsApp send page
  */
 
-// Configuration Constants
+// Configuration Constants — the date picker's range (the rest of this object
+// had no reader; FE-F16-15).
 export const CONFIG = {
-  // Timing constants
-  DEDUPLICATION_WINDOW_MS: 5000,
-  PROGRESS_BAR_INTERVAL_MS: 200,
-  PROGRESS_BAR_MAX_WIDTH: 90,
-  HEARTBEAT_INTERVAL_MS: 60000,
-  ERROR_DISPLAY_DURATION_MS: 10000,
-  MAX_RECONNECT_ATTEMPTS: 20,
-
-  // Delay constants
-  CLIENT_RESTART_DELAY_MS: 2000,
-  LOGOUT_DELAY_MS: 1000,
-  DEBOUNCE_DELAY_MS: 300,
-  OPERATION_TIMEOUT_MS: 30000,
-
-  // Retry constants
-  RETRY_BASE_DELAY_MS: 1000,
-  RETRY_MAX_DELAY_MS: 10000,
-  RETRY_MAX_ATTEMPTS: 3,
-
-  // Date range
   DATE_RANGE_DAYS_BACK: 7,
   DATE_RANGE_DAYS_FORWARD: 30,
 } as const;
@@ -45,12 +26,11 @@ export const API_ENDPOINTS = {
 } as const;
 
 // State Constants
+// The send page's SSE transport states (the batch's own state is `SendingProgress`).
 export const UI_STATES = {
   DISCONNECTED: 'disconnected',
   CONNECTING: 'connecting',
   CONNECTED: 'connected',
-  SENDING: 'sending',
-  COMPLETED: 'completed',
   ERROR: 'error',
 } as const;
 
@@ -81,15 +61,4 @@ export const MESSAGE_STATUS_TEXT: Record<MessageStatusValue, string> = {
   [MESSAGE_STATUS.READY]: 'Ready to Resend',
   [MESSAGE_STATUS.FAILED]: 'Failed',
   [MESSAGE_STATUS.INVALID_PHONE]: 'Invalid Phone',
-};
-
-export const MESSAGE_STATUS_CLASS: Record<MessageStatusValue, string> = {
-  [MESSAGE_STATUS.PENDING]: 'status-pending',
-  [MESSAGE_STATUS.SERVER]: 'status-server',
-  [MESSAGE_STATUS.DEVICE]: 'status-device',
-  [MESSAGE_STATUS.READ]: 'status-read',
-  [MESSAGE_STATUS.PLAYED]: 'status-played',
-  [MESSAGE_STATUS.READY]: 'status-ready',
-  [MESSAGE_STATUS.FAILED]: 'status-failed',
-  [MESSAGE_STATUS.INVALID_PHONE]: 'status-invalid',
 };

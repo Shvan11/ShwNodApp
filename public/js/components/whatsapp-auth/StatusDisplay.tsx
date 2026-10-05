@@ -14,10 +14,26 @@ interface StatusContent {
 
 interface StatusDisplayProps {
   authState: AuthState;
+  /**
+   * False for a role that may not pair (`roleCaps().manageWhatsApp`): the pairing
+   * states then say who does it instead of pointing at buttons the page doesn't
+   * show (FE-F16-4).
+   */
+  canPair?: boolean;
 }
 
-export const StatusDisplay = ({ authState }: StatusDisplayProps) => {
+/** What a role that can't pair sees in place of the QR / re-link screens. */
+export const PAIRING_ELSEWHERE: StatusContent = {
+  icon: '🔐',
+  title: 'WhatsApp is not linked',
+  message: 'Pairing is done by the front desk or an admin. Ask them to link the clinic\'s WhatsApp; this page updates by itself once they have.',
+};
+
+export const StatusDisplay = ({ authState, canPair = true }: StatusDisplayProps) => {
   const getStatusContent = (): StatusContent | null => {
+    if (!canPair && (authState === AUTH_STATES.NEEDS_RELINK || authState === AUTH_STATES.QR_REQUIRED)) {
+      return PAIRING_ELSEWHERE;
+    }
     switch (authState) {
       case AUTH_STATES.INITIALIZING:
         return {
@@ -44,8 +60,9 @@ export const StatusDisplay = ({ authState }: StatusDisplayProps) => {
         return {
           icon: '⏳',
           title: 'Restoring WhatsApp session…',
-          message:
-            'This can take up to two minutes. If it doesn\'t finish, use "Re-link Device" below to get a fresh QR code.',
+          message: canPair
+            ? 'This can take up to two minutes. If it doesn\'t finish, use "Re-link Device" below to get a fresh QR code.'
+            : 'This can take up to two minutes.',
         };
 
       case AUTH_STATES.NEEDS_RELINK:

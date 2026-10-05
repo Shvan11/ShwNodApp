@@ -10,6 +10,7 @@ import type { EmployeeRow } from '@shared/contracts/employee.contract';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { resolveDoctorColor, NEUTRAL_PICKER_HEX } from './doctorColors';
+import { isClinicDoctorName } from '@shared/clinic-doctor';
 import styles from './EmployeeSettings.module.css';
 
 // Row shapes are owned by the employee contract (the single source of truth for
@@ -69,6 +70,12 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         appointment_color: ''
     });
     const [activeTab, setActiveTab] = useState<'basic' | 'other'>('basic');
+    // One save at a time: a double-clicked Add created two employees (FE-F21-10).
+    const savingRef = useRef(false);
+    const [saving, setSaving] = useState(false);
+    // The 'Clinic' pseudo-doctor is found by name for X-ray/Consult intake; the server
+    // refuses renaming, quitting or deleting it (FE-F21-12), so the form doesn't offer it.
+    const editingClinicRow = editingId !== null && isClinicDoctorName(employees.find(e => e.id === editingId)?.employee_name);
     // Right-click menu on the employee name → Edit/Delete without horizontal-
     // scrolling the wide table to reach the Actions column.
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; employee: Employee } | null>(null);
@@ -150,9 +157,40 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         setShowAddForm(false);
     };
 
+    // Everything an employee write changes: every employee list (Settings' own, the
+    // task assignee and expense pickers), the doctor feeds behind booking, the calendar
+    // colours and the work form, the operators, and the commission report. Only
+    // Settings' own list was refreshed, so a quit or renamed doctor stayed selectable
+    // elsewhere until the cache aged out (FE-F21-11).
+    const refreshEmployeeReads = () =>
+        Promise.all([
+            queryClient.invalidateQueries({ queryKey: qk.lookups.employeesAll() }),
+            queryClient.invalidateQueries({ queryKey: qk.lookups.doctors() }),
+            queryClient.invalidateQueries({ queryKey: qk.lookups.workDoctors() }),
+            queryClient.invalidateQueries({ queryKey: qk.lookups.operators() }),
+            queryClient.invalidateQueries({ queryKey: qk.reports.commissionsAll() }),
+        ]);
+
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (savingRef.current) return;
 
+        // The required fields sit on two tabs and only the visible one is in the DOM,
+        // so the browser checks just that one; check the other here and take the user
+        // to it (it used to reach the server and come back as "Invalid request body").
+        if (!formData.employee_name.trim() || !formData.position) {
+            setActiveTab('basic');
+            toast.warning('Enter the employee name and position.');
+            return;
+        }
+        if (formData.percentage && !formData.commissionPercentage) {
+            setActiveTab('other');
+            toast.warning('Enter the commission rate (1–100%), or untick percentage-based compensation.');
+            return;
+        }
+
+        savingRef.current = true;
+        setSaving(true);
         try {
             const url = editingId
                 ? `/api/employees/${editingId}`
@@ -160,13 +198,15 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
             await (editingId ? putJSON(url, formData) : postJSON(url, formData));
 
-            await queryClient.invalidateQueries({ queryKey: qk.lookups.employees('?includeInactive=true') });
+            await refreshEmployeeReads();
             handleCancel();
 
             toast.success(editingId ? 'Employee updated successfully!' : 'Employee added successfully!');
         } catch (err) {
-            console.error('Error saving employee:', err);
             toast.error(httpErrorMessage(err, 'Failed to save employee'));
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
         }
     };
 
@@ -178,10 +218,11 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         try {
             await deleteJSON(`/api/employees/${employeeId}`);
 
-            await queryClient.invalidateQueries({ queryKey: qk.lookups.employees('?includeInactive=true') });
+            await refreshEmployeeReads();
             toast.success('Employee deleted successfully!');
         } catch (err) {
-            console.error('Error deleting employee:', err);
+            // An employee with history comes back 409 saying what holds them and
+            // that "Currently employed" is the way to retire them (FE-F21-6).
             toast.error(httpErrorMessage(err, 'Failed to delete employee'));
         }
     };
@@ -212,11 +253,6 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
     // built-in default (or neutral) on the calendar.
     const handleClearColor = () => {
         setFormData(prev => ({ ...prev, appointment_color: '' }));
-    };
-
-    const getPositionName = (positionId: number | string | null): string => {
-        const pos = positions.find(p => p.id === Number(positionId));
-        return pos?.position_name ?? 'Unknown';
     };
 
     // Effective calendar swatch for the table — only for the calendar's doctors
@@ -292,277 +328,287 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                 onClose={handleCancel}
                 contentClassName={styles.modal}
                 ariaLabelledBy="employee-modal-title"
+                unsavedGuard={{ watchInput: true }}
             >
-                <ModalHeader
-                    titleId="employee-modal-title"
-                    icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} />}
-                    title={editingId ? 'Edit Employee' : 'Add New Employee'}
-                    onClose={handleCancel}
-                />
-                <form onSubmit={handleSubmit}>
-                            <div className={styles.modalBody}>
-                                <div className={styles.tabs}>
-                                    <button
-                                        type="button"
-                                        className={cn(styles.tabBtn, activeTab === 'basic' && styles.active)}
-                                        onClick={() => setActiveTab('basic')}
-                                    >
-                                        <i className="fas fa-id-card"></i> Basic Info
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={cn(styles.tabBtn, activeTab === 'other' && styles.active)}
-                                        onClick={() => setActiveTab('other')}
-                                    >
-                                        <i className="fas fa-sliders-h"></i> Other Options
-                                    </button>
-                                </div>
+                {(dismiss) => (<>
+                    <ModalHeader
+                        titleId="employee-modal-title"
+                        icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} />}
+                        title={editingId ? 'Edit Employee' : 'Add New Employee'}
+                        onClose={dismiss}
+                    />
+                    <form onSubmit={handleSubmit}>
+                                <div className={styles.modalBody}>
+                                    <div className={styles.tabs}>
+                                        <button
+                                            type="button"
+                                            className={cn(styles.tabBtn, activeTab === 'basic' && styles.active)}
+                                            onClick={() => setActiveTab('basic')}
+                                        >
+                                            <i className="fas fa-id-card"></i> Basic Info
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={cn(styles.tabBtn, activeTab === 'other' && styles.active)}
+                                            onClick={() => setActiveTab('other')}
+                                        >
+                                            <i className="fas fa-sliders-h"></i> Other Options
+                                        </button>
+                                    </div>
 
-                                <div className={styles.tabContent}>
-                                    {activeTab === 'basic' && (
-                                        <div>
-                                            <div className={styles.formRow}>
-                                                <div className={styles.formGroup}>
-                                                    <label htmlFor="employee_name">
-                                                        Employee Name <span className={styles.required}>*</span>
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        id="employee_name"
-                                                        name="employee_name"
-                                                        value={formData.employee_name}
-                                                        onChange={handleInputChange}
-                                                        required
-                                                        placeholder="e.g., John Smith"
-                                                    />
-                                                </div>
-
-                                                <div className={styles.formGroup}>
-                                                    <label htmlFor="position">
-                                                        Position <span className={styles.required}>*</span>
-                                                    </label>
-                                                    <select
-                                                        id="position"
-                                                        name="position"
-                                                        value={formData.position}
-                                                        onChange={handleInputChange}
-                                                        required
-                                                    >
-                                                        <option value="">Select a position</option>
-                                                        {positions.map(pos => (
-                                                            <option key={pos.id} value={pos.id}>
-                                                                {pos.position_name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className={styles.formRow}>
-                                                <div className={styles.formGroup}>
-                                                    <label htmlFor="phone">
-                                                        Phone Number
-                                                    </label>
-                                                    <input
-                                                        type="tel"
-                                                        id="phone"
-                                                        name="phone"
-                                                        value={formData.phone}
-                                                        onChange={handleInputChange}
-                                                        placeholder="e.g., 0750 123 4567"
-                                                    />
-                                                </div>
-                                                <div className={styles.formGroup}>
-                                                    <label htmlFor="sort_order">
-                                                        Sort Order
-                                                        <span className={styles.fieldHelp}>
-                                                            (Lower numbers appear first)
-                                                        </span>
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        id="sort_order"
-                                                        name="sort_order"
-                                                        value={formData.sort_order}
-                                                        onChange={handleInputChange}
-                                                        placeholder="e.g., 1"
-                                                        min="1"
-                                                        max="999"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className={styles.checkboxGroup}>
-                                                <div className={styles.checkboxItem}>
-                                                    <label>
+                                    <div className={styles.tabContent}>
+                                        {activeTab === 'basic' && (
+                                            <div>
+                                                <div className={styles.formRow}>
+                                                    <div className={styles.formGroup}>
+                                                        <label htmlFor="employee_name">
+                                                            Employee Name <span className={styles.required}>*</span>
+                                                        </label>
                                                         <input
-                                                            type="checkbox"
-                                                            name="is_active"
-                                                            checked={formData.is_active}
+                                                            type="text"
+                                                            id="employee_name"
+                                                            name="employee_name"
+                                                            value={formData.employee_name}
                                                             onChange={handleInputChange}
+                                                            required
+                                                            readOnly={editingClinicRow}
+                                                            placeholder="e.g., John Smith"
                                                         />
-                                                        <span className={styles.checkboxLabel}>
-                                                            <i className="fas fa-user-check"></i>
-                                                            Currently employed
+                                                        {editingClinicRow && (
                                                             <span className={styles.fieldHelp}>
-                                                                (Uncheck if this employee has left / quit)
+                                                                The pseudo-doctor X-ray and Consult intake works are filed under — it can&apos;t be renamed, marked as quit or deleted.
                                                             </span>
-                                                        </span>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {activeTab === 'other' && (
-                                        <div>
-                                            <div className={styles.formRow}>
-                                                <div className={styles.formGroup}>
-                                                    <label htmlFor="email">
-                                                        Email Address
-                                                        <span className={styles.fieldHelp}>
-                                                            (Required for notifications)
-                                                        </span>
-                                                    </label>
-                                                    <input
-                                                        type="email"
-                                                        id="email"
-                                                        name="email"
-                                                        value={formData.email}
-                                                        onChange={handleInputChange}
-                                                        placeholder="employee@example.com"
-                                                    />
-                                                </div>
-                                                <div className={styles.formGroup}>
-                                                    {/* Empty placeholder */}
-                                                </div>
-                                            </div>
-
-                                            <div className={styles.formRow}>
-                                                <div className={styles.formGroup}>
-                                                    <label htmlFor="appointment_color">
-                                                        Calendar Color
-                                                        <span className={styles.fieldHelp}>
-                                                            (Shown on the appointment calendar)
-                                                        </span>
-                                                    </label>
-                                                    <div className={styles.colorField}>
-                                                        <input
-                                                            type="color"
-                                                            id="appointment_color"
-                                                            name="appointment_color"
-                                                            className={styles.colorInput}
-                                                            value={formData.appointment_color || NEUTRAL_PICKER_HEX}
-                                                            onChange={handleInputChange}
-                                                        />
-                                                        <span className={styles.colorValue}>
-                                                            {formData.appointment_color ? formData.appointment_color.toUpperCase() : 'None (neutral)'}
-                                                        </span>
-                                                        {formData.appointment_color && (
-                                                            <button
-                                                                type="button"
-                                                                className={styles.colorClear}
-                                                                onClick={handleClearColor}
-                                                            >
-                                                                <i className="fas fa-times"></i> Clear
-                                                            </button>
                                                         )}
                                                     </div>
-                                                </div>
-                                                <div className={styles.formGroup}></div>
-                                            </div>
 
-                                            {!formData.is_active && (
-                                                <p className={styles.fieldHelp}>
-                                                    <i className="fas fa-info-circle"></i> This employee is marked as having quit, so email and appointment options are disabled. Commission settings are kept so past-period commission reports stay accurate.
-                                                </p>
-                                            )}
-                                            <div className={styles.checkboxGroup}>
-                                                <div className={styles.checkboxItem}>
-                                                    <label>
-                                                        <input
-                                                            type="checkbox"
-                                                            name="receiveEmail"
-                                                            checked={formData.receiveEmail}
-                                                            onChange={handleInputChange}
-                                                            disabled={!formData.is_active}
-                                                        />
-                                                        <span className={styles.checkboxLabel}>
-                                                            <i className="fas fa-envelope"></i>
-                                                            Receive Email Notifications
-                                                        </span>
-                                                    </label>
-                                                </div>
-
-                                                <div className={styles.checkboxItem}>
-                                                    <label>
-                                                        <input
-                                                            type="checkbox"
-                                                            name="getAppointments"
-                                                            checked={formData.getAppointments}
-                                                            onChange={handleInputChange}
-                                                            disabled={!formData.is_active}
-                                                        />
-                                                        <span className={styles.checkboxLabel}>
-                                                            <i className="fas fa-calendar-check"></i>
-                                                            Include in Appointment Reports
-                                                        </span>
-                                                    </label>
-                                                </div>
-
-                                                <div className={styles.checkboxItem}>
-                                                    <label>
-                                                        <input
-                                                            type="checkbox"
-                                                            name="percentage"
-                                                            checked={formData.percentage}
-                                                            onChange={handleInputChange}
-                                                        />
-                                                        <span className={styles.checkboxLabel}>
-                                                            <i className="fas fa-percent"></i>
-                                                            Percentage-Based Compensation
-                                                        </span>
-                                                    </label>
-                                                </div>
-
-                                                {formData.percentage && (
-                                                    <div className={styles.commissionRateField}>
-                                                        <label htmlFor="commissionPercentage">
-                                                            Commission rate <span className={styles.required}>*</span>
-                                                            <span className={styles.fieldHelp}>(% of payments collected on this doctor&apos;s works)</span>
+                                                    <div className={styles.formGroup}>
+                                                        <label htmlFor="position">
+                                                            Position <span className={styles.required}>*</span>
                                                         </label>
-                                                        <div className={styles.commissionRateInput}>
+                                                        <select
+                                                            id="position"
+                                                            name="position"
+                                                            value={formData.position}
+                                                            onChange={handleInputChange}
+                                                            required
+                                                        >
+                                                            <option value="">Select a position</option>
+                                                            {positions.map(pos => (
+                                                                <option key={pos.id} value={pos.id}>
+                                                                    {pos.position_name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div className={styles.formRow}>
+                                                    <div className={styles.formGroup}>
+                                                        <label htmlFor="phone">
+                                                            Phone Number
+                                                        </label>
+                                                        <input
+                                                            type="tel"
+                                                            id="phone"
+                                                            name="phone"
+                                                            value={formData.phone}
+                                                            onChange={handleInputChange}
+                                                            placeholder="e.g., 0750 123 4567"
+                                                        />
+                                                    </div>
+                                                    <div className={styles.formGroup}>
+                                                        <label htmlFor="sort_order">
+                                                            Sort Order
+                                                            <span className={styles.fieldHelp}>
+                                                                (Lower numbers appear first)
+                                                            </span>
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            id="sort_order"
+                                                            name="sort_order"
+                                                            value={formData.sort_order}
+                                                            onChange={handleInputChange}
+                                                            placeholder="e.g., 1"
+                                                            min="1"
+                                                            max="999"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className={styles.checkboxGroup}>
+                                                    <div className={styles.checkboxItem}>
+                                                        <label>
                                                             <input
-                                                                type="number"
-                                                                id="commissionPercentage"
-                                                                name="commissionPercentage"
-                                                                value={formData.commissionPercentage}
+                                                                type="checkbox"
+                                                                name="is_active"
+                                                                checked={formData.is_active}
                                                                 onChange={handleInputChange}
-                                                                min="1"
-                                                                max="100"
-                                                                step="1"
-                                                                required
-                                                                placeholder="e.g., 15"
+                                                                disabled={editingClinicRow}
                                                             />
-                                                            <span className={styles.commissionRateSuffix}>%</span>
+                                                            <span className={styles.checkboxLabel}>
+                                                                <i className="fas fa-user-check"></i>
+                                                                Currently employed
+                                                                <span className={styles.fieldHelp}>
+                                                                    (Uncheck if this employee has left / quit)
+                                                                </span>
+                                                            </span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeTab === 'other' && (
+                                            <div>
+                                                <div className={styles.formRow}>
+                                                    <div className={styles.formGroup}>
+                                                        <label htmlFor="email">
+                                                            Email Address
+                                                            <span className={styles.fieldHelp}>
+                                                                (Required for notifications)
+                                                            </span>
+                                                        </label>
+                                                        <input
+                                                            type="email"
+                                                            id="email"
+                                                            name="email"
+                                                            value={formData.email}
+                                                            onChange={handleInputChange}
+                                                            placeholder="employee@example.com"
+                                                        />
+                                                    </div>
+                                                    <div className={styles.formGroup}>
+                                                        {/* Empty placeholder */}
+                                                    </div>
+                                                </div>
+
+                                                <div className={styles.formRow}>
+                                                    <div className={styles.formGroup}>
+                                                        <label htmlFor="appointment_color">
+                                                            Calendar Color
+                                                            <span className={styles.fieldHelp}>
+                                                                (Shown on the appointment calendar)
+                                                            </span>
+                                                        </label>
+                                                        <div className={styles.colorField}>
+                                                            <input
+                                                                type="color"
+                                                                id="appointment_color"
+                                                                name="appointment_color"
+                                                                className={styles.colorInput}
+                                                                value={formData.appointment_color || NEUTRAL_PICKER_HEX}
+                                                                onChange={handleInputChange}
+                                                            />
+                                                            <span className={styles.colorValue}>
+                                                                {formData.appointment_color ? formData.appointment_color.toUpperCase() : 'None (neutral)'}
+                                                            </span>
+                                                            {formData.appointment_color && (
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.colorClear}
+                                                                    onClick={handleClearColor}
+                                                                >
+                                                                    <i className="fas fa-times"></i> Clear
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
+                                                    <div className={styles.formGroup}></div>
+                                                </div>
+
+                                                {!formData.is_active && (
+                                                    <p className={styles.fieldHelp}>
+                                                        <i className="fas fa-info-circle"></i> This employee is marked as having quit, so email and appointment options are disabled. Commission settings are kept so past-period commission reports stay accurate.
+                                                    </p>
                                                 )}
+                                                <div className={styles.checkboxGroup}>
+                                                    <div className={styles.checkboxItem}>
+                                                        <label>
+                                                            <input
+                                                                type="checkbox"
+                                                                name="receiveEmail"
+                                                                checked={formData.receiveEmail}
+                                                                onChange={handleInputChange}
+                                                                disabled={!formData.is_active}
+                                                            />
+                                                            <span className={styles.checkboxLabel}>
+                                                                <i className="fas fa-envelope"></i>
+                                                                Receive Email Notifications
+                                                            </span>
+                                                        </label>
+                                                    </div>
+
+                                                    <div className={styles.checkboxItem}>
+                                                        <label>
+                                                            <input
+                                                                type="checkbox"
+                                                                name="getAppointments"
+                                                                checked={formData.getAppointments}
+                                                                onChange={handleInputChange}
+                                                                disabled={!formData.is_active}
+                                                            />
+                                                            <span className={styles.checkboxLabel}>
+                                                                <i className="fas fa-calendar-check"></i>
+                                                                Include in Appointment Reports
+                                                            </span>
+                                                        </label>
+                                                    </div>
+
+                                                    <div className={styles.checkboxItem}>
+                                                        <label>
+                                                            <input
+                                                                type="checkbox"
+                                                                name="percentage"
+                                                                checked={formData.percentage}
+                                                                onChange={handleInputChange}
+                                                            />
+                                                            <span className={styles.checkboxLabel}>
+                                                                <i className="fas fa-percent"></i>
+                                                                Percentage-Based Compensation
+                                                            </span>
+                                                        </label>
+                                                    </div>
+
+                                                    {formData.percentage && (
+                                                        <div className={styles.commissionRateField}>
+                                                            <label htmlFor="commissionPercentage">
+                                                                Commission rate <span className={styles.required}>*</span>
+                                                                <span className={styles.fieldHelp}>(% of payments collected on this doctor&apos;s works)</span>
+                                                            </label>
+                                                            <div className={styles.commissionRateInput}>
+                                                                <input
+                                                                    type="number"
+                                                                    id="commissionPercentage"
+                                                                    name="commissionPercentage"
+                                                                    value={formData.commissionPercentage}
+                                                                    onChange={handleInputChange}
+                                                                    min="1"
+                                                                    max="100"
+                                                                    step="1"
+                                                                    required
+                                                                    placeholder="e.g., 15"
+                                                                />
+                                                                <span className={styles.commissionRateSuffix}>%</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                    <div className={styles.modalFooter}>
-                        <button type="button" onClick={handleCancel} className={styles.btnCancel}>
-                            Cancel
-                        </button>
-                        <button type="submit" className={styles.btnSave}>
-                            <i className="fas fa-save"></i>
-                            {editingId ? 'Update Employee' : 'Add Employee'}
-                        </button>
-                    </div>
-                </form>
+                        <div className={styles.modalFooter}>
+                            <button type="button" onClick={dismiss} className={styles.btnCancel}>
+                                Cancel
+                            </button>
+                            <button type="submit" className={styles.btnSave} disabled={saving}>
+                                <i className={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}></i>
+                                {editingId ? 'Update Employee' : 'Add Employee'}
+                            </button>
+                        </div>
+                    </form>
+                </>)}
             </Modal>
 
             <div className={styles.list}>
@@ -609,7 +655,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         </td>
                                         <td data-label="Position">
                                             <span className={styles.positionBadge}>
-                                                {getPositionName(employee.position)}
+                                                {employee.position_name ?? 'Unknown'}
                                             </span>
                                         </td>
                                         <td data-label="Status">
@@ -697,16 +743,20 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                 className={`${styles.btnIcon} ${styles.btnEdit}`}
                                                 onClick={() => handleEdit(employee)}
                                                 title="Edit employee"
+                                                aria-label="Edit employee"
                                             >
-                                                <i className="fas fa-edit"></i>
+                                                <i className="fas fa-edit" aria-hidden="true"></i>
                                             </button>
-                                            <button
-                                                className={`${styles.btnIcon} ${styles.btnDelete}`}
-                                                onClick={() => handleDelete(employee.id, employee.employee_name)}
-                                                title="Delete employee"
-                                            >
-                                                <i className="fas fa-trash"></i>
-                                            </button>
+                                            {!isClinicDoctorName(employee.employee_name) && (
+                                                <button
+                                                    className={`${styles.btnIcon} ${styles.btnDelete}`}
+                                                    onClick={() => handleDelete(employee.id, employee.employee_name)}
+                                                    title="Delete employee"
+                                                    aria-label="Delete employee"
+                                                >
+                                                    <i className="fas fa-trash" aria-hidden="true"></i>
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -735,19 +785,21 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                         <i className="fas fa-edit" aria-hidden="true"></i>
                         <span>Edit</span>
                     </button>
-                    <button
-                        type="button"
-                        role="menuitem"
-                        className={`${styles.contextMenuItem} ${styles.contextMenuItemDanger}`}
-                        onClick={() => {
-                            const { id, employee_name } = contextMenu.employee;
-                            closeContextMenu();
-                            handleDelete(id, employee_name);
-                        }}
-                    >
-                        <i className="fas fa-trash" aria-hidden="true"></i>
-                        <span>Delete</span>
-                    </button>
+                    {!isClinicDoctorName(contextMenu.employee.employee_name) && (
+                        <button
+                            type="button"
+                            role="menuitem"
+                            className={`${styles.contextMenuItem} ${styles.contextMenuItemDanger}`}
+                            onClick={() => {
+                                const { id, employee_name } = contextMenu.employee;
+                                closeContextMenu();
+                                handleDelete(id, employee_name);
+                            }}
+                        >
+                            <i className="fas fa-trash" aria-hidden="true"></i>
+                            <span>Delete</span>
+                        </button>
+                    )}
                 </div>
             )}
         </div>

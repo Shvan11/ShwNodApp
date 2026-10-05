@@ -27,6 +27,8 @@ import {
   deleteArchformPatient,
   isArchformAvailable,
   ArchformDbUnavailableError,
+  ArchformNotConfiguredError,
+  ArchformPatientNotFoundError,
 } from '../../services/archform/archform-db.js';
 
 const router = Router();
@@ -34,6 +36,36 @@ const router = Router();
 // ============================================================================
 // ARCHFORM PATIENT MATCHING
 // ============================================================================
+
+/**
+ * The two "Archform can't be read" answers. 503 when the configured file isn't
+ * reachable; 409 `notConfigured` when this install has no ARCHFORM_DB_PATH at all
+ * (FE-F18-4 — it used to try this clinic's `\\workPC` share). Returns true when it
+ * answered.
+ */
+function respondArchformUnavailable(res: Response, error: unknown): boolean {
+  if (error instanceof ArchformNotConfiguredError) {
+    res.status(409).json({
+      success: false,
+      unavailable: true,
+      notConfigured: true,
+      message: error.message,
+      path: '',
+    });
+    return true;
+  }
+  if (error instanceof ArchformDbUnavailableError) {
+    log.warn('Archform database unavailable', { path: error.dbPath });
+    res.status(503).json({
+      success: false,
+      unavailable: true,
+      message: 'Archform database is not accessible',
+      path: error.dbPath,
+    });
+    return true;
+  }
+  return false;
+}
 
 /**
  * Get all patients from Archform SQLite database
@@ -50,16 +82,7 @@ router.get(
         count: patients.length
       });
     } catch (error) {
-      if (error instanceof ArchformDbUnavailableError) {
-        log.warn('Archform database unavailable', { path: error.dbPath });
-        res.status(503).json({
-          success: false,
-          unavailable: true,
-          message: 'Archform database is not accessible',
-          path: error.dbPath,
-        });
-        return;
-      }
+      if (respondArchformUnavailable(res, error)) return;
       log.error('Error fetching Archform patients:', error);
       ErrorResponses.internalError(
         res,
@@ -135,10 +158,20 @@ router.patch(
         return;
       }
 
-      await alignerArchformQueries.updateArchformId(
+      const conflict = await alignerArchformQueries.updateArchformId(
         parseInt(setId, 10),
         archformId ?? null
       );
+      if (conflict) {
+        ErrorResponses.conflict(
+          res,
+          conflict.kind === 'set_already_linked'
+            ? 'This aligner set is already linked to another Archform patient. Reload the page, and unmatch it first if it should change.'
+            : 'This Archform patient is already linked to another aligner set. Reload the page, and unmatch that set first if it should change.',
+          { code: conflict.kind.toUpperCase(), ...conflict }
+        );
+        return;
+      }
 
       log.info('Updated archform_id', { setId, archformId });
 
@@ -189,15 +222,11 @@ router.put(
 
       sendSuccess(res, null, 'Archform patient updated successfully');
     } catch (error) {
-      if (error instanceof ArchformDbUnavailableError) {
-        res.status(503).json({
-          success: false,
-          unavailable: true,
-          message: 'Archform database is not accessible',
-          path: error.dbPath,
-        });
+      if (error instanceof ArchformPatientNotFoundError) {
+        ErrorResponses.notFound(res, 'Archform patient', { details: error.message });
         return;
       }
+      if (respondArchformUnavailable(res, error)) return;
       log.error('Error updating Archform patient:', error);
       ErrorResponses.internalError(
         res,
@@ -249,15 +278,7 @@ router.delete(
         'Archform patient deleted successfully'
       );
     } catch (error) {
-      if (error instanceof ArchformDbUnavailableError) {
-        res.status(503).json({
-          success: false,
-          unavailable: true,
-          message: 'Archform database is not accessible',
-          path: error.dbPath,
-        });
-        return;
-      }
+      if (respondArchformUnavailable(res, error)) return;
       log.error('Error deleting Archform patient:', error);
       ErrorResponses.internalError(
         res,

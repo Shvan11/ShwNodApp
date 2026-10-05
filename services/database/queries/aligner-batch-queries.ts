@@ -61,10 +61,13 @@ interface BatchData {
   // but never read, so the API accepted them and silently dropped them.
 }
 
-// Full replace (every editable column is written unconditionally). `aligner_set_id`
-// stays REQUIRED: it identifies the owning set and is rejected if it differs from
-// the stored value — a batch cannot be moved between sets.
-type BatchUpdateData = BatchData;
+// PARTIAL update: an omitted field keeps its stored value (FE-F17-1). It was a full
+// replace seeded from the page's cached batch list, so an edit made from a page
+// loaded before the doctor changed `days` in the portal wrote the old days back,
+// logged a bogus DaysChanged flag and forward-synced the revert to the doctor.
+// `aligner_set_id` is optional; when present it must equal the stored value (a
+// batch cannot be moved between sets).
+type BatchUpdateData = Partial<BatchData>;
 
 interface DeactivatedBatchInfo {
   deactivatedBatch: {
@@ -336,10 +339,7 @@ export async function updateBatch(
     has_lower_template,
   } = batchData;
 
-  const upper = toIntOr(upper_aligner_count, 0);
-  const lower = toIntOr(lower_aligner_count, 0);
-
-  await withPgTransaction(async (trx) => {
+  return withPgTransaction(async (trx) => {
     const old = await trx
       .selectFrom('aligner_batches')
       .select(['aligner_set_id', 'upper_aligner_count', 'lower_aligner_count', 'days', 'has_upper_template', 'has_lower_template', 'delivered_to_patient_date', 'batch_sequence'])
@@ -347,9 +347,17 @@ export async function updateBatch(
       .executeTakeFirst();
     if (!old) throw new Error('Aligner batch not found');
     // aligner_set_id identifies the owning set, it is not editable — a batch cannot
-    // be moved between sets. Required in the contract, so `undefined` (which never
-    // equals the stored id) can no longer reach here from a partial body.
-    if (aligner_set_id !== old.aligner_set_id) throw new Error('Cannot change aligner_set_id');
+    // be moved between sets.
+    if (aligner_set_id !== undefined && aligner_set_id !== old.aligner_set_id) {
+      throw new Error('Cannot change aligner_set_id');
+    }
+    const setId = old.aligner_set_id;
+
+    // Omitted = unchanged (FE-F17-1).
+    const upper = upper_aligner_count === undefined ? (old.upper_aligner_count ?? 0) : toIntOr(upper_aligner_count, 0);
+    const lower = lower_aligner_count === undefined ? (old.lower_aligner_count ?? 0) : toIntOr(lower_aligner_count, 0);
+    const newDays = days === undefined ? (old.days ?? null) : toIntOr(days, null);
+    if (upper <= 0 && lower <= 0) throw new Error('Enter an upper or lower aligner count');
 
     const oldHasU = old.has_upper_template ?? false;
     const oldHasL = old.has_lower_template ?? false;
@@ -360,7 +368,7 @@ export async function updateBatch(
       const earlier = await trx
         .selectFrom('aligner_batches')
         .select('aligner_batch_id')
-        .where('aligner_set_id', '=', aligner_set_id)
+        .where('aligner_set_id', '=', setId)
         .where('aligner_batch_id', '<>', batchId)
         .where('batch_sequence', '<', old.batch_sequence)
         .executeTakeFirst();
@@ -372,7 +380,7 @@ export async function updateBatch(
     const set = await trx
       .selectFrom('aligner_sets')
       .select(['remaining_upper_aligners', 'remaining_lower_aligners'])
-      .where('aligner_set_id', '=', aligner_set_id)
+      .where('aligner_set_id', '=', setId)
       .forUpdate()
       .executeTakeFirst();
     const remU = set?.remaining_upper_aligners ?? 0;
@@ -385,16 +393,32 @@ export async function updateBatch(
     if (newLoConsumed > remL + oldLoConsumed) throw new Error(`Cannot update aligner batch: requested lower aligners (${newLoConsumed}) exceed available count (${remL + oldLoConsumed})`);
 
     if (is_last === true) {
-      await trx.updateTable('aligner_batches').set({ is_last: false }).where('aligner_set_id', '=', aligner_set_id).where('aligner_batch_id', '<>', batchId).where('is_last', '=', true).execute();
+      await trx.updateTable('aligner_batches').set({ is_last: false }).where('aligner_set_id', '=', setId).where('aligner_batch_id', '<>', batchId).where('is_last', '=', true).execute();
     }
+    // Activating this batch turns the set's other active one off — reported back,
+    // so the drawer's "Batch #N was automatically deactivated" toast can fire
+    // (it couldn't: this always returned null, FE-F17-13).
+    let deactivated: DeactivatedBatchInfo | null = null;
     if (is_active === true) {
       if (!old.delivered_to_patient_date) throw new Error('Cannot set is_active: batch must be delivered first');
-      await trx.updateTable('aligner_batches').set({ is_active: false }).where('aligner_set_id', '=', aligner_set_id).where('aligner_batch_id', '<>', batchId).where('is_active', '=', true).execute();
+      const turnedOff = await trx
+        .updateTable('aligner_batches')
+        .set({ is_active: false })
+        .where('aligner_set_id', '=', setId)
+        .where('aligner_batch_id', '<>', batchId)
+        .where('is_active', '=', true)
+        .returning(['aligner_batch_id', 'batch_sequence'])
+        .execute();
+      if (turnedOff.length > 0) {
+        deactivated = {
+          deactivatedBatch: { batchId: turnedOff[0].aligner_batch_id, batchSequence: turnedOff[0].batch_sequence },
+        };
+      }
     }
 
     const countsChanged = upper !== (old.upper_aligner_count ?? 0) || lower !== (old.lower_aligner_count ?? 0);
     const templateChanged = newHasU !== oldHasU || newHasL !== oldHasL;
-    const daysChanged = toIntOr(days, null) !== (old.days ?? null);
+    const daysChanged = newDays !== (old.days ?? null);
 
     // Renumbering guard: a count/template change resequences every LATER batch's
     // start sequences. If one of those is already manufactured/delivered, its
@@ -405,7 +429,7 @@ export async function updateBatch(
       const lockedLater = await trx
         .selectFrom('aligner_batches')
         .select('batch_sequence')
-        .where('aligner_set_id', '=', aligner_set_id)
+        .where('aligner_set_id', '=', setId)
         .where('batch_sequence', '>', old.batch_sequence)
         .where((eb) => eb.or([
           eb('manufacture_date', 'is not', null),
@@ -426,8 +450,8 @@ export async function updateBatch(
       .set({
         upper_aligner_count: upper,
         lower_aligner_count: lower,
-        days: toIntOr(days, null),
-        notes: notes || null,
+        days: newDays,
+        notes: notes === undefined ? undefined : notes || null,
         is_active: is_active ?? undefined,
         is_last: is_last ?? undefined,
         has_upper_template: newHasU,
@@ -437,7 +461,7 @@ export async function updateBatch(
       .execute();
 
     if (countsChanged || templateChanged) {
-      await resequenceBatches(trx, aligner_set_id);
+      await resequenceBatches(trx, setId);
     }
 
     const upperDelta = newUpConsumed - oldUpConsumed;
@@ -446,7 +470,7 @@ export async function updateBatch(
       await trx
         .updateTable('aligner_sets')
         .set({ remaining_upper_aligners: remU - upperDelta, remaining_lower_aligners: remL - lowerDelta })
-        .where('aligner_set_id', '=', aligner_set_id)
+        .where('aligner_set_id', '=', setId)
         .execute();
     }
 
@@ -454,18 +478,16 @@ export async function updateBatch(
       await trx
         .insertInto('aligner_activity_flags')
         .values({
-          aligner_set_id,
+          aligner_set_id: setId,
           activity_type: 'DaysChanged',
-          activity_description: `days changed from ${old.days ?? 'not set'} to ${days ?? 'not set'}`,
+          activity_description: `days changed from ${old.days ?? 'not set'} to ${newDays ?? 'not set'}`,
           related_record_id: batchId,
         })
         .execute();
     }
 
+    return deactivated;
   });
-
-  // No result set → no deactivated-batch info.
-  return null;
 }
 
 /**

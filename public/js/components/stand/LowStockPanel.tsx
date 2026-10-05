@@ -3,7 +3,6 @@
  * Displays a compact list of items below their reorder level,
  * with a restock action button for each item.
  */
-import React from 'react';
 import type { StandItem } from '../../hooks/useStand';
 import styles from './LowStockPanel.module.css';
 
@@ -13,7 +12,7 @@ interface LowStockPanelProps {
   onRestock: (item: StandItem) => void;
 }
 
-const LowStockPanel: React.FC<LowStockPanelProps> = ({ items, loading, onRestock }) => {
+export default function LowStockPanel({ items, loading, onRestock }: LowStockPanelProps) {
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
@@ -61,6 +60,4 @@ const LowStockPanel: React.FC<LowStockPanelProps> = ({ items, loading, onRestock
       )}
     </div>
   );
-};
-
-export default React.memo(LowStockPanel);
+}

@@ -36,26 +36,6 @@
   margin-bottom: var(--spacing-xl);
 }
 
-.panel {
-  background: var(--background-primary);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: var(--spacing-lg);
-}
-
-.panelHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
-}
-
-.panelHeader h2 {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  color: var(--text-primary);
-}
-
 .navCards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

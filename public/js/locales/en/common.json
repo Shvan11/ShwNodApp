@@ -61,6 +61,7 @@
     "editValues": "Edit values",
     "manage": "Manage {{name}}",
     "manageValues": "Manage values",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load this list."
   }
 }

@@ -23,7 +23,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PATIENT_TYPE_IDS, WORK_STATUS, WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
-import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../public/js/config/expenseCategories.js';
+import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../shared/expense-categories.js';
 
 const DIR = fileURLToPath(new URL('../../migrations/pg/', import.meta.url));
 const REPO = fileURLToPath(new URL('../../', import.meta.url));

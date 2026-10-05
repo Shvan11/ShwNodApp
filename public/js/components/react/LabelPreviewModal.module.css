@@ -105,69 +105,6 @@
 }
 
 /* ===========================================
-   HEADER
-   =========================================== */
-
-.header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--lpm-space-lg) var(--lpm-space-xl);
-    border-bottom: 1px solid var(--border-color);
-    background: var(--lpm-gradient);
-    color: var(--color-white);
-}
-
-.header h2 {
-    margin: 0;
-    font-size: var(--lpm-font-size-2xl);
-    font-weight: var(--font-weight-semibold);
-    display: flex;
-    align-items: center;
-    gap: var(--lpm-space-sm);
-}
-
-.header h2 i {
-    font-size: 1.1rem;
-}
-
-.closeBtn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: var(--color-white);
-    width: 36px;
-    height: 36px;
-    border-radius: var(--lpm-radius-lg);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color var(--lpm-transition-normal);
-}
-
-.closeBtn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.closeBtn:focus-visible {
-    outline: 2px solid var(--color-white);
-    outline-offset: 2px;
-}
-
-/* Queue mode header */
-.queueModeHeader h2 {
-    flex-wrap: wrap;
-    gap: var(--lpm-space-md);
-}
-
-.queueHeaderStats {
-    font-size: var(--lpm-font-size-md);
-    font-weight: var(--font-weight-normal);
-    opacity: 0.9;
-    margin-left: auto;
-}
-
-/* ===========================================
    CONTENT LAYOUTS
    =========================================== */
 

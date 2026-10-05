@@ -31,6 +31,7 @@ import { validate } from '../../middleware/validate.js';
 import { authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
 import * as waContract from '../../shared/contracts/whatsapp.contract.js';
+import { getClinicDisplayName } from '../../services/settings/clinic-identity.js';
 
 const router = Router();
 
@@ -290,6 +291,7 @@ router.post(
       if (!whatsapp.isReady()) {
         res.json({
           success: false,
+          code: 'not_connected',
           message: 'WhatsApp not connected'
         });
         return;
@@ -300,6 +302,7 @@ router.post(
         log.warn(`Appointment not found: ${appointmentId}`);
         res.json({
           success: false,
+          code: 'not_found',
           message: 'Appointment not found'
         });
         return;
@@ -309,6 +312,7 @@ router.post(
         log.warn(`No phone number for patient ${appointment.person_id}`);
         res.json({
           success: false,
+          code: 'no_phone',
           message: 'No phone number for patient'
         });
         return;
@@ -319,6 +323,7 @@ router.post(
         log.warn(`Invalid phone format: ${appointment.phone}`);
         res.json({
           success: false,
+          code: 'invalid_phone',
           message: 'Invalid phone number'
         });
         return;
@@ -332,7 +337,7 @@ router.post(
       });
       const dayOfWeek = appDateObj.toLocaleDateString('en-GB', { weekday: 'long' });
 
-      const message = `Shwan Orthodontics
+      const message = `${await getClinicDisplayName()}
 
 Dear ${appointment.patient_name},
 
@@ -363,6 +368,7 @@ Thank you.`;
         log.error(`Failed to send appointment confirmation: ${result.error}`);
         res.json({
           success: false,
+          code: 'send_failed',
           message: 'Failed to send message'
         });
       }
@@ -372,6 +378,7 @@ Thank you.`;
       );
       res.json({
         success: false,
+        code: 'internal',
         message: 'Internal error'
       });
     }

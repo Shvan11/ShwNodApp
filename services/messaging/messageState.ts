@@ -26,14 +26,43 @@ interface ClientStatus {
 }
 
 /**
- * Message stats interface
+ * The progress of the CURRENT (or last) reminder batch — and only that batch.
+ *
+ * These counters used to grow on every `MessageSent`/`MessageFailed`, which the
+ * service also emits for one-off sends (payment receipts, booking confirmations,
+ * re-sends, task notices), and `finished` was only ever set true. So the /send
+ * page's bar counted every message since the last restart (prod: 25 and 33
+ * one-off sends before two 22-message batches → "26/22", pinned at 100 %), and a
+ * second batch in the same process was "finished" after its first message
+ * (audit FE-F16-1). Now `startBatch()` zeroes them, only the batch loop counts
+ * (`recordBatchResult`), and the frames + `/api/wa/initial-state` report this.
  */
-interface MessageStats {
+export interface BatchProgress {
+  started: boolean;
+  finished: boolean;
+  total: number;
   sent: number;
   failed: number;
-  finished: boolean;
+  /** The appointment date the batch is for (YYYY-MM-DD), null before the first batch. */
+  date: string | null;
+  /** Why the batch stopped early (never started, connection lost), null on a normal finish. */
+  error: string | null;
+}
+
+interface MessageStats extends BatchProgress {
   finishReport: boolean;
 }
+
+const IDLE_STATS: MessageStats = {
+  started: false,
+  finished: false,
+  total: 0,
+  sent: 0,
+  failed: 0,
+  date: null,
+  error: null,
+  finishReport: false,
+};
 
 /**
  * Person interface
@@ -110,12 +139,7 @@ class MessageStateManager {
           lastActivity: Date.now(),
           manualDisconnect: false,
         })),
-        StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({
-          sent: 0,
-          failed: 0,
-          finished: false,
-          finishReport: false,
-        })),
+        StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({ ...IDLE_STATS })),
         StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, () => new Map()),
         StateManager.atomicOperation<Map<string, number>>(
           this.stateKeys.MESSAGE_STATUSES,
@@ -267,8 +291,9 @@ class MessageStateManager {
    * Add person atomically with deduplication
    */
   async addPerson(person: Person): Promise<boolean> {
-    let wasNewMessage = false;
-
+    // No send counters here: one-off sends (receipts, confirmations, re-sends)
+    // come through addPerson too. The batch's own counts are `recordBatchResult`'s
+    // (FE-F16-1).
     await StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, (persons) => {
       const current = persons || new Map<string, Person>();
       const existing = current.get(person.messageId);
@@ -287,7 +312,6 @@ class MessageStateManager {
         // (index.ts's MessageFailed handler) passes its own status, and clobbering
         // it here left every failed send permanently recorded as PENDING — nothing
         // downstream ever transitions a person that was born failed.
-        wasNewMessage = true;
         current.set(person.messageId, {
           ...person,
           addedAt: Date.now(),
@@ -296,28 +320,6 @@ class MessageStateManager {
       }
       return current;
     });
-
-    // Only increment counters for new messages
-    if (wasNewMessage) {
-      if (person.success === '&#10004;') {
-        await StateManager.atomicOperation<MessageStats>(
-          this.stateKeys.MESSAGE_STATS,
-          (stats) => ({
-            ...(stats || { sent: 0, failed: 0, finished: false, finishReport: false }),
-            sent: (stats?.sent || 0) + 1,
-          })
-        );
-      } else if (person.success === '&times;') {
-        // Increment failed count for failed messages
-        await StateManager.atomicOperation<MessageStats>(
-          this.stateKeys.MESSAGE_STATS,
-          (stats) => ({
-            ...(stats || { sent: 0, failed: 0, finished: false, finishReport: false }),
-            failed: (stats?.failed || 0) + 1,
-          })
-        );
-      }
-    }
 
     return true;
   }
@@ -427,9 +429,53 @@ class MessageStateManager {
    */
   async setFinishReport(finished: boolean): Promise<MessageStats> {
     return StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...(stats || { sent: 0, failed: 0, finished: false, finishReport: false }),
+      ...(stats || IDLE_STATS),
       finishReport: finished,
     }));
+  }
+
+  /** A reminder batch begins: its counters start from zero (FE-F16-1). */
+  async startBatch(date: string, total: number): Promise<BatchProgress> {
+    const next = await StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, (stats) => ({
+      ...(stats || IDLE_STATS),
+      started: true,
+      finished: false,
+      total,
+      sent: 0,
+      failed: 0,
+      date,
+      error: null,
+    }));
+    return toBatchProgress(next);
+  }
+
+  /** One recipient of the running batch was attempted. */
+  async recordBatchResult(ok: boolean): Promise<BatchProgress> {
+    const next = await StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, (stats) => {
+      const current = stats || IDLE_STATS;
+      return ok ? { ...current, sent: current.sent + 1 } : { ...current, failed: current.failed + 1 };
+    });
+    return toBatchProgress(next);
+  }
+
+  /**
+   * The running batch ended. `error` says why it stopped early; a batch that
+   * failed before it began (circuit breaker open, the eligibility read threw) is
+   * recorded as started-and-finished with that error, so the page can say so.
+   */
+  async finishBatch(error: string | null = null): Promise<BatchProgress> {
+    const next = await StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, (stats) => ({
+      ...(stats || IDLE_STATS),
+      started: true,
+      finished: true,
+      error,
+    }));
+    return toBatchProgress(next);
+  }
+
+  /** The current (or last) batch's progress. */
+  get batchProgress(): BatchProgress {
+    return toBatchProgress(StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS) || IDLE_STATS);
   }
 
   /**
@@ -470,12 +516,7 @@ class MessageStateManager {
     log.info('Resetting message-send session state');
 
     await Promise.all([
-      StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({
-        sent: 0,
-        failed: 0,
-        finished: false,
-        finishReport: false,
-      })),
+      StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, () => ({ ...IDLE_STATS })),
 
       StateManager.atomicOperation<Map<string, Person>>(this.stateKeys.PERSONS, () => new Map()),
       StateManager.atomicOperation<Map<string, number>>(
@@ -497,12 +538,7 @@ class MessageStateManager {
       lastActivity: Date.now(),
       manualDisconnect: false,
     };
-    const messageStats = StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS) || {
-      sent: 0,
-      failed: 0,
-      finished: false,
-      finishReport: false,
-    };
+    const messageStats = StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS) || IDLE_STATS;
     const personsMap =
       StateManager.get<Map<string, Person>>(this.stateKeys.PERSONS) || new Map<string, Person>();
     const persons = Array.from(personsMap.values());
@@ -543,31 +579,6 @@ class MessageStateManager {
     return map ? Array.from(map.values()) : [];
   }
 
-  /**
-   * Get message stats
-   */
-  get sentMessages(): number {
-    const stats = StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS);
-    return stats?.sent || 0;
-  }
-
-  get failedMessages(): number {
-    const stats = StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS);
-    return stats?.failed || 0;
-  }
-
-  get finishedSending(): boolean {
-    const stats = StateManager.get<MessageStats>(this.stateKeys.MESSAGE_STATS);
-    return stats?.finished || false;
-  }
-
-  async setFinishedSending(finished: boolean): Promise<MessageStats> {
-    return StateManager.atomicOperation<MessageStats>(this.stateKeys.MESSAGE_STATS, (stats) => ({
-      ...(stats || { sent: 0, failed: 0, finished: false, finishReport: false }),
-      finished,
-    }));
-  }
-
   // Cleanup methods
   cleanupQR(): void {
     log.info('Cleaning up QR code');
@@ -602,6 +613,11 @@ class MessageStateManager {
     StateManager.cleanup();
     stateEvents.removeAllListeners();
   }
+}
+
+function toBatchProgress(stats: MessageStats): BatchProgress {
+  const { started, finished, total, sent, failed, date, error } = stats;
+  return { started, finished, total, sent, failed, date, error };
 }
 
 // Create singleton instance

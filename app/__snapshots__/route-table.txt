@@ -193,8 +193,9 @@ GET     /api/messaging/count/:date  [validate(params)]
 GET     /api/messaging/message-text/:appointmentId  [validate(params)]
 POST    /api/messaging/reset/:date  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
+GET     /api/aligner/features
 GET     /api/aligner/doctors
-GET     /api/aligner/all-sets
+GET     /api/aligner/all-sets  [validate(query)]
 GET     /api/aligner/patients/all
 GET     /api/aligner/patients/by-doctor/:doctorId
 GET     /api/aligner/patients  [validate(query)]
@@ -207,7 +208,7 @@ DELETE  /api/aligner/sets/:setId  [authorize(admin|front_desk|clinical) -> valid
 MOUNT   /api
 GET     /api/aligner/notes/:setId
 POST    /api/aligner/notes  [authorize(admin|front_desk|clinical) -> validate(body)]
-PATCH   /api/aligner/notes/:noteId/toggle-read  [authorize(admin|front_desk|clinical) -> validate(params)]
+PATCH   /api/aligner/notes/read  [authorize(admin|front_desk|clinical) -> validate(body)]
 PATCH   /api/aligner/notes/:noteId  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 DELETE  /api/aligner/notes/:noteId  [authorize(admin|front_desk|clinical) -> validate(params)]
 GET     /api/aligner/notes/:noteId/status
@@ -232,6 +233,7 @@ PATCH   /api/aligner/sets/:setId/archform  [authorize(admin|front_desk|clinical)
 PUT     /api/aligner/archform/patients/:id  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 DELETE  /api/aligner/archform/patients/:id  [authorize(admin|front_desk|clinical) -> validate(params)]
 MOUNT   /api
+GET     /api/aligner/labels/settings
 POST    /api/aligner/labels/generate  [authorize(admin|front_desk|clinical) -> validate(body)]
 MOUNT   /api
 GET     /api/aligner-doctors
@@ -258,9 +260,9 @@ GET     /api/health/detailed
 POST    /api/health/start  [authorize(admin)]
 POST    /api/health/stop  [authorize(admin)]
 MOUNT   /api
-GET     /api/options
+GET     /api/options  [authorize(admin)]
 PUT     /api/options/bulk  [authorize(admin) -> validate(body)]
-GET     /api/options/:optionName
+GET     /api/options/:optionName  [validate(params)]
 PUT     /api/options/:optionName  [authorize(admin) -> validate(params,body)]
 GET     /api/config/database  [authorize(admin)]
 POST    /api/config/database/test  [authorize(admin) -> validate(body)]
@@ -300,6 +302,8 @@ POST    /api/photo-editor/:personId/prepare  [authorize(admin|front_desk|clinica
 POST    /api/photo-editor/:personId/render  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 DELETE  /api/photo-editor/:personId/view  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 GET     /api/photo-editor/:personId/photo-dates  [validate(params)]
+GET     /api/photo-editor/:personId/framing/:tpCode  [validate(params)]
+GET     /api/photo-editor/:personId/source-size  [validate(params,query)]
 GET     /api/photo-editor/:personId/taken-dates  [validate(params,query)]
 MOUNT   /api/videos
 GET     /api/videos
@@ -326,6 +330,7 @@ GET     /api/stand/items/:id  [authorize(admin|front_desk)]
 POST    /api/stand/items  [authenticate -> authorize(admin|front_desk) -> validate(body)]
 PUT     /api/stand/items/:id  [authenticate -> authorize(admin|front_desk) -> validate(params,body)]
 DELETE  /api/stand/items/:id  [authenticate -> authorize(admin) -> validate(params)]
+POST    /api/stand/items/:id/reactivate  [authenticate -> authorize(admin) -> validate(params)]
 POST    /api/stand/items/:id/restock  [authenticate -> authorize(admin|front_desk) -> validate(params,body)]
 POST    /api/stand/items/:id/adjust  [authenticate -> authorize(admin) -> validate(params,body)]
 GET     /api/stand/items/:id/movements  [authorize(admin|front_desk)]
@@ -333,8 +338,8 @@ POST    /api/stand/sales  [authenticate -> authorize(admin|front_desk) -> valida
 GET     /api/stand/sales  [authorize(admin|front_desk) -> validate(query)]
 GET     /api/stand/sales/:id  [authorize(admin|front_desk)]
 POST    /api/stand/sales/:id/void  [authenticate -> authorize(admin) -> validate(params,body)]
-GET     /api/stand/reports/summary  [authorize(admin|front_desk)]
-GET     /api/stand/reports/top-items  [authorize(admin|front_desk)]
+GET     /api/stand/reports/summary  [authorize(admin|front_desk) -> validate(query)]
+GET     /api/stand/reports/top-items  [authorize(admin|front_desk) -> validate(query)]
 MOUNT   /api/localsend
 GET     /api/localsend/devices  [validate(query)]
 POST    /api/localsend/probe  [authorize(admin|front_desk|clinical) -> validate(body)]
@@ -432,6 +437,7 @@ MOUNT   /api/calendar
 GET     /api/calendar/month  [validate(query)]
 GET     /api/calendar/range  [validate(query)]
 POST    /api/calendar/regenerate  [authorize(admin|front_desk)]
+PUT     /api/calendar/slot-settings  [authorize(admin|front_desk) -> validate(body)]
 GET     /api/calendar/available-slots  [validate(query)]
 GET     /api/calendar/month-availability  [validate(query)]
 MOUNT   /api/email

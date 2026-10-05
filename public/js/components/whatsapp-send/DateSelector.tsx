@@ -21,8 +21,13 @@ interface DateSelectorProps {
   onReset: () => Promise<void>;
   onSendEmail: () => Promise<void>;
   loading: boolean;
+  /** The count read failed — the banner says so in its error colours. */
+  countFailed: boolean;
   resetConfirm: boolean;
   emailConfirm: boolean;
+  /** A reset / email request is in flight: its button stays disabled until it answers. */
+  resetting: boolean;
+  emailing: boolean;
   sendability: DateSendability;
 }
 
@@ -45,8 +50,11 @@ export default function DateSelector({
   onReset,
   onSendEmail,
   loading,
+  countFailed,
   resetConfirm,
   emailConfirm,
+  resetting,
+  emailing,
   sendability,
 }: DateSelectorProps) {
   const handleRefreshClick = async (e: MouseEvent<HTMLButtonElement>) => {
@@ -104,7 +112,7 @@ export default function DateSelector({
             id="resetMessagingBtn"
             className={`btn ${resetConfirm ? 'btn-warning' : 'btn-danger'}`}
             onClick={handleResetClick}
-            disabled={loading}
+            disabled={loading || resetting}
             aria-label={
               resetConfirm ? 'Click again to confirm reset' : 'Reset all messages for selected date'
             }
@@ -112,13 +120,13 @@ export default function DateSelector({
             <span className={styles.btnIcon} aria-hidden="true">
               {resetConfirm ? '⚠️' : '🔄'}
             </span>
-            <span>{resetConfirm ? 'Click to Confirm Reset' : 'Reset Messages'}</span>
+            <span>{resetting ? 'Resetting...' : resetConfirm ? 'Click to Confirm Reset' : 'Reset Messages'}</span>
           </button>
           <button
             id="sendEmailBtn"
             className={`btn ${emailConfirm ? 'btn-warning' : 'btn-success'}`}
             onClick={handleSendEmailClick}
-            disabled={loading}
+            disabled={loading || emailing}
             aria-label={
               emailConfirm ? 'Click again to confirm sending email' : 'Email appointment list to staff'
             }
@@ -126,13 +134,13 @@ export default function DateSelector({
             <span className={styles.btnIcon} aria-hidden="true">
               {emailConfirm ? '⚠️' : '📧'}
             </span>
-            <span>{emailConfirm ? 'Click to Confirm Email' : 'Email to Staff'}</span>
+            <span>{emailing ? 'Sending email...' : emailConfirm ? 'Click to Confirm Email' : 'Email to Staff'}</span>
           </button>
         </div>
 
         <div
           id="messageCount"
-          className={styles.messageCountInfo}
+          className={`${styles.messageCountInfo} ${loading ? styles.loading : countFailed ? styles.error : ''}`}
           role="status"
           aria-live="polite"
           aria-atomic="true"

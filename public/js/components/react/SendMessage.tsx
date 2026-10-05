@@ -1,37 +1,51 @@
 import { useState } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Select, { SingleValue, StylesConfig } from 'react-select';
+import Select, { SingleValue } from 'react-select';
 import { useQuery } from '@tanstack/react-query';
 import { useWhatsAppStatus } from '../../contexts/GlobalStateContext';
 import { postFormData, httpErrorMessage } from '@/core/http';
 import { patientPhonesQuery, googleContactsQuery } from '@/query/queries';
+import { GOOGLE_CONTACT_ACCOUNTS } from '@shared/google-contacts-accounts';
+import styles from './SendMessage.module.css';
 
-interface ContactData {
-    id?: string | number;
+interface Contact {
+    id: string | number;
+    name: string;
     phone: string;
-    name?: string;
-    text?: string;
-    [key: string]: unknown;
 }
 
 interface ContactOption {
     value: string | number;
     label: string;
     phone: string;
-    name: string;
-    contactData: ContactData;
 }
 
-type StatusType = 'success' | 'error' | 'warning' | 'auth-required' | '';
+/** `/api/wa/sendmedia2`'s raw answer: how many of the files went, and why the others didn't. */
+interface SendMediaResult {
+    result?: string;
+    sentMessages?: number;
+    total?: number;
+    error?: string;
+    errors?: string[];
+}
 
-// Type for react-select styles
-type SelectStylesConfig = StylesConfig<ContactOption, false>;
+type StatusType = 'success' | 'error' | 'warning';
+
+/** `/sendmedia2` is mounted with a 120 s timeout: several files, or one big Telegram file, take longer than the funnel's 30 s default (FE-F16-6). */
+const SEND_TIMEOUT_MS = 120_000;
+
+// The patients' phone book, then every Google contact account in the registry —
+// an account added there appears here without an edit (FE-F16-14).
+const SOURCES: ReadonlyArray<{ id: string; label: string }> = [
+    { id: 'pat', label: "Patients' Phones" },
+    ...GOOGLE_CONTACT_ACCOUNTS.map((a) => ({ id: a.id, label: a.label })),
+];
 
 const SendMessage = () => {
     const navigate = useNavigate();
 
-    // Use global state for WhatsApp client status
+    // Live: the auth-required banner clears itself the moment the client pairs.
     const { clientReady: whatsappClientReady } = useWhatsAppStatus();
 
     // Seed from the ?file= URL param once on mount (lazy initializers, so there's no
@@ -40,56 +54,54 @@ const SendMessage = () => {
         const fileParam = new URLSearchParams(window.location.search).get('file');
         return fileParam ? decodeURIComponent(fileParam) : '';
     });
-    const [pathsArray] = useState<string[]>(() => {
-        const fileParam = new URLSearchParams(window.location.search).get('file');
-        return fileParam ? decodeURIComponent(fileParam).split(',') : [];
-    });
     const [selectedSource, setSelectedSource] = useState('pat');
     const [selectedContact, setSelectedContact] = useState<ContactOption | null>(null);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [program, setProgram] = useState('WhatsApp');
-    const [statusMessage, setStatusMessage] = useState('');
-    const [statusType, setStatusType] = useState<StatusType>('');
+    const [status, setStatus] = useState<{ type: StatusType; message: string } | null>(null);
+    const [authPrompted, setAuthPrompted] = useState(false);
+    // One send at a time: a double click used to send every file twice (FE-F16-6).
+    const [sending, setSending] = useState(false);
 
-    // Contacts come from one of two sources depending on the selector: the
-    // patients' phone book (`pat`) or a Google contact group (`shw`/`cli`). Only
-    // the active source fetches; the other stays disabled.
+    const fileCount = filePath ? filePath.split(',').filter((p) => p.trim()).length : 0;
+    const showAuthRequired = authPrompted && program === 'WhatsApp' && !whatsappClientReady;
+
+    // Contacts come from one of the sources above; only the active one fetches.
     const phonesResult = useQuery({ ...patientPhonesQuery(), enabled: selectedSource === 'pat' });
     const googleResult = useQuery({
         ...googleContactsQuery(selectedSource),
         enabled: selectedSource !== 'pat',
     });
     const activeResult = selectedSource === 'pat' ? phonesResult : googleResult;
-    const contactsArray = (activeResult.data ?? []) as ContactData[];
-    const contactOptions: ContactOption[] = contactsArray.map(contact => ({
-        value: contact.id || contact.phone,
-        label: `${contact.name || contact.text} - ${contact.phone}`,
+    // A patient with no phone can't be sent anything — it used to be listed as "Name - null".
+    const contacts: Contact[] =
+        selectedSource === 'pat'
+            ? (phonesResult.data ?? []).flatMap((c) => (c.phone ? [{ id: c.id, name: c.name, phone: c.phone }] : []))
+            : (googleResult.data ?? []).map((c) => ({ id: c.id, name: c.text, phone: c.phone }));
+    const contactOptions: ContactOption[] = contacts.map((contact) => ({
+        value: contact.id,
+        label: `${contact.name} - ${contact.phone}`,
         phone: contact.phone,
-        name: contact.name || contact.text || '',
-        contactData: contact
     }));
 
-    // Surface a contact-load failure with the existing status banner, once per error
-    // transition. The setters are called directly (the later-declared showMessage
-    // would trip react-hooks/immutability); type is 'error' so the success-only
-    // auto-clear timer in showMessage doesn't apply.
+    // Surface a contact-load failure with the status banner, once per error transition.
     const [prevContactsError, setPrevContactsError] = useState(activeResult.isError);
     if (activeResult.isError !== prevContactsError) {
         setPrevContactsError(activeResult.isError);
         if (activeResult.isError) {
-            setStatusMessage(`Failed to load contacts: ${httpErrorMessage(activeResult.error, 'Unknown error')}`);
-            setStatusType('error');
+            setStatus({
+                type: 'error',
+                message: `Failed to load contacts: ${httpErrorMessage(activeResult.error, 'Unknown error')}`,
+            });
         }
     }
 
-    // Handle source change
     const handleSourceChange = (newSource: string) => {
         setSelectedSource(newSource);
         setSelectedContact(null);
         setPhoneNumber('');
     };
 
-    // Handle contact selection with React-Select
     const handleContactSelect = (selectedOption: SingleValue<ContactOption>) => {
         setSelectedContact(selectedOption);
 
@@ -110,73 +122,69 @@ const SendMessage = () => {
         }
     };
 
-    // Handle form submission
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        if (sending) return;
 
-        // Validate inputs
         if (!phoneNumber.trim()) {
-            showMessage('Please enter a phone number', 'error');
+            setStatus({ type: 'error', message: 'Please enter a phone number' });
             return;
         }
 
         if (!filePath.trim()) {
-            showMessage('Please select a file to send', 'error');
+            setStatus({ type: 'error', message: 'Please select a file to send' });
             return;
         }
 
-        // Check WhatsApp client status if WhatsApp is selected
         if (program === 'WhatsApp' && !whatsappClientReady) {
-            showAuthenticationRequired();
+            setStatus(null);
+            setAuthPrompted(true);
             return;
         }
 
-        // Prepare form data
         const formData = new FormData();
         formData.append('prog', program);
         formData.append('phone', phoneNumber);
         formData.append('file', filePath);
 
+        setSending(true);
+        setStatus(null);
         try {
-            const data = await postFormData<{ result?: string; sentMessages?: number; error?: string }>('/api/wa/sendmedia2', formData);
+            const data = await postFormData<SendMediaResult>('/api/wa/sendmedia2', formData, {
+                timeoutMs: SEND_TIMEOUT_MS,
+            });
+            const total = data.total ?? fileCount;
+            const sent = data.sentMessages ?? 0;
+            const reasons = (data.errors?.length ? data.errors : data.error ? [data.error] : []).join('; ');
 
-            if (data.result === 'OK') {
-                const fileCount = pathsArray.length;
-                showMessage(`${program} message sent successfully! (${data.sentMessages || 0}/${fileCount} files sent)`, 'success');
-            } else if (data.error) {
-                showMessage(`${program} Error: ${data.error}`, 'error');
+            if (total > 0 && sent === total) {
+                setStatus({
+                    type: 'success',
+                    message: `${program} message sent (${sent} of ${total} file${total === 1 ? '' : 's'}).`,
+                });
+            } else if (sent > 0) {
+                setStatus({
+                    type: 'warning',
+                    message: `Only ${sent} of ${total} files were sent by ${program}${reasons ? ` — ${reasons}` : ''}.`,
+                });
             } else {
-                showMessage('Unknown error occurred while sending message', 'error');
+                setStatus({
+                    type: 'error',
+                    message: `${program} could not send the file${total === 1 ? '' : 's'}${reasons ? `: ${reasons}` : '.'}`,
+                });
             }
         } catch (error) {
             console.error('Error sending message:', error);
-            showMessage(`Failed to send ${program} message: ${httpErrorMessage(error, 'Unknown error')}`, 'error');
+            setStatus({
+                type: 'error',
+                message: `Failed to send ${program} message: ${httpErrorMessage(error, 'Unknown error')}`,
+            });
+        } finally {
+            setSending(false);
         }
     };
 
-    // Show message
-    const showMessage = (message: string, type: StatusType) => {
-        setStatusMessage(message);
-        setStatusType(type);
-
-        // Auto-remove success messages after 5 seconds
-        if (type === 'success') {
-            setTimeout(() => {
-                setStatusMessage('');
-                setStatusType('');
-            }, 5000);
-        }
-    };
-
-    // Show authentication required message
-    const showAuthenticationRequired = () => {
-        setStatusMessage('');
-        setStatusType('auth-required');
-    };
-
-    // Handle close
     const handleClose = () => {
-        // Close the window
         if (window.opener) {
             window.close();
         } else {
@@ -184,175 +192,128 @@ const SendMessage = () => {
         }
     };
 
-    // Custom styles for react-select
-    const selectStyles: SelectStylesConfig = {
-        control: (provided) => ({
-            ...provided,
-            minHeight: '42px',
-            width: '100%',
-            minWidth: '350px',
-            border: '1px solid var(--border-color)',
-            borderRadius: '4px',
-            fontSize: 'var(--font-size-base)',
-            fontFamily: "'Raleway', sans-serif"
-        }),
-        container: (provided) => ({
-            ...provided,
-            width: '100%'
-        }),
-        valueContainer: (provided) => ({
-            ...provided,
-            width: '100%',
-            flexWrap: 'nowrap'
-        }),
-        menu: (provided) => ({
-            ...provided,
-            zIndex: 9999
-        }),
-        option: (provided, state) => ({
-            ...provided,
-            backgroundColor: state.isSelected ? 'var(--whatsapp-green)' : state.isFocused ? 'var(--surface-hover)' : 'white',
-            color: state.isSelected ? 'white' : 'var(--text-primary)',
-            padding: '10px 12px'
-        }),
-        placeholder: (provided, state) => ({
-            ...provided,
-            color: 'var(--text-secondary)',
-            fontStyle: 'italic',
-            opacity: state.isFocused ? 0 : 1,
-            transition: 'opacity 0.15s ease'
-        })
+    // `?popup` tells the auth page to close itself after pairing, instead of
+    // navigating this popup to the whole /send page (FE-F16-13).
+    const openAuthPopup = () => {
+        window.open('/auth?popup=1', 'whatsappAuth', 'width=600,height=700,resizable=yes,scrollbars=yes');
     };
 
     return (
-        <div className="send-message-container">
-            {/* Status Messages */}
-            {statusMessage && (
-                <div className={`status-message ${statusType}`}>
-                    {statusMessage}
+        <div className={styles.page}>
+            <form onSubmit={handleSubmit} className={styles.card} aria-busy={sending}>
+                <div className={styles.header}>
+                    <h2 className={styles.title}>Send Files</h2>
+                    <button
+                        type="button"
+                        onClick={handleClose}
+                        className={styles.closeButton}
+                        aria-label="Close"
+                    >
+                        <i className="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
                 </div>
-            )}
 
-            {statusType === 'auth-required' && (
-                <div className="status-message auth-required">
-                    <h3>WhatsApp Authentication Required</h3>
-                    <p>The WhatsApp client needs to be authenticated before sending messages.</p>
-                    <div className="auth-actions">
-                        <button
-                            onClick={() => window.open('/auth', 'whatsappAuth', 'width=600,height=700,resizable=yes,scrollbars=yes')}
-                            className="auth-popup-btn"
-                        >
-                            <span className="btn-icon">📱</span>
-                            Authenticate WhatsApp
-                        </button>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="retry-btn"
-                        >
-                            <span className="btn-icon">🔄</span>
-                            Check Again
-                        </button>
+                {status && (
+                    <div className={`${styles.status} ${styles[status.type]}`} role={status.type === 'success' ? 'status' : 'alert'}>
+                        {status.message}
                     </div>
-                    <div className="auth-help">
-                        <p><small>Click "Authenticate WhatsApp" to scan QR code in a popup window</small></p>
+                )}
+
+                {showAuthRequired && (
+                    <div className={`${styles.status} ${styles.authRequired}`} role="alert">
+                        <h3>WhatsApp Authentication Required</h3>
+                        <p>The WhatsApp client needs to be paired before files can be sent. This message clears by itself once it is.</p>
+                        <div className={styles.authActions}>
+                            <button type="button" onClick={openAuthPopup} className="btn btn-primary">
+                                <i className="fa-solid fa-qrcode" aria-hidden="true"></i> Open WhatsApp pairing
+                            </button>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Source Selection */}
-            <div className="form-group">
-                <select
-                    value={selectedSource}
-                    onChange={(e: ChangeEvent<HTMLSelectElement>) => handleSourceChange(e.target.value)}
-                    className="wainput"
-                >
-                    <option value="pat">Patients' Phones</option>
-                    <option value="shw">Dr. Shwan Phone</option>
-                    <option value="cli">Clinic Phone</option>
-                </select>
-            </div>
-
-            {/* Contact Selection with React-Select */}
-            <div className="form-group">
-                <Select<ContactOption, false>
-                    value={selectedContact}
-                    onChange={handleContactSelect}
-                    options={contactOptions}
-                    isSearchable={true}
-                    isClearable={true}
-                    placeholder="Search and select a contact..."
-                    noOptionsMessage={() => "No contacts found"}
-                    className="react-select-container"
-                    classNamePrefix="react-select"
-                    blurInputOnSelect={false}
-                    closeMenuOnSelect={true}
-                    hideSelectedOptions={false}
-                    styles={selectStyles}
-                />
-            </div>
-
-            {/* Main Form */}
-            <form onSubmit={handleSubmit} className="waform">
-                <button
-                    type="button"
-                    onClick={handleClose}
-                    className="close-btn"
-                    aria-label="Close"
-                >
-                    <i className="fa-solid fa-rectangle-xmark fa-2xl"></i>
-                </button>
-
-                <h2>Send WhatsApp</h2>
-                <hr />
-
-                {/* Program Selection */}
-                <div className="form-group">
+                <div className={styles.field}>
+                    <label className={styles.label} htmlFor="sendProgram">Send with</label>
                     <select
+                        id="sendProgram"
                         value={program}
                         onChange={(e: ChangeEvent<HTMLSelectElement>) => setProgram(e.target.value)}
-                        className="wainput"
+                        className={styles.select}
                     >
                         <option value="WhatsApp">WhatsApp</option>
                         <option value="Telegram">Telegram</option>
                     </select>
                 </div>
 
-                {/* Phone Input */}
-                <div className="phone-input-wrapper">
+                <div className={styles.field}>
+                    <label className={styles.label} htmlFor="sendSource">Contacts from</label>
+                    <select
+                        id="sendSource"
+                        value={selectedSource}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => handleSourceChange(e.target.value)}
+                        className={styles.select}
+                    >
+                        {SOURCES.map((s) => (
+                            <option key={s.id} value={s.id}>{s.label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className={styles.field}>
+                    <label className={styles.label} htmlFor="sendContact">Contact</label>
+                    <Select<ContactOption, false>
+                        inputId="sendContact"
+                        value={selectedContact}
+                        onChange={handleContactSelect}
+                        options={contactOptions}
+                        isSearchable={true}
+                        isClearable={true}
+                        isLoading={activeResult.isFetching}
+                        placeholder="Search and select a contact..."
+                        noOptionsMessage={() => 'No contacts found'}
+                        classNamePrefix="react-select"
+                    />
+                </div>
+
+                <div className={styles.field}>
+                    <label className={styles.label} htmlFor="sendPhone">Phone number</label>
                     <input
+                        id="sendPhone"
                         type="text"
+                        inputMode="tel"
                         value={phoneNumber}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
-                        placeholder="Phone number"
-                        className="wainput"
+                        placeholder="e.g. 9647701234567"
+                        className={styles.input}
                         required
                     />
                 </div>
 
-                {/* File Input */}
-                <div className="form-group">
-                    <input
-                        type="text"
-                        value={filePath}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => setFilePath(e.target.value)}
-                        placeholder="File path"
-                        className="wainput"
-                        required
-                        readOnly
-                    />
+                <div className={styles.field}>
+                    <span className={styles.label}>
+                        {fileCount === 1 ? 'File' : `Files (${fileCount})`}
+                    </span>
+                    {fileCount > 1 ? (
+                        <ul className={styles.fileList}>
+                            {filePath.split(',').map((p) => p.trim()).filter(Boolean).map((p) => (
+                                <li key={p}>{p}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <input
+                            type="text"
+                            value={filePath}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setFilePath(e.target.value)}
+                            aria-label="File path"
+                            className={styles.input}
+                            required
+                            readOnly
+                        />
+                    )}
                 </div>
 
-                {/* Submit Button */}
-                <button type="submit" className="btn btn-warning btn-block mt-4">
-                    Send
+                <button type="submit" className={`btn btn-primary ${styles.submit}`} disabled={sending}>
+                    {sending ? 'Sending…' : 'Send'}
                 </button>
-
-                {/* Progress Bar */}
-                <div className="progress-container">
-                    <div id="emptyBar">
-                        <div id="filledBar"></div>
-                    </div>
-                </div>
             </form>
         </div>
     );

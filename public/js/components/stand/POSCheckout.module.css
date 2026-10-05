@@ -192,35 +192,8 @@
   align-items: center;
 }
 
-.patientInput {
-  width: 100%;
-  height: var(--input-height-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-primary);
-  color: var(--text-primary);
-  background-color: var(--surface);
-  border: var(--border-width-thin) solid var(--gray-300);
-  border-radius: var(--radius-md);
-  outline: none;
-  transition: border-color var(--transition-base), box-shadow var(--transition-base);
-}
-
-.patientInput:focus {
-  border-color: var(--primary-color);
-  box-shadow: var(--shadow-focus);
-}
-
-.patientInput:disabled {
-  background-color: var(--gray-100);
-  cursor: not-allowed;
-}
-
-.patientSpinner {
-  position: absolute;
-  right: var(--spacing-md);
-  color: var(--primary-color);
-  font-size: var(--font-size-sm);
+.patientInputWrapper > div {
+  flex: 1;
 }
 
 .clearPatientButton {
@@ -254,47 +227,6 @@
 
 .patientLinked i {
   font-size: var(--font-size-xs);
-}
-
-.patientDropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin: var(--spacing-xs) 0 0;
-  padding: 0;
-  list-style: none;
-  background-color: var(--surface);
-  border: var(--border-width-thin) solid var(--gray-200);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  z-index: var(--z-index-dropdown);
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.patientDropdownItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-sm) var(--spacing-md);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  transition: background-color var(--transition-fast);
-  border-bottom: var(--border-width-thin) solid var(--gray-100);
-}
-
-.patientDropdownItem:last-child {
-  border-bottom: none;
-}
-
-.patientDropdownItem:hover {
-  background-color: var(--blue-50);
-}
-
-.patientId {
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
 }
 
 /* Note input */

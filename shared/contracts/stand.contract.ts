@@ -13,12 +13,9 @@
  * on the long tail. Request bodies for the 5 body-validated sites are fully
  * enumerated → `z.infer` SSoT; the inline `stand*BodySchema` schemas move here.
  *
- * Phase-2 scope decisions (see the dated Findings in the progress tracker):
- *  - Only the 10 EXISTING `validate()` sites are converted to reference the
- *    contract (5 bodies + 7 param sets). No NEW request validation is added —
- *    in particular POST /stand/sales keeps its deliberate "the validateAnd…
- *    service IS the cart boundary" design (no route-level body schema), so
- *    `createSale` is response-only here.
+ * Scope notes:
+ *  - POST /stand/sales: the contract owns the cart's SHAPE; stock levels, item
+ *    existence and totals stay with `validateAndCreateSale`.
  *  - Void-style handlers that `sendSuccess(res, null)` keep doing so (no payload
  *    to type) — their contract entry carries only `params`/`body`.
  *  - `timestamp` (Date-on-server) columns use the shared `timestampString`
@@ -26,6 +23,7 @@
  */
 import { z } from 'zod';
 import {
+  dateString,
   idParams,
   moneyInt,
   optionalDateString,
@@ -151,7 +149,7 @@ const topItemRow = z.looseObject({
 export type TopItemRow = z.infer<typeof topItemRow>;
 
 // ===========================================================================
-// DASHBOARD — GET /api/stand/dashboard (closed container: 6 numbers).
+// DASHBOARD — GET /api/stand/dashboard (closed container: 7 numbers).
 // ===========================================================================
 
 export const dashboard = {
@@ -160,7 +158,10 @@ export const dashboard = {
     todayRevenue: z.number(),
     todayProfit: z.number(),
     lowStockCount: z.number(),
+    /** Active items whose expiry falls in the next 30 days (today included). */
     expiringSoonCount: z.number(),
+    /** Active items already past their expiry with stock still on the shelf (FE-F19-2). */
+    expiredCount: z.number(),
     totalInventoryValue: z.number(),
   }),
 } as const;
@@ -176,17 +177,16 @@ export const categories = {
 } as const;
 export type CategoriesResponse = z.infer<typeof categories.response>;
 
-// POST /api/stand/categories — { name } → { category_id } (201).
+// POST /api/stand/categories — { name } → { category_id, reactivated } (201).
+// Re-adding the name of a DEACTIVATED category brings that row back
+// (`reactivated: true`) instead of failing on the unique name (FE-F19-8).
 export const createCategory = {
   body: z.object({ name: z.string().min(1, 'category name is required') }),
-  response: z.object({ category_id: z.number() }),
+  response: z.object({ category_id: z.number(), reactivated: z.boolean() }),
 } as const;
 export type CreateCategoryBody = z.infer<typeof createCategory.body>;
 export type CreateCategoryResponse = z.infer<typeof createCategory.response>;
 
-// PUT /api/stand/categories/:id — partial update, sendSuccess(null). The body
-// ({ categoryName?, isActive? }) is NOT route-validated today (forwarded to the
-// service); left unchanged this phase — only `:id` is validated.
 // PUT /api/stand/categories/:id — partial update, sendSuccess(null). Both fields
 // optional: the query layer writes only the keys that are present.
 export const updateCategory = {
@@ -225,8 +225,9 @@ export const itemsLowStock = {
   response: z.array(standItemRow),
 } as const;
 
-// GET /api/stand/items/expiring?days=
-// GET /api/stand/items/expiring?days= — `days` VALIDATED (it was
+// GET /api/stand/items/expiring?days= — active items expiring within `days`, AND
+// those already past their expiry that still have stock (FE-F19-2: an expired
+// item used to drop out of the list on its expiry day). `days` VALIDATED (it was
 // `parseInt(req.query.days as string) || 30`, which mapped `days=0` to 30 and
 // accepted negatives straight into the interval).
 export const itemsExpiring = {
@@ -267,8 +268,9 @@ export type VisionScanResult = z.infer<typeof scanVision.response>;
 // Body fully enumerated (mirrors the service's `StandItemCreateData` exactly —
 // every field addStandItem() reads; `createdBy` is injected by the handler).
 // Required: itemName, costPrice, sellPrice (validate 400s without them); the rest
-// are optional (the query `?? `-defaults them). expiryDate stays a permissive
-// string (NOT `dateString`) — the service does `|| null` with no validation.
+// are optional (the query `?? `-defaults them). `expiryDate` is a real
+// `YYYY-MM-DD` day or null: it was a bare string, so an AI-scanned "05/2027"
+// reached the `date` column and 500-ed (FE-F19-10).
 // Strict `z.object`: the handler REST-SPREADS `...req.body` into addStandItem, and
 // the enumeration is verified-complete, so strip safely closes over-posting.
 export const createItem = {
@@ -280,9 +282,9 @@ export const createItem = {
     // `stand_items.cost_price`/`sell_price` are `integer` columns.
     costPrice: moneyInt,
     sellPrice: moneyInt,
-    currentStock: z.coerce.number().optional(),
-    reorderLevel: z.coerce.number().optional(),
-    expiryDate: z.string().nullable().optional(),
+    currentStock: z.coerce.number().int().nonnegative().optional(),
+    reorderLevel: z.coerce.number().int().nonnegative().optional(),
+    expiryDate: dateString.nullable().optional(),
     unit: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
   }),
@@ -305,8 +307,8 @@ export const updateItem = {
     categoryId: z.coerce.number().int().positive().nullable().optional(),
     costPrice: moneyInt.optional(),
     sellPrice: moneyInt.optional(),
-    reorderLevel: z.coerce.number().optional(),
-    expiryDate: z.string().nullable().optional(),
+    reorderLevel: z.coerce.number().int().nonnegative().optional(),
+    expiryDate: dateString.nullable().optional(),
     unit: z.string().nullable().optional(),
     notes: z.string().nullable().optional(),
   }),
@@ -316,12 +318,21 @@ export type UpdateItemBody = z.infer<typeof updateItem.body>;
 // DELETE /api/stand/items/:id — soft delete, sendSuccess(null).
 export const deleteItem = { params: idParams('id') } as const;
 
-// POST /api/stand/items/:id/restock — { quantity, unitCost }, sendSuccess(null).
+// POST /api/stand/items/:id/reactivate — undo the soft delete, sendSuccess(null).
+// Admin-only like the delete it reverses. There was no way back before: the
+// barcode/SKU unique indexes include inactive rows, so a deleted product could
+// never be added again either (FE-F19-8).
+export const reactivateItem = { params: idParams('id') } as const;
+
+// POST /api/stand/items/:id/restock — { quantity, unitCost } → { costPrice }.
+// The item's cost becomes the WEIGHTED AVERAGE of the stock on hand and this
+// delivery (owner decision 2026-10-04, FE-F19-9); `costPrice` is the new value.
 export const restock = {
   params: idParams('id'),
   // `unitCost` writes `stand_stock_movements.unit_cost` (`integer`), and the route
   // used to `parseInt` it — silently truncating a fractional restock cost.
-  body: z.object({ quantity: z.coerce.number().int(), unitCost: moneyInt }),
+  body: z.object({ quantity: z.coerce.number().int().positive(), unitCost: moneyInt }),
+  response: z.object({ costPrice: z.number() }),
 } as const;
 export type RestockBody = z.infer<typeof restock.body>;
 
@@ -353,9 +364,22 @@ export const createSale = {
   // quantities, and `amountPaid` a number, rather than whatever JSON was posted.
   body: z.object({
     items: z
-      .array(z.object({ itemId: z.coerce.number().int().positive(), quantity: z.coerce.number() }))
+      .array(
+        z.object({
+          itemId: z.coerce.number().int().positive(),
+          // `stand_sale_items.quantity` is an integer column: 1.5 used to 500.
+          quantity: z.coerce.number().int().positive(),
+        })
+      )
       .min(1),
     amountPaid: moneyInt,
+    /**
+     * The total the till showed. When the server's total (from the items'
+     * CURRENT prices) differs, the sale is refused with 409 `PRICE_CHANGED` and
+     * the current prices, so a sale is never recorded at a total the cashier
+     * didn't see (FE-F19-14).
+     */
+    expectedTotal: moneyInt.optional(),
     paymentMethod: z.string().optional(),
     customerNote: z.string().nullable().optional(),
     personId: z.coerce.number().int().positive().nullable().optional(),
@@ -399,8 +423,12 @@ export type VoidSaleBody = z.infer<typeof voidSale.body>;
 // REPORTS
 // ===========================================================================
 
-// GET /api/stand/reports/summary?startDate=&endDate=
+// GET /api/stand/reports/summary?startDate=&endDate= — both required real days
+// (an unvalidated `startDate=abc` reached the `::timestamp` cast and 500-ed).
+const reportRangeQuery = z.object({ startDate: dateString, endDate: dateString });
+
 export const reportSummary = {
+  query: reportRangeQuery,
   response: z.object({
     salesSummary: z.array(salesSummaryRow),
     purchases: z.object({ totalPurchases: z.number(), restockCount: z.number() }),
@@ -410,6 +438,11 @@ export type StandReportData = z.infer<typeof reportSummary.response>;
 
 // GET /api/stand/reports/top-items?startDate=&endDate=&limit=
 export const reportTopItems = {
+  // `limit` stays a digit STRING (the handler `Number()`s it): a coerced number in a
+  // query type the handler also names fails Express 5's overload (TS2769).
+  query: reportRangeQuery.extend({ limit: z.string().regex(/^\d+$/, 'limit must be a positive integer').optional() }),
   response: z.array(topItemRow),
 } as const;
+export type ReportSummaryQuery = z.infer<typeof reportSummary.query>;
+export type ReportTopItemsQuery = z.infer<typeof reportTopItems.query>;
 export type ReportTopItemsResponse = z.infer<typeof reportTopItems.response>;

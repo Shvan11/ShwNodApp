@@ -1,6 +1,6 @@
 // AllSetsList.tsx - Simple list view of all aligner sets from v_allsets
 import React, { useEffect, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
@@ -8,6 +8,7 @@ import { formatDate } from '@/core/utils';
 import { alignerAllSetsQuery } from '@/query/queries';
 import { isClosedWorkStatus } from '@shared/contracts/aligner.contract';
 import type * as alignerContract from '@shared/contracts/aligner.contract';
+import { doctorLabel } from '../../utils/aligner-labels';
 import styles from './AllSetsList.module.css';
 
 // Row shape comes from the shared contract (single source of truth, drift-checked
@@ -43,8 +44,6 @@ const getNextBatchState = (set: AlignerSetView): NextBatchState => {
 const AllSetsList: React.FC = () => {
     const navigate = useNavigate();
     const toast = useToast();
-    const { data, isLoading: loading, error, refetch } = useQuery(alignerAllSetsQuery());
-    const sets: AlignerSetView[] = data?.sets ?? [];
 
     // Filters + sort live in the URL so they survive navigating to a patient and
     // back, and a filtered view can be bookmarked. Defaults are unset params.
@@ -59,6 +58,13 @@ const AllSetsList: React.FC = () => {
     const rawSort = searchParams.get('sort') as SortColumn | null;
     const sortColumn: SortColumn = rawSort && SORT_COLUMNS.includes(rawSort) ? rawSort : 'NextDueDate';
     const sortDirection: SortDirection = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+
+    // Finished works and inactive sets are history: the server leaves them out
+    // unless asked (FE-F18-13), and says how many it left out.
+    const { data, isLoading: loading, error, refetch } = useQuery(
+        alignerAllSetsQuery({ inactive: showInactiveSets, finished: showFinished })
+    );
+    const sets: AlignerSetView[] = data?.sets ?? [];
 
     const updateParams = (updates: Record<string, string | null>): void => {
         setSearchParams(
@@ -108,10 +114,12 @@ const AllSetsList: React.FC = () => {
         return <span>{formatDate(set.NextAppointment)}</span>;
     };
 
-    // Check if patient is waiting for next batch (previously delivered, but no next batch)
-    const isWaitingForNextBatch = (set: AlignerSetView): boolean => {
-        return !set.NextBatchPresent && !!set.delivered_to_patient_date;
-    };
+    // "No Next" = waiting for a batch that hasn't been created: the badge's red "Not
+    // Created" state, exactly. It was "delivered, and nothing made-but-undelivered",
+    // which also counted sets whose FINAL batch was delivered (badge "—") and sets
+    // whose next batch exists but isn't made yet ("Pending") — 41 of the 47 it
+    // listed live (FE-F18-2).
+    const isWaitingForNextBatch = (set: AlignerSetView): boolean => getNextBatchState(set) === 'not_created';
 
     // Render next batch status badge (combined status + readiness)
     const renderBatchStateBadge = (set: AlignerSetView): ReactNode => {
@@ -142,17 +150,8 @@ const AllSetsList: React.FC = () => {
     };
 
     const getFilteredSets = (): AlignerSetView[] => {
+        // Inactive sets and finished works are already left out server-side unless asked.
         let filtered = sets;
-
-        // Filter by inactive sets (hide by default)
-        if (!showInactiveSets) {
-            filtered = filtered.filter(s => s.SetIsActive === true);
-        }
-
-        // Filter by finished/discontinued status (hide by default)
-        if (!showFinished) {
-            filtered = filtered.filter(s => !isClosedWorkStatus(s.WorkStatus));
-        }
 
         // Filter by doctor
         if (selectedDoctor !== 'all') {
@@ -285,9 +284,9 @@ const AllSetsList: React.FC = () => {
 
     const filteredSets = sortSets(getFilteredSets());
 
-    // Count different patient categories (excluding inactive sets and finished/discontinued if hidden)
-    const baseSets = showInactiveSets ? sets : sets.filter(s => s.SetIsActive === true);
-    const activeSets = showFinished ? baseSets : baseSets.filter(s => !isClosedWorkStatus(s.WorkStatus));
+    // The rows the counts are over: what the server sent (it already applied the
+    // inactive / finished defaults).
+    const activeSets = sets;
 
     // Doctor dropdown: only doctors with currently visible sets, alphabetical.
     // Keep the active selection listed even if its rows are filtered out, so the
@@ -311,10 +310,15 @@ const AllSetsList: React.FC = () => {
         no_batches: 0, final: 0, ready: 0, pending: 0, not_created: 0,
     };
     activeSets.forEach(s => { stateCounts[getNextBatchState(s)]++; });
-    const lastBatchCount = activeSets.filter(s => s.is_last === true).length;
-    const finishedCount = baseSets.filter(s => isClosedWorkStatus(s.WorkStatus)).length;
-    const inactiveSetsCount = sets.filter(s => s.SetIsActive !== true).length;
-    const noNextBatchCount = activeSets.filter(isWaitingForNextBatch).length;
+    // Shown, or left out by the server (`hidden`) — the toggle counts either way.
+    const finishedCount = showFinished
+        ? sets.filter(s => isClosedWorkStatus(s.WorkStatus)).length
+        : (data?.hidden.finished ?? 0);
+    const inactiveSetsCount = showInactiveSets
+        ? sets.filter(s => s.SetIsActive !== true).length
+        : (data?.hidden.inactive ?? 0);
+    // The toggle counts exactly what it filters to: the legend's "Not Created".
+    const noNextBatchCount = stateCounts.not_created;
     // Toggle counts mirror their filter predicates (LabStatus), not the badge state.
     const pendingManufactureCount = activeSets.filter(s => s.LabStatus === 'needs_mfg').length;
     const pendingDeliveryCount = activeSets.filter(s => s.LabStatus === 'in_lab').length;
@@ -327,6 +331,7 @@ const AllSetsList: React.FC = () => {
                     <i className={`fas fa-filter ${styles.filterIcon}`}></i>
                     <input
                         type="text"
+                        aria-label="Filter by patient or doctor"
                         placeholder="Filter by patient or doctor..."
                         value={filter}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => updateParams({ q: e.target.value || null })}
@@ -345,6 +350,7 @@ const AllSetsList: React.FC = () => {
                 {/* Doctor Filter Dropdown */}
                 <div className={styles.doctorFilter}>
                     <select
+                        aria-label="Filter by doctor"
                         value={selectedDoctor}
                         onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                             updateParams({ dr: e.target.value === 'all' ? null : e.target.value })}
@@ -353,7 +359,7 @@ const AllSetsList: React.FC = () => {
                         <option value="all">All Doctors</option>
                         {uniqueDoctors.map(doctor => (
                             <option key={doctor.id} value={doctor.id}>
-                                {doctor.name === 'Admin' ? doctor.name : `Dr. ${doctor.name}`}
+                                {doctorLabel(doctor.name)}
                             </option>
                         ))}
                     </select>
@@ -424,7 +430,9 @@ const AllSetsList: React.FC = () => {
                     <span className={`${styles.legendDot} ${styles.amber}`}></span> Pending ({stateCounts.pending})
                 </span>
                 <span className={styles.legendItem}>
-                    <i className={`fas fa-flag-checkered ${styles.legendFlagFinal}`}></i> Final ({lastBatchCount})
+                    {/* The badge's own "final" state (last batch DELIVERED) — it counted
+                        `is_last` flags, so the legend added up to more than the rows. */}
+                    <i className={`fas fa-flag-checkered ${styles.legendFlagFinal}`} aria-hidden="true"></i> Final ({stateCounts.final})
                 </span>
                 <span className={styles.legendItem}>
                     <span className={`${styles.legendDot} ${styles.red}`}></span> Not Created ({stateCounts.not_created})
@@ -441,7 +449,7 @@ const AllSetsList: React.FC = () => {
                     </label>
                 )}
                 <span className={styles.info}>
-                    {activeSets.length} active
+                    {activeSets.length} shown
                     {!showFinished && finishedCount > 0 && (
                         <span className={styles.infoHidden}> ({finishedCount} hidden)</span>
                     )}
@@ -515,21 +523,25 @@ const AllSetsList: React.FC = () => {
                                 };
 
                                 return (
+                                // The patient's name is the row's link — the keyboard path,
+                                // with a link's own Enter, and a role a screen reader names.
+                                // The row was a focusable <tr> answering Enter only (FE-F18-14);
+                                // its click stays for the mouse.
                                 <tr
                                     key={`${set.person_id}-${set.aligner_set_id}`}
                                     onClick={() => handlePatientClick(set)}
-                                    onKeyDown={(e: KeyboardEvent<HTMLTableRowElement>) => {
-                                        if (e.key === 'Enter') handlePatientClick(set);
-                                    }}
-                                    tabIndex={0}
                                     className={rowClass}
                                 >
                                     <td data-label="Patient">
-                                        <div className={styles.patientName}>
+                                        <Link
+                                            to={`/aligner/patient/${set.work_id}`}
+                                            className={styles.patientName}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             {set.patient_name}
-                                        </div>
+                                        </Link>
                                     </td>
-                                    <td data-label="Doctor">{set.doctor_name === 'Admin' ? set.doctor_name : `Dr. ${set.doctor_name}`}</td>
+                                    <td data-label="Doctor">{doctorLabel(set.doctor_name)}</td>
                                     <td data-label="Set">
                                         {set.set_sequence != null ? (
                                             <span className={`${styles.badge} ${styles.badgeSet}`}>

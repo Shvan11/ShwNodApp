@@ -16,18 +16,30 @@ function getDefaultDates() {
 }
 
 export default function StandReports() {
-  const defaults = getDefaultDates();
+  const [defaults] = useState(getDefaultDates);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(defaults.endDate);
 
-  const { data: reportData, loading, error: reportError } = useStandReportSummary(startDate, endDate);
-  const { items: topItems, error: topError } = useTopSellingItems(startDate, endDate, 10);
+  // A cleared or reversed range used to show four "0 IQD" cards (FE-F19-12).
+  const rangeProblem = !startDate || !endDate
+    ? 'Pick a start and an end date.'
+    : startDate > endDate
+      ? 'The start date is after the end date.'
+      : null;
+  const queryStart = rangeProblem ? null : startDate;
+  const queryEnd = rangeProblem ? null : endDate;
 
-  // Compute summary totals from daily data
+  const { data: reportData, loading, error: reportError } = useStandReportSummary(queryStart, queryEnd);
+  const { items: topItems, error: topError } = useTopSellingItems(queryStart, queryEnd, 10);
+
+  // Gross Profit is revenue minus the cost of what was sold. Restock purchases are
+  // a separate cash outflow: subtracting them from Gross Profit counted the stock's
+  // cost twice and read as a loss every month the stand restocked (FE-F19-1). The
+  // fourth card is cash in minus stock bought (owner decision 2026-10-04).
   const totalRevenue = reportData?.salesSummary.reduce((s, r) => s + r.Revenue, 0) ?? 0;
   const totalProfit = reportData?.salesSummary.reduce((s, r) => s + r.Profit, 0) ?? 0;
   const totalPurchases = reportData?.purchases.totalPurchases ?? 0;
-  const netProfit = totalProfit - totalPurchases;
+  const netCash = totalRevenue - totalPurchases;
 
   return (
     <div className={styles.reportsContainer}>
@@ -46,7 +58,9 @@ export default function StandReports() {
         </div>
       </div>
 
-      {loading ? (
+      {rangeProblem ? (
+        <div className={styles.loadingState}>{rangeProblem}</div>
+      ) : loading ? (
         <div className={styles.loadingState}>Loading reports...</div>
       ) : reportError ? (
         <div className={styles.loadingState}>{reportError}</div>
@@ -60,14 +74,17 @@ export default function StandReports() {
             <div className={`${styles.summaryCard} ${styles.profitCard}`}>
               <h3>Gross Profit</h3>
               <p className={styles.value}>{formatNumber(totalProfit)} IQD</p>
+              <p className={styles.cardNote}>Revenue minus the cost of the items sold</p>
             </div>
             <div className={`${styles.summaryCard} ${styles.purchasesCard}`}>
               <h3>Stand Purchases</h3>
               <p className={styles.value}>{formatNumber(totalPurchases)} IQD</p>
+              <p className={styles.cardNote}>Stock bought (restocks) in this range</p>
             </div>
             <div className={`${styles.summaryCard} ${styles.netCard}`}>
-              <h3>Net Profit</h3>
-              <p className={styles.value}>{formatNumber(netProfit)} IQD</p>
+              <h3>Net Cash</h3>
+              <p className={styles.value}>{formatNumber(netCash)} IQD</p>
+              <p className={styles.cardNote}>Revenue minus purchases — cash, not profit</p>
             </div>
           </div>
 

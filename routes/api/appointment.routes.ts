@@ -352,7 +352,9 @@ router.post(
       // Handle validation errors from service layer
       if (error instanceof AppointmentValidationError) {
         if (error.code === 'APPOINTMENT_CONFLICT') {
-          ErrorResponses.conflict(res, error.message, error.details);
+          // The code rides `details` like every other refusal's, so the booking
+          // forms translate it — an Arabic form showed this English text (found in RE1).
+          ErrorResponses.conflict(res, error.message, { code: error.code, ...error.details });
           return;
         }
         ErrorResponses.badRequest(res, error.message, {

@@ -5,16 +5,24 @@
 
 import styles from '../../routes/WhatsAppAuth.module.css';
 
-export const SuccessDisplay = () => {
-  // Derived from the URL during render — a `returnTo` param means we're about to
-  // bounce back to the messaging page, so reflect that in the copy.
-  const returnTo = new URLSearchParams(window.location.search).get('returnTo');
-  const message = returnTo
-    ? 'Redirecting you back to the messaging page...'
-    : 'Your WhatsApp client is ready to send messages';
+interface SuccessDisplayProps {
+  /** Where the page goes next: a path, 'close' (a popup closes itself), or null (it stays). */
+  afterPairing: string | null;
+}
+
+export const SuccessDisplay = ({ afterPairing }: SuccessDisplayProps) => {
+  // The copy follows what the page will actually do. It used to key on a
+  // `?returnTo` param nothing sets, so the 2 s redirect ran under "ready to send
+  // messages" (FE-F16-13).
+  const message =
+    afterPairing === 'close'
+      ? 'This window will close in a moment.'
+      : afterPairing
+        ? 'Taking you back in a moment…'
+        : 'Your WhatsApp client is ready to send messages';
 
   return (
-    <div className={styles.successSection}>
+    <div className={styles.successSection} role="status" aria-live="polite">
       <div className={styles.successIconContainer}>
         <span className={styles.successIcon} aria-hidden="true">
           ✅

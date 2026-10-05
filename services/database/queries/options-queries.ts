@@ -114,6 +114,22 @@ export async function upsertOption(optionName: string, optionValue: string): Pro
 }
 
 /**
+ * Insert-or-update several options in ONE transaction — all of them or none. For
+ * settings that are only meaningful together (the calendar's early/late lists and
+ * their toggle); `upsertOption` per row could leave half of them written.
+ */
+export async function upsertOptions(entries: ReadonlyArray<{ name: string; value: string }>): Promise<void> {
+  if (entries.length === 0) return;
+  await getKysely()
+    .insertInto('options')
+    .values(entries.map((e) => ({ option_name: e.name, option_value: e.value })))
+    .onConflict((oc) =>
+      oc.column('option_name').doUpdateSet((eb) => ({ option_value: eb.ref('excluded.option_value') }))
+    )
+    .execute();
+}
+
+/**
  * Bulk update multiple existing options. All updates run inside a single
  * transaction, so a SQL error on any row rolls back the whole batch (atomic) —
  * matching this function's contract. Names that match no existing row are not

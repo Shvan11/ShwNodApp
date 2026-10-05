@@ -49,6 +49,33 @@ function expectedWorkingNames(
 }
 
 /**
+ * The first session's Smile (`{id}00.i13`) for each patient, by its REAL on-disk name
+ * — one directory read for the whole list, no per-file stat. Editor renders are
+ * lower-case `.i13` and Dolphin's upper-case `.I13`; on a case-sensitive volume the
+ * guessed lower-case name 404s for the latter (25 of 79 aligner patients), and a
+ * patient with no such file cost a failed request and a console error per card
+ * (FE-F18-8). A patient without one maps to null.
+ */
+export async function findFirstSmiles(personIds: readonly number[]): Promise<Map<number, string>> {
+  const found = new Map<number, string>();
+  if (personIds.length === 0) return found;
+  let names: string[];
+  try {
+    names = await fs.readdir(workingDir());
+  } catch {
+    return found; // working/ may not exist yet on a fresh share
+  }
+  const wanted = new Map<string, number>();
+  for (const id of personIds) wanted.set(workingFileName(id, 0, 'i13').toLowerCase(), id);
+  for (const name of names) {
+    const id = wanted.get(name.toLowerCase());
+    // Canonical lower-case first, if both spellings exist.
+    if (id !== undefined && (!found.has(id) || name === workingFileName(id, 0, 'i13'))) found.set(id, name);
+  }
+  return found;
+}
+
+/**
  * List the patient's rendered working images out of the shared dir.
  * `tpCodes` is the patient's own `time_points.tp_code` set — see the module note
  * on why a prefix match would cross patients.

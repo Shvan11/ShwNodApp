@@ -10,28 +10,32 @@ import type { Editor as GrapesJSEditorType } from 'grapesjs';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { qk } from '@/query/keys';
 import { templateQuery } from '@/query/queries';
+import { useUnsavedRouteGuard } from '@/hooks/useUnsavedRouteGuard';
+import * as templateContract from '@shared/contracts/template.contract';
 
 import styles from './TemplateDesigner.module.css';
-import GrapesJSEditor from './GrapesJSEditor';
+import GrapesJSEditor, { DESIGN_SAVED_EVENT, type GrapesJSTemplate } from './GrapesJSEditor';
 import DesignerToolbar from './DesignerToolbar';
 import { useToast } from '../../contexts/ToastContext';
-import { useConfirm } from '../../contexts/ConfirmContext';
 
-interface Template {
-    template_id: number | null;
-    template_name: string;
-    template_file_path: string | null;
-}
+/** Text for the generated document's <title>, escaped for HTML. */
+const escapeHtml = (text: string): string =>
+    text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 function TemplateDesigner() {
     const { templateId } = useParams<{ templateId: string }>();
     const navigate = useNavigate();
     const editorRef = useRef<GrapesJSEditorType | null>(null);
     const toast = useToast();
-    const confirm = useConfirm();
     const queryClient = useQueryClient();
 
     const [isSaving, setIsSaving] = useState(false);
+
+    // Unsaved design work. Leaving by anything but the toolbar's Back (a header
+    // link, the browser's back) dropped it silently, while Back asked every time,
+    // changed or not (FE-F20-9a). Now every way out asks, and only when dirty.
+    const [isDirty, setIsDirty] = useState(false);
+    useUnsavedRouteGuard(isDirty);
 
     // Edit mode loads the existing template; the factory is keyed on the id and
     // disabled when absent (the "new template" path below).
@@ -47,8 +51,8 @@ function TemplateDesigner() {
 
     // New-template mode seeds a default in place of a fetch; edit mode surfaces the
     // fetched row. Loading only applies while an edit-mode fetch is in flight.
-    const template: Template | null = templateId
-        ? ((loadedTemplate ?? null) as Template | null)
+    const template: GrapesJSTemplate | null = templateId
+        ? (loadedTemplate ?? null)
         : { template_id: null, template_name: 'New Template', template_file_path: null };
     const isLoading = !!templateId && queryLoading;
     const error = isError ? 'Failed to load template: ' + httpErrorMessage(queryError, 'Unknown error') : null;
@@ -83,7 +87,11 @@ function TemplateDesigner() {
             const completeHtml = generateCompleteHTML(html, css, pageWidth, pageHeight);
 
             // Send to backend
-            await postJSON(`/api/templates/${templateId}/save-html`, { html: completeHtml });
+            await postJSON(`/api/templates/${templateId}/save-html`, { html: completeHtml }, {
+                schema: templateContract.saveHtml.response,
+            });
+            // What is on screen is now what is saved.
+            editor.trigger(DESIGN_SAVED_EVENT);
             queryClient.invalidateQueries({ queryKey: qk.templates.all() });
             toast.success('Template saved successfully!');
         } catch (err) {
@@ -123,10 +131,9 @@ function TemplateDesigner() {
         }
     };
 
-    const handleBack = async () => {
-        if (await confirm('Are you sure you want to leave? Unsaved changes will be lost.', { title: 'Leave Designer', confirmText: 'Leave' })) {
-            navigate('/templates');
-        }
+    // The route guard asks when there is unsaved work.
+    const handleBack = () => {
+        navigate('/templates');
     };
 
     const generateCompleteHTML = (
@@ -144,7 +151,7 @@ function TemplateDesigner() {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Receipt Preview</title>
+    <title>${escapeHtml(template?.template_name || 'Document')}</title>
     <style>
         @page {
             size: ${pageSize};
@@ -232,6 +239,7 @@ function TemplateDesigner() {
                 ref={editorRef}
                 template={template}
                 styles={styles}
+                onDirtyChange={setIsDirty}
             />
 
             {isSaving && (

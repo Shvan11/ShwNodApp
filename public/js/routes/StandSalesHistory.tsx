@@ -3,7 +3,10 @@ import { useStandSales, useStandSale, useStandSaleMutations } from '../hooks/use
 import SalesHistoryTable from '../components/stand/SalesHistoryTable';
 import SaleDetailModal from '../components/stand/SaleDetailModal';
 import Modal from '../components/react/Modal';
+import ModalHeader from '../components/react/ModalHeader';
 import { useToast } from '../contexts/ToastContext';
+import { useAuthUser } from '../contexts/GlobalStateContext';
+import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { httpErrorMessage } from '@/core/http';
 import { toLocalDateString } from '@/utils/calendarDate';
 import styles from './StandSalesHistory.module.css';
@@ -19,6 +22,9 @@ function getDefaultDates() {
 
 export default function StandSalesHistory() {
   const toast = useToast();
+  const user = useAuthUser();
+  // Voiding is admin-only on the server; front desk used to see Void and get a 403 (FE-F19-7).
+  const canVoid = roleCaps(user?.role as UserRole | undefined).adminWrites;
   const defaults = getDefaultDates();
 
   const [startDate, setStartDate] = useState(defaults.startDate);
@@ -38,7 +44,7 @@ export default function StandSalesHistory() {
     setAppliedStart(startDate);
     setAppliedEnd(endDate);
   };
-  const { sale: viewSale, loading: saleLoading } = useStandSale(viewSaleId);
+  const { sale: viewSale, loading: saleLoading, error: saleError, refetch: refetchSale } = useStandSale(viewSaleId);
   const { voidSale } = useStandSaleMutations();
 
   const handleVoid = (saleId: number) => {
@@ -105,6 +111,7 @@ export default function StandSalesHistory() {
       <SalesHistoryTable
         sales={sales}
         loading={loading}
+        canVoid={canVoid}
         onView={(saleId) => setViewSaleId(saleId)}
         onVoid={handleVoid}
       />
@@ -113,6 +120,9 @@ export default function StandSalesHistory() {
         isOpen={!!viewSaleId}
         sale={viewSale}
         loading={saleLoading}
+        error={saleError}
+        onRetry={() => void refetchSale()}
+        canVoid={canVoid}
         onClose={() => setViewSaleId(null)}
         onVoid={handleVoid}
       />
@@ -125,8 +135,13 @@ export default function StandSalesHistory() {
           closeOnEscape={!voiding}
           ariaLabelledBy="void-sale-modal-title"
         >
+          <ModalHeader
+            title={`Void Sale #${voidSaleId}`}
+            titleId="void-sale-modal-title"
+            variant="danger"
+            onClose={() => { if (!voiding) setVoidSaleId(null); }}
+          />
           <div className={styles.voidModal}>
-            <h2 id="void-sale-modal-title">Void Sale #{voidSaleId}</h2>
             <label htmlFor="void-reason">Reason for voiding this sale</label>
             <textarea
               id="void-reason"

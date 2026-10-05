@@ -265,13 +265,6 @@
 }
 
 /* Note cell */
-.noteCell {
-  max-width: 150px;
-  min-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Responsive */
 @media (max-width: 768px) {

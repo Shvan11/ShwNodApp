@@ -156,9 +156,17 @@ const workCreateFields = {
 // ===========================================================================
 
 // GET /api/getworkdetails?workId= — single work (wire-shaped via toWorkWire).
+// The fields the aligner sets page reads are modeled (FE-F17-15: its loader cast
+// the read to a hand-written `WorkData`); the rest ride the loose tail.
 export const getWorkDetails = {
-  response: z.looseObject({ work_id: z.number() }),
+  response: z.looseObject({
+    work_id: z.number(),
+    person_id: z.number(),
+    currency: z.string().nullable(),
+    type_name: z.string().nullable(),
+  }),
 } as const;
+export type WorkDetails = z.infer<typeof getWorkDetails.response>;
 
 // GET /api/getworks?code= — all works for a patient.
 // One work row as served by GET /api/getworks (work-queries.ts#getWorksByPatient
