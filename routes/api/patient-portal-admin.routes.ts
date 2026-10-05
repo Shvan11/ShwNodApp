@@ -52,6 +52,7 @@ router.get(
         failedAttempts: status.failedAttempts,
         qrDataUrl: qr.qr,
         portalUrl: qr.url,
+        usesDefaultAddress: qr.usesDefaultAddress,
       });
     } catch (error) {
       log.error('Portal status fetch error', { error: (error as Error).message });

@@ -41,6 +41,15 @@ export const getBranding = {
   response: brandingResponse,
 } as const;
 
+// GET /api/branding/public → PRE-AUTH: only the clinic's display name, for the pages a
+// visitor sees before signing in (staff login, patient portal sign-in, tab titles).
+// They carried this clinic's name as a literal on every install (audit FE-F23-8);
+// the TV display already shows the same name unauthenticated. null when unset.
+export const getPublicBranding = {
+  response: z.object({ clinicName: z.string().nullable() }),
+} as const;
+export type PublicBranding = z.infer<typeof getPublicBranding.response>;
+
 // PUT /api/branding → set the clinic display name. An empty string clears it
 // (header reverts to the built-in default). Trimmed + capped so it fits the header.
 export const updateBranding = {

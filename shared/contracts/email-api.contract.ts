@@ -23,11 +23,22 @@
 import { z } from 'zod';
 import { optionalDateString } from '../validation.js';
 
-// GET /api/email/config → { config } (masked config object, dynamic shape).
-// Intentionally loose: EmailConfigService sanitizes and returns a dynamic SMTP config
-// map; the exact key set varies by configured transport and is not statically enumerable.
+// GET /api/email/config → { config }. The stored SMTP settings as typed values (port a
+// number, secure a boolean). The password itself never leaves the server: the form is
+// told only whether one is stored (`smtp_password_set`) and leaves its box empty, so a
+// mask can't be posted back as the password (audit FE-F22-2).
+export const emailConfigView = z.looseObject({
+  smtp_host: z.string().optional(),
+  smtp_port: z.number().optional(),
+  smtp_secure: z.boolean().optional(),
+  smtp_user: z.string().optional(),
+  smtp_password_set: z.boolean(),
+  from_address: z.string().optional(),
+  from_name: z.string().optional(),
+});
+export type EmailConfigView = z.infer<typeof emailConfigView>;
 export const config = {
-  response: z.object({ config: z.unknown() }),
+  response: z.object({ config: emailConfigView }),
 } as const;
 
 // POST /api/email/config → { message, updated }. Body is a free-form key/value map

@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
-import Modal from './Modal';
-import ModalHeader from './ModalHeader';
 import sharedStyles from './DatabaseSettings.module.css';
 import styles from './ProtocolHandlersSettings.module.css';
 import {
@@ -41,12 +39,6 @@ interface FileInfo {
     name: string;
     lastModified: Date;
     size: number;
-}
-
-interface ModalState {
-    show: boolean;
-    title: string;
-    message: string;
 }
 
 interface ProtocolHandlersSettingsProps {
@@ -97,7 +89,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // UI state
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
     const [configError, setConfigError] = useState<string | null>(null);
 
     // ========================================================================
@@ -130,8 +121,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             setConfig(parsed);
             setPendingChanges({});
         } catch (error) {
-            console.error('Error loading config from file:', error);
-
             if (isNotFoundError(error)) {
                 // File was deleted/moved
                 await removeHandle(HANDLE_STORAGE_KEY);
@@ -166,8 +155,8 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     setFileHandle(savedHandle);
                 });
             })
-            .catch((error: unknown) => {
-                console.error('Error loading saved handle:', error);
+            .catch(() => {
+                // No usable saved handle — the page offers "Select INI File".
             });
     }, []);
 
@@ -196,9 +185,17 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         }
     }, [pendingChanges, onChangesUpdate]);
 
+    /**
+     * Pick an INI file and make it the edited one. The current file (if any) is
+     * replaced only once a new one is chosen: "Change File" used to forget the saved
+     * file first, so cancelling the picker left no file at all (audit FE-F22-13).
+     */
     const selectIniFile = async (): Promise<void> => {
+        const unsaved = Object.values(pendingChanges).some(section => Object.keys(section).length > 0);
+        if (unsaved && !await confirm('Discard your unsaved changes and open a different file?', { title: 'Change File', danger: true, confirmText: 'Discard' })) {
+            return;
+        }
         setIsLoading(true);
-        setConfigError(null);
 
         try {
             const result = await pickIniFile();
@@ -212,6 +209,10 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
             if (result.data) {
                 const handle = result.data;
+                setConfigError(null);
+                setConfig({});
+                setPendingChanges({});
+                setFileInfo(null);
 
                 // Save handle for persistence
                 await saveHandle(HANDLE_STORAGE_KEY, handle, {
@@ -226,7 +227,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 toast.success('INI file loaded successfully');
             }
         } catch (error) {
-            console.error('Error selecting INI file:', error);
             setConfigError('Failed to select file: ' + (error as Error).message);
         } finally {
             setIsLoading(false);
@@ -248,25 +248,13 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 setPermissionState('denied');
                 toast.warning('Permission denied. Please try again.');
             }
-        } catch (error) {
-            console.error('Error requesting permission:', error);
+        } catch {
             toast.error('Failed to request permission');
         }
     };
 
-    const changeFile = async (): Promise<void> => {
-        // Clear current handle and let user select a new one
-        await removeHandle(HANDLE_STORAGE_KEY);
-        setFileHandle(null);
-        setHasFileAccess(false);
-        setConfig({});
-        setPendingChanges({});
-        setFileInfo(null);
-        setConfigError(null);
-
-        // Immediately prompt for new file
-        await selectIniFile();
-    };
+    // `saveHandle` overwrites the stored handle on success, so nothing is removed first.
+    const changeFile = selectIniFile;
 
     // ========================================================================
     // FILE OPERATIONS
@@ -284,7 +272,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         );
 
         if (totalChanges === 0) {
-            showModal('Info', 'No changes to save.');
+            toast.info('No changes to save.');
             return;
         }
 
@@ -294,7 +282,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             // Ensure we have write permission
             const hasPermission = await ensurePermission(fileHandle, 'readwrite');
             if (!hasPermission) {
-                showModal('Permission Denied', 'Cannot save without write permission. Please grant access and try again.');
+                toast.error('Cannot save without write permission. Grant access and try again.');
                 return;
             }
 
@@ -324,10 +312,9 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 size: file.size
             });
 
-            showModal('Success', 'Configuration saved successfully.\n\nNote: Protocol handlers will use the new settings immediately.');
+            toast.success('Configuration saved — protocol handlers use it straight away.');
         } catch (error) {
-            console.error('Error saving config:', error);
-            showModal('Error', 'Failed to save configuration: ' + (error as Error).message);
+            toast.error('Failed to save configuration: ' + (error as Error).message);
         } finally {
             setIsSaving(false);
         }
@@ -365,14 +352,13 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             const result = await writeTextFile(backupHandle, content);
 
             if (result.success) {
-                showModal('Success', 'Backup created successfully.');
+                toast.success('Backup created');
             } else {
                 throw new Error(result.error || 'Failed to create backup');
             }
         } catch (error) {
             if (!isAbortError(error)) {
-                console.error('Error creating backup:', error);
-                showModal('Error', 'Failed to create backup: ' + (error as Error).message);
+                toast.error('Failed to create backup: ' + (error as Error).message);
             }
         }
     };
@@ -389,7 +375,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
         try {
             // Pick a backup file to restore from
-            const result = await pickIniFile();
+            const result = await pickIniFile({ includeBackups: true });
 
             if (!result.success || !result.data) {
                 if (!isAbortError({ name: result.errorName })) {
@@ -435,11 +421,10 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 size: file.size
             });
 
-            showModal('Success', 'Configuration restored from backup.');
+            toast.success('Configuration restored from backup');
         } catch (error) {
             if (!isAbortError(error)) {
-                console.error('Error restoring from backup:', error);
-                showModal('Error', 'Failed to restore from backup: ' + (error as Error).message);
+                toast.error('Failed to restore from backup: ' + (error as Error).message);
             }
         }
     };
@@ -454,14 +439,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     // ========================================================================
     // UI HELPERS
     // ========================================================================
-
-    const showModal = (title: string, message: string) => {
-        setModal({ show: true, title, message });
-    };
-
-    const hideModal = () => {
-        setModal({ show: false, title: '', message: '' });
-    };
 
     const handleInputChange = (section: string, key: string, value: string) => {
         // Strip surrounding quotes (from Windows "Copy as path")
@@ -478,12 +455,13 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             }));
         } else {
             setPendingChanges(prev => {
+                // Copy the section too — deleting from prev[section] mutated the previous state.
                 const updated = { ...prev };
                 if (updated[section]) {
-                    delete updated[section][key];
-                    if (Object.keys(updated[section]).length === 0) {
-                        delete updated[section];
-                    }
+                    const rest = { ...updated[section] };
+                    delete rest[key];
+                    if (Object.keys(rest).length === 0) delete updated[section];
+                    else updated[section] = rest;
                 }
                 return updated;
             });
@@ -826,25 +804,6 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 </div>
             )}
 
-            {/* Modal */}
-            <Modal
-                isOpen={modal.show}
-                onClose={hideModal}
-                contentClassName={sharedStyles.modalContent}
-                ariaLabelledBy="protocol-handlers-modal-title"
-            >
-                <ModalHeader
-                    titleId="protocol-handlers-modal-title"
-                    title={modal.title}
-                    onClose={hideModal}
-                />
-                <div className={sharedStyles.modalBody}>
-                    <pre>{modal.message}</pre>
-                </div>
-                <div className={sharedStyles.modalFooter}>
-                    <button className={`${sharedStyles.btn} ${sharedStyles.btnPrimary}`} onClick={hideModal}>OK</button>
-                </div>
-            </Modal>
         </div>
     );
 };

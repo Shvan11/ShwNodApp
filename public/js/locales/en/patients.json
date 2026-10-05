@@ -183,5 +183,48 @@
     },
     "saveCost": "Save cost",
     "cancelCost": "Cancel"
+  },
+  "portal": {
+    "title": "Portal Access",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "enabled": "Portal access enabled",
+    "pin": "PIN",
+    "pinSet": "Set",
+    "pinNotSet": "Not set",
+    "lastLogin": "Last login",
+    "never": "Never",
+    "failedAttempts": "Failed attempts",
+    "status": "Status",
+    "lockedUntil": "Locked until {{time}}",
+    "active": "Active",
+    "disabled": "Disabled",
+    "resetPin": "Reset PIN",
+    "createPin": "Create PIN",
+    "unlock": "Unlock",
+    "qrAlt": "Portal QR code",
+    "defaultAddress": "This link uses the app's built-in address, not your clinic's. Set PUBLIC_URL on the server to your clinic's public address before giving it to a patient.",
+    "confirmReset": {
+      "title": "Reset PIN",
+      "message": "Reset this patient's portal PIN? The current PIN stops working at once, and you will need to give them the new one.",
+      "confirm": "Reset PIN"
+    },
+    "pinModal": {
+      "title": "New Portal PIN",
+      "hint": "Share this PIN with the patient now — it won't be shown again.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "done": "Done"
+    },
+    "toast": {
+      "enabledOn": "Portal access enabled",
+      "enabledOff": "Portal access disabled",
+      "updateFailed": "Failed to update",
+      "resetFailed": "Failed to reset PIN",
+      "unlocked": "Portal access unlocked",
+      "unlockFailed": "Failed to unlock",
+      "copyFailed": "Unable to copy — please write the PIN down.",
+      "loadFailed": "Failed to load portal access"
+    }
   }
 }

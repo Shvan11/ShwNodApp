@@ -1,17 +1,18 @@
 /**
  * Settings → Integrations: manage external-service authentication.
  *
- * Telegram only for now (WhatsApp / Google will live here later). The Telegram
- * card surfaces live auth status and drives the interactive MTProto user login
- * (phone → code → optional 2FA password). The session is persisted server-side
- * (options table), so once authorized the file-share Telegram option starts
- * working with no restart. Admin-only tab; the backend routes are admin-gated too.
+ * One card per service: Telegram (the interactive MTProto user login — phone → code →
+ * optional 2FA password; the session is persisted server-side in the options table, so
+ * once authorized the file-share Telegram option works with no restart), 3Shape Unite,
+ * Google Drive, Google Contacts (multi-account), Gemini and the aligner-portal
+ * Cloudflare allow-list. Admin-only tab; the backend routes are admin-gated too.
  */
 import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { useToast } from '@/contexts/ToastContext';
+import { useConfirm } from '@/contexts/ConfirmContext';
 import {
   integrationsTelegramStatusQuery,
   integrationsThreeShapeStatusQuery,
@@ -33,11 +34,12 @@ type LoginStep = null | 'phone' | 'code' | 'password';
 
 const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
-  const { data, isLoading: loading, isError, error: queryError, refetch } =
+  const { data, isLoading: loading, isError, error: queryError } =
     useQuery(integrationsTelegramStatusQuery());
-  const status = (data as integrations.TelegramStatusResponse | undefined) ?? null;
+  const status = data ?? null;
 
   const [busy, setBusy] = useState(false);
 
@@ -149,6 +151,11 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
   }, [resetLogin]);
 
   const logout = useCallback(async (): Promise<void> => {
+    const ok = await confirm(
+      'Log the clinic\'s Telegram account out of this server? Sharing files by Telegram stops until someone logs in again with the account\'s phone and a login code.',
+      { title: 'Log out of Telegram', danger: true, confirmText: 'Log out' }
+    );
+    if (!ok) return;
     setBusy(true);
     try {
       await postJSON(
@@ -163,7 +170,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     } finally {
       setBusy(false);
     }
-  }, [toast, loadStatus]);
+  }, [toast, confirm, loadStatus]);
 
   const onKey = (e: KeyboardEvent, fn: () => void): void => {
     if (e.key === 'Enter') {
@@ -174,7 +181,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
 
   // ── 3Shape Unite (OAuth Web Service) ──
   const { data: tsData, isLoading: tsLoading } = useQuery(integrationsThreeShapeStatusQuery());
-  const tsStatus = (tsData as integrations.ThreeShapeStatusResponse | undefined) ?? null;
+  const tsStatus = tsData ?? null;
   const [tsBusy, setTsBusy] = useState(false);
 
   // Handle the one-shot ?threeshape=connected|error flag the OAuth callback
@@ -206,6 +213,11 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
   }, []);
 
   const disconnectThreeShape = useCallback(async (): Promise<void> => {
+    const ok = await confirm(
+      'Disconnect 3Shape? Pushing patients and pulling scans stops until someone signs in to the clinic\'s 3Shape account again.',
+      { title: 'Disconnect 3Shape', danger: true, confirmText: 'Disconnect' }
+    );
+    if (!ok) return;
     setTsBusy(true);
     try {
       await postJSON(
@@ -220,11 +232,11 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     } finally {
       setTsBusy(false);
     }
-  }, [toast, queryClient]);
+  }, [toast, confirm, queryClient]);
 
   // ── Google Drive (aligner PDF storage, OAuth) ──
   const { data: gdData, isLoading: gdLoading } = useQuery(integrationsGoogleDriveStatusQuery());
-  const gdStatus = (gdData as integrations.GoogleDriveStatusResponse | undefined) ?? null;
+  const gdStatus = gdData ?? null;
   const [gdBusy, setGdBusy] = useState(false);
 
   // Handle the one-shot ?googleDrive=connected|error flag the OAuth callback
@@ -255,6 +267,11 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
   }, []);
 
   const disconnectGoogleDrive = useCallback(async (): Promise<void> => {
+    const ok = await confirm(
+      'Disconnect Google Drive? Aligner-set PDFs can\'t be uploaded until the Drive account is connected again.',
+      { title: 'Disconnect Google Drive', danger: true, confirmText: 'Disconnect' }
+    );
+    if (!ok) return;
     setGdBusy(true);
     try {
       await postJSON(
@@ -269,11 +286,11 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     } finally {
       setGdBusy(false);
     }
-  }, [toast, queryClient]);
+  }, [toast, confirm, queryClient]);
 
   // ── Google Contacts (message-recipient phone book, OAuth, multi-account) ──
   const { data: gcData, isLoading: gcLoading } = useQuery(integrationsGoogleContactsStatusQuery());
-  const gcStatus = (gcData as integrations.GoogleContactsStatusResponse | undefined) ?? null;
+  const gcStatus = gcData ?? null;
   const [gcBusy, setGcBusy] = useState<string | null>(null);
 
   // One-shot ?googleContacts=connected|error flag from the OAuth callback.
@@ -308,7 +325,12 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
   }, []);
 
   const disconnectGoogleContacts = useCallback(
-    async (accountId: string): Promise<void> => {
+    async (accountId: string, label: string): Promise<void> => {
+      const ok = await confirm(
+        `Disconnect the "${label}" Google Contacts account? Its contacts disappear from the recipient lists until it is connected again.`,
+        { title: 'Disconnect Google Contacts', danger: true, confirmText: 'Disconnect' }
+      );
+      if (!ok) return;
       setGcBusy(accountId);
       try {
         await postJSON(
@@ -326,12 +348,12 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
         setGcBusy(null);
       }
     },
-    [toast, queryClient]
+    [toast, confirm, queryClient]
   );
 
   // ── Gemini (Google GenAI) ──
   const { data: gmData, isLoading: gmLoading } = useQuery(integrationsGeminiStatusQuery());
-  const gmStatus = (gmData as integrations.GeminiStatusResponse | undefined) ?? null;
+  const gmStatus = gmData ?? null;
   const [gmKey, setGmKey] = useState('');
   const [gmModel, setGmModel] = useState('');
   const [gmBusy, setGmBusy] = useState(false);
@@ -402,7 +424,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
 
   // ── Cloudflare Access (aligner-portal doctor allow-list) ──
   const { data: cfData, isLoading: cfLoading } = useQuery(integrationsCloudflareListStatusQuery());
-  const cfStatus = (cfData as integrations.CloudflareListStatusResponse | undefined) ?? null;
+  const cfStatus = cfData ?? null;
   const [cfBusy, setCfBusy] = useState(false);
 
   const syncCloudflareList = useCallback(async (): Promise<void> => {
@@ -485,6 +507,20 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
     ? 'Not configured'
     : `${gcConnectedCount}/${gcTotalCount} connected`;
 
+  // Re-read every card. It used to refetch only Telegram's status (FE-F22-8).
+  const STATUS_KEYS = [
+    qk.settings.integrationsTelegramStatus(),
+    qk.settings.integrationsThreeShapeStatus(),
+    qk.settings.integrationsGoogleDriveStatus(),
+    qk.settings.integrationsGoogleContactsStatus(),
+    qk.settings.integrationsGeminiStatus(),
+    qk.settings.integrationsCloudflareListStatus(),
+  ];
+  const refreshing = loading || tsLoading || gdLoading || gcLoading || gmLoading || cfLoading;
+  const refreshAll = (): void => {
+    for (const queryKey of STATUS_KEYS) void queryClient.invalidateQueries({ queryKey });
+  };
+
   const health: 'ok' | 'warn' | 'off' = !status?.configured
     ? 'off'
     : status.authorized
@@ -504,12 +540,12 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
             <i className="fas fa-plug" aria-hidden="true" /> Integrations
           </h3>
           <p className={styles.description}>
-            Manage authentication for external services. More integrations (WhatsApp) will
-            appear here.
+            Connect, check and disconnect the external services this clinic uses.
+            WhatsApp is paired on its own page.
           </p>
         </div>
-        <button type="button" className={styles.refreshBtn} onClick={() => void refetch()} disabled={loading}>
-          <i className={`fas fa-sync-alt ${loading ? styles.spin : ''}`} aria-hidden="true" /> Refresh
+        <button type="button" className={styles.refreshBtn} onClick={refreshAll} disabled={refreshing}>
+          <i className={`fas fa-sync-alt ${refreshing ? styles.spin : ''}`} aria-hidden="true" /> Refresh
         </button>
       </div>
 
@@ -707,12 +743,6 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                 )}
               </dd>
             </div>
-            {tsStatus.connected && tsStatus.expiresAt && (
-              <div className={styles.row}>
-                <dt>Token expires</dt>
-                <dd>{formatLocaleDateTime(tsStatus.expiresAt)}</dd>
-              </div>
-            )}
           </dl>
         )}
 
@@ -783,12 +813,6 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                 )}
               </dd>
             </div>
-            {gdStatus.connected && gdStatus.expiresAt && (
-              <div className={styles.row}>
-                <dt>Access token expires</dt>
-                <dd>{formatLocaleDateTime(gdStatus.expiresAt)}</dd>
-              </div>
-            )}
           </dl>
         )}
 
@@ -895,7 +919,7 @@ const IntegrationsSettings = ({ onChangesUpdate }: Props) => {
                       <button
                         type="button"
                         className={styles.dangerBtn}
-                        onClick={() => void disconnectGoogleContacts(account.id)}
+                        onClick={() => void disconnectGoogleContacts(account.id, account.label)}
                         disabled={gcBusy !== null}
                       >
                         Disconnect

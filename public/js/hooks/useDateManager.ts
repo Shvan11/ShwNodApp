@@ -4,7 +4,8 @@
 import { useState, useMemo } from 'react';
 import { CONFIG } from '../utils/whatsapp-send-constants';
 import { dateString } from '@shared/validation';
-import { toLocalDateString } from '../utils/calendarDate';
+import { parseLocalDate, toLocalDateString } from '../utils/calendarDate';
+import { useToday } from './useClock';
 
 /**
  * Date option for dropdown
@@ -89,11 +90,10 @@ function getDefaultDate(): string {
 /**
  * Format date label with relative time
  */
-function formatDateLabel(date: Date): string {
+function formatDateLabel(date: Date, today: Date): string {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   const dateStr = toLocalDateString(date);
-  const today = new Date();
   const todayStr = toLocalDateString(today);
 
   // Calculate yesterday and tomorrow
@@ -135,10 +135,11 @@ function formatDateLabel(date: Date): string {
 }
 
 /**
- * Generate date options for dropdown
+ * Generate date options for dropdown. `today` comes from the clock store, not
+ * `new Date()`: memoized on `currentDate` alone, a page left open overnight kept
+ * yesterday's list and labels (FE-F26-2).
  */
-function generateDateOptions(currentDate: string): DateOption[] {
-  const today = new Date();
+function generateDateOptions(currentDate: string, today: Date): DateOption[] {
   const dates: Date[] = [];
 
   // Add past days (7 days back) for historical message status viewing
@@ -160,7 +161,7 @@ function generateDateOptions(currentDate: string): DateOption[] {
 
   return dates.map((date) => ({
     value: toLocalDateString(date),
-    label: formatDateLabel(date),
+    label: formatDateLabel(date, today),
     isToday: toLocalDateString(date) === toLocalDateString(today),
     isDefault: toLocalDateString(date) === currentDate,
   }));
@@ -170,8 +171,7 @@ function generateDateOptions(currentDate: string): DateOption[] {
  * Check if a date is within the sendable range (1-2 days from today).
  * The reminder query only returns messages for tomorrow or the day after.
  */
-function getDateSendability(dateStr: string): DateSendability {
-  const today = new Date();
+function getDateSendability(dateStr: string, today: Date): DateSendability {
   const selected = new Date(dateStr + 'T00:00:00');
   const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const selectedMidnight = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate());
@@ -191,16 +191,17 @@ function getDateSendability(dateStr: string): DateSendability {
  */
 export function useDateManager(): UseDateManagerReturn {
   const [currentDate, setCurrentDate] = useState<string>(() => getDefaultDate());
+  const todayStr = useToday();
 
   // Generate date options whenever current date changes
   const dateOptions = useMemo(() => {
-    return generateDateOptions(currentDate);
-  }, [currentDate]);
+    return generateDateOptions(currentDate, parseLocalDate(todayStr));
+  }, [currentDate, todayStr]);
 
   // Check if selected date is in the sendable range
   const sendability = useMemo(() => {
-    return getDateSendability(currentDate);
-  }, [currentDate]);
+    return getDateSendability(currentDate, parseLocalDate(todayStr));
+  }, [currentDate, todayStr]);
 
   // Handle date change
   const handleDateChange = (newDate: string): void => {

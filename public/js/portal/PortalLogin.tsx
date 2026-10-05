@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { PortalPatient } from './PortalApp';
 import { loginResponseSchema } from './portal.schemas';
@@ -6,6 +6,10 @@ import styles from './portal.module.css';
 
 interface Props {
   onLogin: (patient: PortalPatient) => void;
+  /** The configured clinic name, or null (unset/unreachable) — never a literal (FE-F23-8). */
+  clinicName: string | null;
+  /** Shown above the form, e.g. after a session ended mid-use (FE-F23-10). */
+  notice: string | null;
 }
 
 function readPidFromUrl(): string {
@@ -14,15 +18,11 @@ function readPidFromUrl(): string {
   return /^\d+$/.test(raw) ? raw : '';
 }
 
-const PortalLogin = ({ onLogin }: Props) => {
+const PortalLogin = ({ onLogin, clinicName, notice }: Props) => {
   const [personId, setPersonId] = useState(() => readPidFromUrl());
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    document.title = 'Patient Portal — Shwan Orthodontics';
-  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -55,7 +55,6 @@ const PortalLogin = ({ onLogin }: Props) => {
         patientName: data.patientName ?? null,
         firstName: null,
         lastName: null,
-        language: data.language ?? null,
       });
     } catch {
       setError('Unable to reach the server. Please try again.');
@@ -70,8 +69,10 @@ const PortalLogin = ({ onLogin }: Props) => {
         <div className={styles.loginHeader}>
           <i className={`fas fa-tooth ${styles.loginIcon}`} aria-hidden="true" />
           <h1 className={styles.loginTitle}>Patient Portal</h1>
-          <p className={styles.loginSubtitle}>Shwan Orthodontics</p>
+          {clinicName && <p className={styles.loginSubtitle}>{clinicName}</p>}
         </div>
+
+        {notice && !error && <div className={styles.noticeBox} role="status">{notice}</div>}
 
         <label className={styles.field}>
           <span className={styles.fieldLabel}>Patient Number</span>

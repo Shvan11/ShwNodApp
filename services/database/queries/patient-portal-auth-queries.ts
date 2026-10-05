@@ -4,12 +4,20 @@
  * Manages the `patient_portal_auth` table: PIN hash, enabled flag,
  * failed-attempt lockout, and last-login tracking.
  *
- * The upsert is `ON CONFLICT (person_id) DO UPDATE` against the PK. The timestamp
- * columns (`locked_until`, `last_login_at`, `created_at`, `updated_at`) are PG
- * `timestamp` → parsed to a local Date by kysely.ts, and are written with
- * `now() AT TIME ZONE 'UTC'` so they stay on a UTC wall-clock.
+ * The upsert is `ON CONFLICT (person_id) DO UPDATE` against the PK. `locked_until`,
+ * `last_login_at` and `created_at` are written with `now() AT TIME ZONE 'UTC'`, so
+ * they hold a UTC wall clock, by design on both sides of the mirror
+ * (migrations/supabase/mirror-timezone-2026-09-27.sql). (`updated_at` is LOCAL: the
+ * `set_updated_at` trigger overwrites whatever is written.)
+ *
+ * So they must be READ as UTC. kysely.ts parses every `timestamp` as a LOCAL wall
+ * clock, which put each of them 3 h in the past on a Baghdad server: `verifyPin`'s
+ * `locked_until > now` was never true, so five wrong PINs printed "Account locked
+ * for 30 minutes" and the right PIN still signed in on the next try, and the staff
+ * card showed last-login times 3 h early (audit FE-F23-14). `asUtcInstant` converts
+ * them in SQL to `timestamptz`, which pg parses as the real instant.
  */
-import { sql } from 'kysely';
+import { sql, type RawBuilder } from 'kysely';
 import { getKysely } from '../kysely.js';
 
 export interface PortalAuthRow {
@@ -25,6 +33,13 @@ export interface PortalAuthRow {
 
 const utcNow = sql<Date>`now() at time zone 'UTC'`;
 
+/** A UTC-wall-clock `timestamp` column as the instant it names (see the header). */
+function asUtcInstant<C extends 'locked_until' | 'last_login_at' | 'created_at'>(
+  column: C
+): RawBuilder<C extends 'created_at' ? Date : Date | null> {
+  return sql`${sql.ref(column)} at time zone 'UTC'`;
+}
+
 export async function getAuthRow(personId: number): Promise<PortalAuthRow | null> {
   const db = getKysely();
   const row = await db
@@ -35,14 +50,31 @@ export async function getAuthRow(personId: number): Promise<PortalAuthRow | null
       'pin_hash',
       'enabled',
       'failed_attempts',
-      'locked_until',
-      'last_login_at',
-      'created_at',
+      asUtcInstant('locked_until').as('locked_until'),
+      asUtcInstant('last_login_at').as('last_login_at'),
+      asUtcInstant('created_at').as('created_at'),
       'updated_at',
     ])
     .executeTakeFirst();
 
   return row ?? null;
+}
+
+/**
+ * Sign a patient out of the portal everywhere: delete their rows from the portal
+ * session store.
+ *
+ * `authenticatePatient` trusts the session's `patientId` and never re-reads this
+ * table, and the portal cookie is `rolling`, so without this, disabling a patient's
+ * access or changing their PIN — the clinic's answer to "someone else has my PIN" —
+ * changed nothing for a phone that was already signed in (audit FE-F23-3; FE-F22-1
+ * is the staff twin). Returns the number of sessions ended.
+ */
+export async function endPortalSessions(personId: number): Promise<number> {
+  const result = await sql`
+    DELETE FROM "portal_sessions" WHERE "sess"->>'patientId' = ${String(personId)}
+  `.execute(getKysely());
+  return Number(result.numAffectedRows ?? 0n);
 }
 
 export async function upsertPin(personId: number, pinHash: string): Promise<void> {
@@ -95,7 +127,7 @@ export async function recordFailedAttempt(
       updated_at: utcNow,
     }))
     .where('person_id', '=', personId)
-    .returning(['failed_attempts', 'locked_until'])
+    .returning(['failed_attempts', asUtcInstant('locked_until').as('locked_until')])
     .executeTakeFirst();
 
   return {

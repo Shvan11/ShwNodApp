@@ -1,11 +1,11 @@
 import { useState, useEffect, ChangeEvent, MouseEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
-import Modal from './Modal';
-import ModalHeader from './ModalHeader';
+import { useToast } from '../../contexts/ToastContext';
 import styles from './DatabaseSettings.module.css';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { waitForServerRestart } from '@/core/serverHealth';
 import { databaseConfigQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import * as settings from '@shared/contracts/settings.contract';
@@ -30,11 +30,8 @@ interface ConnectionStatus {
     details?: string;
 }
 
-interface ModalState {
-    show: boolean;
-    title: string;
-    message: string;
-}
+/** Where a restart is: asked for and waiting on the new process, or given up on. */
+type RestartState = null | 'waiting' | 'timedOut';
 
 interface DatabaseSettingsProps {
     onChangesUpdate?: (hasChanges: boolean) => void;
@@ -50,11 +47,13 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     });
     const [pendingChanges, setPendingChanges] = useState<PendingChanges>({});
     const [isTestingConnection, setIsTestingConnection] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const confirm = useConfirm();
+    const toast = useToast();
     const queryClient = useQueryClient();
     const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
     const [showPassword, setShowPassword] = useState(false);
-    const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '' });
+    const [restart, setRestart] = useState<RestartState>(null);
 
     const { data: configData, isLoading, isError, error: loadError } = useQuery(databaseConfigQuery());
 
@@ -70,16 +69,6 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         setConfig(configData.config as DatabaseConfig);
     }
 
-    // Surface a load failure once per error transition. setModal is called directly
-    // (the later-declared showModal would trip react-hooks/immutability).
-    const [prevIsError, setPrevIsError] = useState(isError);
-    if (isError !== prevIsError) {
-        setPrevIsError(isError);
-        if (isError) {
-            setModal({ show: true, title: 'Error', message: 'Failed to load database configuration: ' + httpErrorMessage(loadError, 'Unknown error') });
-        }
-    }
-
     useEffect(() => {
         // Notify parent component about changes
         if (onChangesUpdate) {
@@ -88,14 +77,6 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         // onChangesUpdate intentionally excluded — parent should provide a stable ref
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingChanges]);
-
-    const showModal = (title: string, message: string) => {
-        setModal({ show: true, title, message });
-    };
-
-    const hideModal = () => {
-        setModal({ show: false, title: '', message: '' });
-    };
 
     const handleInputChange = (key: string, value: string) => {
         const originalValue = config[key];
@@ -119,19 +100,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         setConnectionStatus(null);
 
         try {
-            // Get current values (including pending changes)
+            // Current values including pending changes. A still-masked password stands
+            // for the saved one: the server uses it only against the saved host/port/user.
             const testConfig = { ...config, ...pendingChanges };
-
-            // Check if password is masked (security feature)
-            if (isMaskedSecret(testConfig.PG_PASSWORD)) {
-                setConnectionStatus({
-                    success: false,
-                    message: 'Cannot test with masked password',
-                    details: 'Please enter a new password to test the connection. Existing passwords are masked for security.'
-                });
-                setIsTestingConnection(false);
-                return;
-            }
 
             const data = await postJSON<{ connectionOk: boolean; message: string; details?: string }>(
                 '/api/config/database/test',
@@ -158,12 +129,35 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         }
     };
 
-    const saveConfiguration = async () => {
-        if (Object.keys(pendingChanges).length === 0) {
-            showModal('Info', 'No changes to save.');
+    /**
+     * Ask the server to restart, then wait for the NEW process before reloading. It used
+     * to reload after a fixed 5 s — mid graceful-shutdown (up to 15 s) or before the
+     * service manager had the app back up — onto a proxy error page, or, on a box with
+     * no service manager, onto nothing at all while the page said "restarting" (FE-F22-6).
+     */
+    const restartApplication = async () => {
+        const requestedAt = Date.now();
+        try {
+            await postJSON<{ message?: string }>(
+                '/api/system/restart',
+                { reason: 'Database configuration update' }
+            );
+        } catch (error) {
+            toast.error('Failed to restart the application: ' + httpErrorMessage(error, 'Unknown error'));
             return;
         }
+        setRestart('waiting');
+        if (await waitForServerRestart(requestedAt)) {
+            window.location.reload();
+        } else {
+            setRestart('timedOut');
+        }
+    };
 
+    const saveConfiguration = async () => {
+        if (Object.keys(pendingChanges).length === 0 || isSaving) return;
+
+        setIsSaving(true);
         try {
             // Get complete configuration (current + pending changes).
             // The loaded password is a MASK, not the real one. Posting it back
@@ -188,22 +182,24 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
             if (data.requiresRestart) {
                 const shouldRestart = await confirm(
-                    data.message + '\n\nThe application must be restarted for database changes to take effect.\n\nRestart now?',
+                    (data.message ? data.message + '\n\n' : '') +
+                        'The application must be restarted for database changes to take effect.\n\nRestart now?',
                     { title: 'Restart Required', danger: true, confirmText: 'Restart Now', cancelText: 'Later' }
                 );
 
                 if (shouldRestart) {
-                    restartApplication();
+                    void restartApplication();
                 } else {
-                    showModal('Success', data.message + '\n\nRemember to restart the application for changes to take effect.');
+                    toast.warning('Saved. Restart the application for the change to take effect.');
                 }
             } else {
-                showModal('Success', data.message || 'Configuration saved successfully.');
+                toast.success(data.message || 'Configuration saved');
             }
 
         } catch (error) {
-            console.error('Error saving database config:', error);
-            showModal('Error', 'Failed to save database configuration: ' + httpErrorMessage(error, 'Unknown error'));
+            toast.error('Failed to save the database configuration: ' + httpErrorMessage(error, 'Unknown error'));
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -227,30 +223,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            showModal('Success', 'Configuration exported successfully.');
+            toast.success('Configuration exported (the password is not included)');
         } catch (error) {
-            console.error('Error exporting configuration:', error);
-            showModal('Error', 'Failed to export configuration: ' + httpErrorMessage(error, 'Unknown error'));
-        }
-    };
-
-    const restartApplication = async () => {
-        try {
-            await postJSON<{ message?: string }>(
-                '/api/system/restart',
-                { reason: 'Database configuration update' }
-            );
-
-            // A failed restart-init throws from postJSON → caught below.
-            showModal('Restarting', 'Application is restarting. Please wait...');
-
-            // Check if server is back up
-            setTimeout(() => {
-                window.location.reload();
-            }, 5000);
-        } catch (error) {
-            console.error('Error restarting application:', error);
-            showModal('Error', 'Failed to restart application: ' + httpErrorMessage(error, 'Unknown error'));
+            toast.error('Failed to export the configuration: ' + httpErrorMessage(error, 'Unknown error'));
         }
     };
 
@@ -259,6 +234,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
     };
 
     const hasChanges = Object.keys(pendingChanges).length > 0;
+    const passwordIsSaved = isMaskedSecret(getCurrentValue('PG_PASSWORD'));
 
     return (
         <div className={styles.container}>
@@ -271,10 +247,36 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                     Configure database connection settings. Changes require application restart.
                 </p>
 
+                {restart && (
+                    <div className={`${styles.connectionStatus} ${restart === 'waiting' ? styles.success : styles.error}`} role="status">
+                        <div className={styles.statusHeader}>
+                            <i className={restart === 'waiting' ? 'fas fa-spinner fa-spin' : 'fas fa-exclamation-circle'}></i>
+                            <span>
+                                {restart === 'waiting'
+                                    ? 'Restarting the application… this page reloads as soon as it is back.'
+                                    : 'The application has not come back after two minutes.'}
+                            </span>
+                        </div>
+                        {restart === 'timedOut' && (
+                            <div className={styles.statusDetails}>
+                                Check the server: on a Windows service install, look at the service and its logs;
+                                on a development machine nothing restarts the process for you.
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {isLoading ? (
                     <div className={styles.loadingSpinner}>
                         <i className="fas fa-spinner fa-spin"></i>
                         <span>Loading database configuration...</span>
+                    </div>
+                ) : isError ? (
+                    <div className={`${styles.connectionStatus} ${styles.error}`}>
+                        <div className={styles.statusHeader}>
+                            <i className="fas fa-exclamation-circle"></i>
+                            <span>{httpErrorMessage(loadError, 'Failed to load the database configuration')}</span>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -353,6 +355,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                     <button
                                         type="button"
                                         className={styles.passwordToggle}
+                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
                                         onClick={(e: MouseEvent<HTMLButtonElement>) => {
                                             e.preventDefault();
                                             e.stopPropagation();
@@ -362,7 +365,11 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                         <i className={showPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
                                     </button>
                                 </div>
-                                <div className={styles.settingDescription}>PostgreSQL role password (leave blank for trust/peer auth)</div>
+                                <div className={styles.settingDescription}>
+                                    {passwordIsSaved
+                                        ? 'The saved password is hidden. Leave it to keep it; type over it to change it.'
+                                        : 'PostgreSQL role password (leave blank for trust/peer auth)'}
+                                </div>
                             </div>
                         </div>
 
@@ -390,7 +397,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                 </button>
 
                                 {connectionStatus && (
-                                    <div className={`${styles.connectionStatus} ${connectionStatus.success ? styles.success : styles.error}`}>
+                                    <div className={`${styles.connectionStatus} ${connectionStatus.success ? styles.success : styles.error}`} role="status">
                                         <div className={styles.statusHeader}>
                                             <i className={connectionStatus.success ? "fas fa-check-circle" : "fas fa-exclamation-circle"}></i>
                                             <span>{connectionStatus.message}</span>
@@ -408,7 +415,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 <button
                     className={`${styles.btn} ${styles.btnPrimary}`}
                     onClick={saveConfiguration}
-                    disabled={!hasChanges}
+                    disabled={!hasChanges || isSaving || restart === 'waiting'}
                 >
                     <i className="fas fa-save"></i>
                     {hasChanges
@@ -427,12 +434,13 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
                 <button
                     className={`${styles.btn} ${styles.btnInfo}`}
+                    disabled={restart === 'waiting'}
                     onClick={async () => {
                         const ok = await confirm(
                             'This will restart the live application server for all users. Continue?',
                             { title: 'Restart Application', danger: true, confirmText: 'Restart Now', cancelText: 'Cancel' }
                         );
-                        if (ok) restartApplication();
+                        if (ok) void restartApplication();
                     }}
                     title="Restart application to apply configuration changes"
                 >
@@ -447,26 +455,6 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                     <span>Application restart required after saving database configuration changes.</span>
                 </div>
             )}
-
-            {/* Modal */}
-            <Modal
-                isOpen={modal.show}
-                onClose={hideModal}
-                contentClassName={styles.modalContent}
-                ariaLabelledBy="database-settings-modal-title"
-            >
-                <ModalHeader
-                    titleId="database-settings-modal-title"
-                    title={modal.title}
-                    onClose={hideModal}
-                />
-                <div className={styles.modalBody}>
-                    <pre>{modal.message}</pre>
-                </div>
-                <div className={styles.modalFooter}>
-                    <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={hideModal}>OK</button>
-                </div>
-            </Modal>
         </div>
     );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, ComponentType } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { authMeQuery } from '@/query/queries';
+import { authMeQuery, syncFeaturesQuery } from '@/query/queries';
 import { roleCaps, type RoleCapabilities, type UserRole } from '@shared/auth/roles';
 import { useUnsavedRouteGuard } from '../../hooks/useUnsavedRouteGuard';
 
@@ -44,6 +44,11 @@ interface TabConfig {
      * and Calendar Times on a clinical 403 (audit FE-F21-3).
      */
     requires?: keyof RoleCapabilities;
+    /**
+     * The CDC sink the tab reports on. The tab shows only on an install that has that sink
+     * (`GET /api/sync/features`) — for every role (audit FE-F22-7; owner, 2026-10-05).
+     */
+    feature?: 'supabase' | 'dolphin';
 }
 
 // Tab configuration defined statically outside the component to avoid recreation on render.
@@ -131,14 +136,16 @@ const tabs: TabConfig[] = [
         label: 'Supabase Status',
         icon: 'fas fa-cloud',
         component: SupabaseStatusSettings,
-        description: 'Live status of Supabase portal & failover sync'
+        description: 'Live status of Supabase portal & failover sync',
+        feature: 'supabase'
     },
     {
         id: 'dolphinStatus',
         label: 'Dolphin Status',
         icon: 'fas fa-database',
         component: DolphinStatusSettings,
-        description: 'Live status of the legacy Dolphin Imaging SQL Server sink'
+        description: 'Live status of the legacy Dolphin Imaging SQL Server sink',
+        feature: 'dolphin'
     },
     {
         id: 'tvDisplay',
@@ -155,7 +162,7 @@ const tabs: TabConfig[] = [
         label: 'Integrations',
         icon: 'fas fa-plug',
         component: IntegrationsSettings,
-        description: 'Manage Telegram (and later WhatsApp/Google) authentication',
+        description: 'Telegram, 3Shape, Google Drive and Contacts, Gemini and the portal allow-list',
         requires: 'manageSettings'
     },
     {
@@ -194,11 +201,18 @@ const SettingsComponent: React.FC = () => {
     const [dirtyTab, setDirtyTab] = useState<string | null>(null);
     const activeDirty = dirtyTab === activeTab;
 
-    // Filter tabs based on user role dynamically.
+    // Which sinks this install has. Until it answers (or if it fails) the sink tabs stay
+    // listed, so a deep link to one is never bounced before the answer is in.
+    const { data: features, isPending: featuresPending } = useQuery(syncFeaturesQuery());
+
+    // Filter tabs by role and by what this install has.
     const filteredTabs = useMemo(() => {
         const caps = roleCaps((userRole ?? undefined) as UserRole | undefined);
-        return tabs.filter(tabItem => !tabItem.requires || caps[tabItem.requires]);
-    }, [userRole]);
+        return tabs.filter(tabItem =>
+            (!tabItem.requires || caps[tabItem.requires]) &&
+            (!tabItem.feature || !features || features[tabItem.feature])
+        );
+    }, [userRole, features]);
 
     // Switching tabs or leaving Settings with unsaved edits asks first (the tab's
     // edits are dropped when it unmounts); a reload gets the browser's prompt.
@@ -219,12 +233,12 @@ const SettingsComponent: React.FC = () => {
 
     // Redirect to the fallback tab if the active one is unknown or unauthorized.
     useEffect(() => {
-        if (userRole === null) return; // Wait until user info is loaded
+        if (userRole === null || featuresPending) return; // Wait until both are loaded
 
         if (!filteredTabs.some(t => t.id === activeTab)) {
             navigate(`/settings/${filteredTabs[0]?.id ?? 'general'}`, { replace: true });
         }
-    }, [userRole, activeTab, filteredTabs, navigate]);
+    }, [userRole, featuresPending, activeTab, filteredTabs, navigate]);
 
     const handleTabChange = (tabId: string): void => {
         if (filteredTabs.some(t => t.id === tabId)) {

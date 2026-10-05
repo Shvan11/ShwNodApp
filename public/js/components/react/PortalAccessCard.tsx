@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Modal from './Modal';
 import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { formatLocaleDateTime } from '../../utils/formatters';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { portalStatusQuery } from '@/query/queries';
@@ -14,67 +17,39 @@ interface Props {
   personId: number;
 }
 
-// Staff-side portal read shapes. The contract's `portalStatus.response` is a loose
-// container (only `enabled` enumerated), so these annotate the long-tail fields
-// this card reads — co-located with the sole consumer rather than in the
-// envelope-only api.types.ts.
-
-/** Normalized read-shape of GET /api/patients/:id/portal. */
-interface PortalStatus {
-  enabled: boolean;
-  hasPin: boolean;
-  lockedUntil: string | null;
-  lastLoginAt: string | null;
-  failedAttempts: number;
-  qrDataUrl: string;
-  portalUrl: string;
-}
-
-/** POST /api/patients/:id/portal/reset-pin. */
-interface PortalPinResetResponse {
-  success: boolean;
-  pin?: string;
-  error?: string;
-}
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return 'Never';
-  return formatLocaleDateTime(iso, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }) || iso;
-}
-
+/**
+ * Staff side of the Patient Portal for one patient: enable/disable, PIN, lock state, QR.
+ * Rendered only for roles the portal routes admit (`roleCaps().managePatientPortal`,
+ * checked by the caller). Lives on the translated patient-info page, so it is in the
+ * `patients` namespace (audit FE-F22-12).
+ */
 const PortalAccessCard = ({ personId }: Props) => {
+  const { t } = useTranslation('patients');
+  const { language } = useLanguage();
   const toast = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
-  const { data, isLoading: loading, error: queryError, refetch } = useQuery(
+  const { data: status, isLoading: loading, error: queryError, refetch } = useQuery(
     portalStatusQuery(personId)
   );
-  const error = queryError ? httpErrorMessage(queryError, 'Unknown error') : null;
-
-  const status: PortalStatus | null = useMemo(() => {
-    if (!data) return null;
-    const d = data as Partial<PortalStatus>;
-    return {
-      enabled: d.enabled ?? false,
-      hasPin: d.hasPin ?? false,
-      lockedUntil: d.lockedUntil ?? null,
-      lastLoginAt: d.lastLoginAt ?? null,
-      failedAttempts: d.failedAttempts ?? 0,
-      qrDataUrl: d.qrDataUrl ?? '',
-      portalUrl: d.portalUrl ?? '',
-    };
-  }, [data]);
+  const error = queryError ? httpErrorMessage(queryError, t('portal.toast.loadFailed')) : null;
 
   const [busyAction, setBusyAction] = useState<
     null | 'enable' | 'reset' | 'unlock'
   >(null);
   const [newPin, setNewPin] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
+
+  const formatDateTime = (iso: string | null): string => {
+    if (!iso) return t('portal.never');
+    return formatLocaleDateTime(iso, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }, language) || iso;
+  };
 
   const invalidatePortal = () =>
     queryClient.invalidateQueries({ queryKey: qk.patient.portal(personId) });
@@ -86,9 +61,9 @@ const PortalAccessCard = ({ personId }: Props) => {
     try {
       await postJSON(`/api/patients/${personId}/portal/enable`, { enabled: next });
       await invalidatePortal();
-      toast.success(next ? 'Portal access enabled' : 'Portal access disabled');
+      toast.success(next ? t('portal.toast.enabledOn') : t('portal.toast.enabledOff'));
     } catch (err) {
-      toast.error(httpErrorMessage(err, 'Failed to update'));
+      toast.error(httpErrorMessage(err, t('portal.toast.updateFailed')));
     } finally {
       setBusyAction(null);
     }
@@ -96,17 +71,28 @@ const PortalAccessCard = ({ personId }: Props) => {
 
   const handleResetPin = async () => {
     if (busyAction) return;
+    // Replacing a working PIN locks the patient out until they get the new one, so it
+    // asks first; creating the first PIN doesn't.
+    if (status?.hasPin) {
+      const ok = await confirm(t('portal.confirmReset.message'), {
+        title: t('portal.confirmReset.title'),
+        confirmText: t('portal.confirmReset.confirm'),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setBusyAction('reset');
     try {
-      const data = await postJSON<PortalPinResetResponse>(`/api/patients/${personId}/portal/reset-pin`, {}, { schema: patientContract.resetPin.response });
-      if (!data.pin) {
-        throw new Error(data.error || 'Failed to reset PIN');
-      }
+      const data = await postJSON<patientContract.ResetPinResponse>(
+        `/api/patients/${personId}/portal/reset-pin`,
+        {},
+        { schema: patientContract.resetPin.response }
+      );
       setNewPin(data.pin);
       setCopyState('idle');
       await invalidatePortal();
     } catch (err) {
-      toast.error(httpErrorMessage(err, 'Failed to reset PIN'));
+      toast.error(httpErrorMessage(err, t('portal.toast.resetFailed')));
     } finally {
       setBusyAction(null);
     }
@@ -117,10 +103,10 @@ const PortalAccessCard = ({ personId }: Props) => {
     setBusyAction('unlock');
     try {
       await postJSON(`/api/patients/${personId}/portal/unlock`, {});
-      toast.success('Portal access unlocked');
+      toast.success(t('portal.toast.unlocked'));
       await invalidatePortal();
     } catch (err) {
-      toast.error(httpErrorMessage(err, 'Failed to unlock'));
+      toast.error(httpErrorMessage(err, t('portal.toast.unlockFailed')));
     } finally {
       setBusyAction(null);
     }
@@ -131,11 +117,17 @@ const PortalAccessCard = ({ personId }: Props) => {
     try {
       await navigator.clipboard.writeText(newPin);
       setCopyState('copied');
-      setTimeout(() => setCopyState('idle'), 1500);
     } catch {
-      toast.error('Unable to copy — please write the PIN down.');
+      toast.error(t('portal.toast.copyFailed'));
     }
   };
+
+  // Put the Copy button back 1.5 s after a copy; cleared if the dialog closes first.
+  useEffect(() => {
+    if (copyState !== 'copied') return;
+    const id = setTimeout(() => setCopyState('idle'), 1500);
+    return () => clearTimeout(id);
+  }, [copyState]);
 
   // A clock used only to re-evaluate the lock against the current time. `Date.now()`
   // can't be read during render (impure → the badge would never refresh on its own),
@@ -158,12 +150,12 @@ const PortalAccessCard = ({ personId }: Props) => {
     <div className={viewStyles.patientInfoCard}>
       <h3 className={viewStyles.patientCardTitle}>
         <i className={`fas fa-qrcode ${viewStyles.piIconGap}`}></i>
-        Portal Access
+        {t('portal.title')}
       </h3>
 
       {loading && (
         <div className={styles.loadingRow}>
-          <i className="fas fa-spinner fa-spin"></i> Loading…
+          <i className="fas fa-spinner fa-spin"></i> {t('portal.loading')}
         </div>
       )}
 
@@ -175,7 +167,7 @@ const PortalAccessCard = ({ personId }: Props) => {
             className="btn btn-sm btn-secondary"
             onClick={() => refetch()}
           >
-            Retry
+            {t('portal.retry')}
           </button>
         </div>
       )}
@@ -189,28 +181,28 @@ const PortalAccessCard = ({ personId }: Props) => {
               disabled={busyAction === 'enable'}
               onChange={handleEnableToggle}
             />
-            <span>Portal access enabled</span>
+            <span>{t('portal.enabled')}</span>
           </label>
 
           <div className={styles.statusGrid}>
             <div>
-              <span className={styles.label}>PIN</span>
+              <span className={styles.label}>{t('portal.pin')}</span>
               <span className={styles.value}>
-                {status.hasPin ? 'Set' : 'Not set'}
+                {status.hasPin ? t('portal.pinSet') : t('portal.pinNotSet')}
               </span>
             </div>
             <div>
-              <span className={styles.label}>Last login</span>
+              <span className={styles.label}>{t('portal.lastLogin')}</span>
               <span className={styles.value}>
                 {formatDateTime(status.lastLoginAt)}
               </span>
             </div>
             <div>
-              <span className={styles.label}>Failed attempts</span>
+              <span className={styles.label}>{t('portal.failedAttempts')}</span>
               <span className={styles.value}>{status.failedAttempts}</span>
             </div>
             <div>
-              <span className={styles.label}>Status</span>
+              <span className={styles.label}>{t('portal.status')}</span>
               <span
                 className={
                   isLocked
@@ -219,10 +211,10 @@ const PortalAccessCard = ({ personId }: Props) => {
                 }
               >
                 {isLocked
-                  ? `Locked until ${formatDateTime(status.lockedUntil)}`
+                  ? t('portal.lockedUntil', { time: formatDateTime(status.lockedUntil) })
                   : status.enabled
-                  ? 'Active'
-                  : 'Disabled'}
+                  ? t('portal.active')
+                  : t('portal.disabled')}
               </span>
             </div>
           </div>
@@ -235,7 +227,7 @@ const PortalAccessCard = ({ personId }: Props) => {
               disabled={busyAction === 'reset'}
             >
               <i className="fas fa-key"></i>{' '}
-              {status.hasPin ? 'Reset PIN' : 'Create PIN'}
+              {status.hasPin ? t('portal.resetPin') : t('portal.createPin')}
             </button>
             {isLocked && (
               <button
@@ -244,7 +236,7 @@ const PortalAccessCard = ({ personId }: Props) => {
                 onClick={handleUnlock}
                 disabled={busyAction === 'unlock'}
               >
-                <i className="fas fa-unlock"></i> Unlock
+                <i className="fas fa-unlock"></i> {t('portal.unlock')}
               </button>
             )}
           </div>
@@ -253,29 +245,39 @@ const PortalAccessCard = ({ personId }: Props) => {
             <div className={styles.qrBlock}>
               <img
                 src={status.qrDataUrl}
-                alt="Portal QR code"
+                alt={t('portal.qrAlt')}
                 className={styles.qrImage}
               />
               {status.portalUrl && (
                 <code className={styles.portalUrl}>{status.portalUrl}</code>
+              )}
+              {status.usesDefaultAddress && (
+                <p className={styles.qrWarning} role="alert">
+                  <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>{' '}
+                  {t('portal.defaultAddress')}
+                </p>
               )}
             </div>
           )}
         </div>
       )}
 
+      {/* The PIN is shown once, so only Done closes this — a stray backdrop click or
+          Escape used to throw it away (audit FE-F22-12). */}
       <Modal
         isOpen={newPin !== null}
         onClose={() => setNewPin(null)}
+        closeOnBackdropClick={false}
+        closeOnEscape={false}
         contentClassName={styles.pinModal}
         ariaLabelledBy="portal-pin-modal-title"
       >
         <div className={styles.pinModalBody}>
           <h3 id="portal-pin-modal-title" className={styles.pinModalTitle}>
-            New Portal PIN
+            {t('portal.pinModal.title')}
           </h3>
           <p className={styles.pinModalHint}>
-            Share this PIN with the patient now — it won't be shown again.
+            {t('portal.pinModal.hint')}
           </p>
           <div className={styles.pinDisplay}>{newPin}</div>
           <div className={styles.pinModalActions}>
@@ -289,14 +291,14 @@ const PortalAccessCard = ({ personId }: Props) => {
                   copyState === 'copied' ? 'fas fa-check' : 'fas fa-copy'
                 }
               ></i>{' '}
-              {copyState === 'copied' ? 'Copied' : 'Copy'}
+              {copyState === 'copied' ? t('portal.pinModal.copied') : t('portal.pinModal.copy')}
             </button>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => setNewPin(null)}
             >
-              Done
+              {t('portal.pinModal.done')}
             </button>
           </div>
         </div>

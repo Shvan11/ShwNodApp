@@ -123,16 +123,27 @@ class DatabaseConfigService {
       };
     }
 
-    // The mask is a display artefact, never a credential — refuse it here too, so
-    // the check does not depend on the client remembering to make it.
+    // The mask is a display artefact, never a credential. It stands for the STORED
+    // password, so a test of the stored server + user may use that — the form could
+    // otherwise never test the saved configuration without the admin retyping a password
+    // they may not have (audit FE-F22-9). Pointed anywhere else it is refused: sending
+    // the real password to a host someone just typed would hand it over.
     if (isMaskedSecret(testConfig.PG_PASSWORD)) {
-      return {
-        success: false,
-        message: 'Cannot test with masked password',
-        details:
-          'The stored password is hidden. Type the password to test the connection, or clear the field for trust/peer auth.',
-        duration: Date.now() - startTime,
-      };
+      const stored = await this.envManager.getDatabaseConfig();
+      const sameTarget =
+        (testConfig.PG_HOST ?? '').trim() === (stored.PG_HOST ?? '').trim() &&
+        String(testConfig.PG_PORT || '5432').trim() === String(stored.PG_PORT || '5432').trim() &&
+        (testConfig.PG_USER ?? '').trim() === (stored.PG_USER ?? '').trim();
+      if (!sameTarget) {
+        return {
+          success: false,
+          message: 'Type the password to test a different server',
+          details:
+            'The saved password is only used to test the saved host, port and user. Type the password for the server you entered.',
+          duration: Date.now() - startTime,
+        };
+      }
+      testConfig = { ...testConfig, PG_PASSWORD: stored.PG_PASSWORD ?? '' };
     }
 
     const parsedPort = parseInt(testConfig.PG_PORT || '5432', 10);

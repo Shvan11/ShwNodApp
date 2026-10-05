@@ -2,13 +2,15 @@ import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { usersListQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import Modal from './Modal';
 import styles from './AdminUserManagement.module.css';
-import { ASSIGNABLE_ROLES, ROLE_LABELS, type UserRole } from '@shared/auth/roles';
+import { ASSIGNABLE_ROLES, ROLE_LABELS, normalizeRole, type UserRole } from '@shared/auth/roles';
 import { MIN_PASSWORD_LENGTH } from '@shared/validation';
+import type { UserRow } from '@shared/contracts/user-management.contract';
 import { formatLocaleDate } from '@/utils/formatters';
 
 const ROLE_BADGE_CLASS: Record<UserRole, string> = {
@@ -16,16 +18,6 @@ const ROLE_BADGE_CLASS: Record<UserRole, string> = {
   front_desk: styles.roleSecretary,
   clinical: styles.roleClinical,
 };
-
-interface User {
-  userId: number;
-  username: string;
-  fullName: string | null;
-  role: UserRole;
-  isActive: boolean;
-  lastLogin: string | null;
-  createdAt: string;
-}
 
 interface FormData {
   username: string;
@@ -39,6 +31,11 @@ interface Message {
   text: string;
 }
 
+// The server's rule (`shared/validation.ts#passwordString`), stated once for both forms.
+// The labels used to say "min 6" while the server required 8 (audit FE-F22-3).
+const PASSWORD_RULE = `min ${MIN_PASSWORD_LENGTH} characters`;
+const EMPTY_FORM: FormData = { username: '', password: '', fullName: '', role: 'front_desk' };
+
 /**
  * Admin User Management Component
  * Only accessible to admin users
@@ -47,23 +44,22 @@ export default function AdminUserManagement() {
   const toast = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
+  const me = useAuthUser();
   const { data, isLoading: loading, isError } = useQuery(usersListQuery());
-  const users = (data?.users ?? []) as User[];
+  const users: UserRow[] = data?.users ?? [];
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [message, setMessage] = useState<Message>({ type: '', text: '' });
+  const [creating, setCreating] = useState(false);
+  // One row-level write at a time (role / toggle / delete): a second click while the
+  // first is in flight used to send it twice.
+  const [busyUserId, setBusyUserId] = useState<number | null>(null);
 
   // Password-reset modal state
   const [resetTarget, setResetTarget] = useState<{ userId: number; username: string } | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [resetting, setResetting] = useState(false);
 
-  // Form state
-  const [formData, setFormData] = useState<FormData>({
-    username: '',
-    password: '',
-    fullName: '',
-    role: 'front_desk'
-  });
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
 
   // Refresh the shared user-list cache after a write.
   const fetchUsers = () => queryClient.invalidateQueries({ queryKey: qk.users.list() });
@@ -76,42 +72,75 @@ export default function AdminUserManagement() {
     if (isError) setMessage({ type: 'error', text: 'Network error loading users' });
   }
 
+  const isSelf = (user: UserRow) => !!me?.username && user.username.toLowerCase() === me.username.toLowerCase();
+
   const handleCreateUser = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (creating) return;
+    if (formData.password.length < MIN_PASSWORD_LENGTH) {
+      setMessage({ type: 'error', text: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      return;
+    }
     setMessage({ type: '', text: '' });
-
+    setCreating(true);
     try {
       await postJSON('/api/users', formData);
-      setMessage({ type: 'success', text: 'User created successfully!' });
-      setFormData({ username: '', password: '', fullName: '', role: 'front_desk' });
+      setMessage({ type: 'success', text: `User ${formData.username} created` });
+      setFormData(EMPTY_FORM);
       setShowCreateForm(false);
-      fetchUsers(); // Reload list
+      fetchUsers();
     } catch (err) {
       setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error creating user') });
+    } finally {
+      setCreating(false);
     }
   };
 
-  const handleToggleActive = async (userId: number) => {
-    if (!await confirm('Toggle user active status?', { title: 'Toggle Status' })) return;
+  const handleToggleActive = async (user: UserRow) => {
+    if (busyUserId !== null) return;
+    const ok = user.isActive
+      ? await confirm(
+          `Deactivate "${user.username}"? They are signed out at once and can't sign in until reactivated.`,
+          { title: 'Deactivate User', danger: true, confirmText: 'Deactivate' }
+        )
+      : await confirm(`Reactivate "${user.username}"? They will be able to sign in again.`, {
+          title: 'Reactivate User',
+          confirmText: 'Reactivate',
+        });
+    if (!ok) return;
 
+    setBusyUserId(user.userId);
     try {
-      await putJSON(`/api/users/${userId}/toggle`, {});
-      setMessage({ type: 'success', text: 'User status updated' });
+      await putJSON(`/api/users/${user.userId}/toggle`, {});
+      setMessage({ type: 'success', text: `${user.username} ${user.isActive ? 'deactivated' : 'reactivated'}` });
       fetchUsers();
     } catch (err) {
       setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
+    } finally {
+      setBusyUserId(null);
     }
   };
 
-  const handleRoleChange = async (userId: number, role: UserRole) => {
-    if (!await confirm(`Change this user's role to "${ROLE_LABELS[role]}"?`, { title: 'Change Role' })) return;
+  const handleRoleChange = async (user: UserRow, role: UserRole) => {
+    if (busyUserId !== null) return;
+    const self = isSelf(user);
+    const consequence = self
+      ? ' This changes what you can do in this app straight away.'
+      : ' They are signed out and sign in again with the new role.';
+    if (!await confirm(`Change ${user.username}'s role to "${ROLE_LABELS[role]}"?${consequence}`, { title: 'Change Role' })) return;
 
+    setBusyUserId(user.userId);
     try {
-      await putJSON(`/api/users/${userId}/role`, { role });
-      setMessage({ type: 'success', text: 'Role updated' });
+      await putJSON(`/api/users/${user.userId}/role`, { role });
+      setMessage({ type: 'success', text: `${user.username} is now ${ROLE_LABELS[role]}` });
       fetchUsers();
+      // Your own change applies to this session server-side; refresh what the shell
+      // shows (tabs, menus) to match instead of waiting for a reload.
+      if (self) void queryClient.invalidateQueries({ queryKey: qk.auth.me() });
     } catch (err) {
       setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
+    } finally {
+      setBusyUserId(null);
     }
   };
 
@@ -142,15 +171,19 @@ export default function AdminUserManagement() {
     }
   };
 
-  const handleDeleteUser = async (userId: number, username: string) => {
-    if (!await confirm(`Are you sure you want to delete user "${username}"? This cannot be undone.`, { title: 'Delete User', danger: true, confirmText: 'Delete' })) return;
+  const handleDeleteUser = async (user: UserRow) => {
+    if (busyUserId !== null) return;
+    if (!await confirm(`Are you sure you want to delete user "${user.username}"? This cannot be undone.`, { title: 'Delete User', danger: true, confirmText: 'Delete' })) return;
 
+    setBusyUserId(user.userId);
     try {
-      await deleteJSON(`/api/users/${userId}`);
-      setMessage({ type: 'success', text: `User ${username} deleted` });
+      await deleteJSON(`/api/users/${user.userId}`);
+      setMessage({ type: 'success', text: `User ${user.username} deleted` });
       fetchUsers();
     } catch (err) {
       setMessage({ type: 'error', text: httpErrorMessage(err, 'Network error') });
+    } finally {
+      setBusyUserId(null);
     }
   };
 
@@ -171,7 +204,7 @@ export default function AdminUserManagement() {
       </div>
 
       {message.text && (
-        <div className={`${styles.message} ${message.type === 'success' ? styles.success : styles.error}`}>
+        <div className={`${styles.message} ${message.type === 'success' ? styles.success : styles.error}`} role="status">
           {message.text}
         </div>
       )}
@@ -204,14 +237,15 @@ export default function AdminUserManagement() {
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label htmlFor="create-user-password">Password * (min 6 characters)</label>
+                <label htmlFor="create-user-password">Password * ({PASSWORD_RULE})</label>
                 <input
                   id="create-user-password"
                   type="password"
                   value={formData.password}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  minLength={6}
+                  minLength={MIN_PASSWORD_LENGTH}
+                  autoComplete="new-password"
                 />
               </div>
               <div className={styles.formGroup}>
@@ -229,8 +263,8 @@ export default function AdminUserManagement() {
               </div>
             </div>
 
-            <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`}>
-              <i className="fas fa-save"></i> Create User
+            <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={creating}>
+              <i className="fas fa-save"></i> {creating ? 'Creating…' : 'Create User'}
             </button>
           </form>
         </div>
@@ -259,56 +293,73 @@ export default function AdminUserManagement() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.userId}>
-                  <td><strong>{user.username}</strong></td>
-                  <td>{user.fullName || '-'}</td>
-                  <td>
-                    <select
-                      className={`${styles.roleBadge} ${ROLE_BADGE_CLASS[user.role]}`}
-                      value={user.role}
-                      onChange={(e: ChangeEvent<HTMLSelectElement>) => handleRoleChange(user.userId, e.target.value as UserRole)}
-                      aria-label={`Role for ${user.username}`}
-                    >
-                      {ASSIGNABLE_ROLES.map((role) => (
-                        <option key={role} value={role}>{ROLE_LABELS[role]}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${user.isActive ? styles.statusActive : styles.statusInactive}`}>
-                      {user.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td>{formatLocaleDate(user.lastLogin) || 'Never'}</td>
-                  <td>{formatLocaleDate(user.createdAt)}</td>
-                  <td>
-                    <div className={styles.actions}>
-                      <button
-                        className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSmall}`}
-                        onClick={() => handleResetPassword(user.userId, user.username)}
-                        title="Reset Password"
+              {users.map((user) => {
+                const role = normalizeRole(user.role);
+                const self = isSelf(user);
+                const busy = busyUserId === user.userId;
+                return (
+                  <tr key={user.userId}>
+                    <td><strong>{user.username}</strong>{self && ' (you)'}</td>
+                    <td>{user.fullName || '-'}</td>
+                    <td>
+                      <select
+                        className={`${styles.roleBadge} ${role ? ROLE_BADGE_CLASS[role] : ''}`}
+                        value={role ?? ''}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => handleRoleChange(user, e.target.value as UserRole)}
+                        disabled={busy}
+                        aria-label={`Role for ${user.username}`}
                       >
-                        <i className="fas fa-key"></i>
-                      </button>
-                      <button
-                        className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSmall}`}
-                        onClick={() => handleToggleActive(user.userId)}
-                        title={user.isActive ? 'Deactivate' : 'Activate'}
-                      >
-                        <i className={`fas fa-${user.isActive ? 'ban' : 'check'}`}></i>
-                      </button>
-                      <button
-                        className={`${styles.btn} ${styles.btnDanger} ${styles.btnSmall}`}
-                        onClick={() => handleDeleteUser(user.userId, user.username)}
-                        title="Delete User"
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {!role && <option value="" disabled>{user.role}</option>}
+                        {ASSIGNABLE_ROLES.map((r) => (
+                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <span className={`${styles.statusBadge} ${user.isActive ? styles.statusActive : styles.statusInactive}`}>
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>{formatLocaleDate(user.lastLogin) || 'Never'}</td>
+                    <td>{formatLocaleDate(user.createdAt)}</td>
+                    <td>
+                      <div className={styles.actions}>
+                        <button
+                          className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSmall}`}
+                          onClick={() => handleResetPassword(user.userId, user.username)}
+                          title="Reset Password"
+                          aria-label={`Reset password for ${user.username}`}
+                        >
+                          <i className="fas fa-key"></i>
+                        </button>
+                        {/* The server refuses both on your own account; don't offer them. */}
+                        {!self && (
+                          <>
+                            <button
+                              className={`${styles.btn} ${styles.btnSecondary} ${styles.btnSmall}`}
+                              onClick={() => handleToggleActive(user)}
+                              disabled={busy}
+                              title={user.isActive ? 'Deactivate' : 'Activate'}
+                              aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.username}`}
+                            >
+                              <i className={`fas fa-${user.isActive ? 'ban' : 'check'}`}></i>
+                            </button>
+                            <button
+                              className={`${styles.btn} ${styles.btnDanger} ${styles.btnSmall}`}
+                              onClick={() => handleDeleteUser(user)}
+                              disabled={busy}
+                              title="Delete User"
+                              aria-label={`Delete ${user.username}`}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -326,17 +377,19 @@ export default function AdminUserManagement() {
           <h3 id="reset-password-modal-title">Reset Password — {resetTarget.username}</h3>
           <form onSubmit={submitResetPassword}>
             <div className={styles.formGroup}>
-              <label htmlFor="reset-new-password">New Password * (min 6 characters)</label>
+              <label htmlFor="reset-new-password">New Password * ({PASSWORD_RULE})</label>
               <input
                 id="reset-new-password"
                 type="password"
                 value={newPasswordInput}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => setNewPasswordInput(e.target.value)}
                 required
-                minLength={6}
+                minLength={MIN_PASSWORD_LENGTH}
+                autoComplete="new-password"
                 // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
                 autoFocus
               />
+              <small>Signs {resetTarget.username} out everywhere they are signed in.</small>
             </div>
             <div className={styles.actions}>
               <button

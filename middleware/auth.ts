@@ -245,6 +245,10 @@ export function authenticateWeb(
     return next();
   }
 
-  // Not logged in - redirect to login
-  res.redirect('/login.html');
+  // Not logged in - redirect to login, carrying the page asked for so sign-in can
+  // return to it (a bookmark, a shared link, the chair kiosk after its session ends).
+  // It used to send a bare /login.html, and sign-in always landed on /dashboard
+  // (audit FE-F23-7). login.html only follows a same-origin path.
+  const returnTo = req.method === 'GET' && req.originalUrl !== '/' ? req.originalUrl : '';
+  res.redirect(returnTo ? `/login.html?next=${encodeURIComponent(returnTo)}` : '/login.html');
 }

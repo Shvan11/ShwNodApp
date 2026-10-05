@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { relativeAge } from '../../utils/formatters';
+import { useNowMinute } from '../../hooks/useClock';
 import styles from './HeaderPopover.module.css';
 
 const FOCUSABLE =
@@ -183,7 +184,10 @@ const HeaderPopover = ({
 /** "5m" / "3h" / "2d" since `iso`, in the active language (Western digits). */
 export const RelativeAge = ({ iso, className }: { iso: string | null; className?: string }) => {
     const { t } = useTranslation('common');
-    const age = relativeAge(iso);
+    // `now` from the clock store: compiled, `relativeAge(iso)` would be cached
+    // on `iso` alone and "5m" would stay "5m" (FE-F26-2).
+    const now = useNowMinute();
+    const age = relativeAge(iso, now);
     if (!age) return null;
     return <span className={className}>{t(`age.${age.unit}`, { n: age.n })}</span>;
 };

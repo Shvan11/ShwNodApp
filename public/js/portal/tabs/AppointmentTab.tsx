@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { PortalNextAppointment } from '../portal.schemas';
 import { portalNextAppointmentResponseSchema } from '../portal.schemas';
+import { portalGet } from '../portalApi';
 import { formatLocaleDate, formatLocaleTime } from '../../utils/formatters';
+import { isClinicDoctorName } from '@shared/clinic-doctor';
 import styles from '../portal.module.css';
 
 function formatAppointmentDate(iso: string): { date: string; time: string } {
@@ -19,16 +21,14 @@ const AppointmentTab = () => {
     let cancelled = false;
     (async () => {
       try {
-        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
-        const res = await fetch('/api/portal/appointments/next', { credentials: 'same-origin' });
-        const parsed = portalNextAppointmentResponseSchema.safeParse(await res.json());
+        const result = await portalGet('/api/portal/appointments/next', portalNextAppointmentResponseSchema);
         if (cancelled) return;
-        if (!res.ok || !parsed.success || !parsed.data.success) {
-          setError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your next appointment.');
+        if (!result.ok) {
+          setError(result.error || 'Unable to load your next appointment.');
           setAppt(null);
           return;
         }
-        setAppt(parsed.data.appointment);
+        setAppt(result.data.appointment);
       } catch {
         if (!cancelled) setError('Unable to reach the server.');
       }
@@ -70,6 +70,9 @@ const AppointmentTab = () => {
   }
 
   const { date, time } = formatAppointmentDate(appt.app_date);
+  // The 'Clinic' pseudo-doctor is a bucket, not a person: no doctor line rather than
+  // "Dr. Clinic" (FE-F23-6, as the Works card does since FE-F7-12).
+  const doctor = appt.DrName && !isClinicDoctorName(appt.DrName) ? appt.DrName : null;
 
   return (
     <div className={styles.tabPanel}>
@@ -77,9 +80,9 @@ const AppointmentTab = () => {
         <div className={styles.appointmentLabel}>Your next appointment</div>
         <div className={styles.appointmentDate}>{date}</div>
         {time && <div className={styles.appointmentTime}>at {time}</div>}
-        {appt.DrName && (
+        {doctor && (
           <div className={styles.appointmentRow}>
-            <i className="fas fa-user-md" aria-hidden="true" /> Dr. {appt.DrName}
+            <i className="fas fa-user-md" aria-hidden="true" /> Dr. {doctor}
           </div>
         )}
         {appt.app_detail && (

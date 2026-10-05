@@ -34,6 +34,7 @@ import lookupRoutes from '../routes/api/lookup.routes.js';
 import lookupAdminRoutes from '../routes/api/lookup-admin.routes.js';
 import publicVideoRoutes from '../routes/public/video.routes.js';
 import tvDisplayRoutes from '../routes/public/tv-display.routes.js';
+import { publicBrandingRouter } from '../routes/api/branding.routes.js';
 import portalRoutes from '../routes/portal.js';
 import { workingDir } from '../services/files/clinic-paths.js';
 import { imageCacheControl } from '../utils/image-cache-control.js';
@@ -89,6 +90,11 @@ export async function mountRoutes(app: Express, wsEmitter: EventEmitter): Promis
   // deleting that file + this mount.
   app.use('/tv-display', tvDisplayRoutes);
   app.use('/api/portal', portalRoutes); // Patient portal (own session, own auth)
+  // GET /api/branding/public — the clinic's display name only, for the pages seen
+  // before sign-in (login.html, the portal sign-in, tab titles). Pre-gate on purpose
+  // and nothing else in it; the rest of /api/branding stays behind the gate below
+  // (audit FE-F23-8).
+  app.use('/api', publicBrandingRouter);
 
   // Serve login page BEFORE auth check (public access)
   app.get('/login.html', (_req: Request, res: Response) => {

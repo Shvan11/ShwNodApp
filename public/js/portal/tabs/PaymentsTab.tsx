@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PortalPaymentRow } from '../portal.schemas';
 import { portalPaymentsResponseSchema } from '../portal.schemas';
-import { formatLocaleDate } from '../../utils/formatters';
+import { portalGet } from '../portalApi';
+import { formatCurrency, formatLocaleDate, formatNumber } from '../../utils/formatters';
 import styles from '../portal.module.css';
 
 // English, like the rest of the portal's text — never the phone's own locale,
@@ -10,8 +11,18 @@ function formatDate(iso: string): string {
   return formatLocaleDate(iso, { year: 'numeric', month: 'short', day: 'numeric' }) || iso;
 }
 
-function formatAmount(v: number): string {
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(v);
+function formatAmount(amount: number, currency: string | null): string {
+  return currency ? formatCurrency(amount, currency) : formatNumber(amount);
+}
+
+/**
+ * "Total paid", one line per currency. Amounts are in their work's currency and are
+ * never converted, so an IQD and a USD work are two totals, not one sum (FE-F23-2).
+ */
+function totalsByCurrency(payments: PortalPaymentRow[]): { currency: string | null; total: number }[] {
+  const totals = new Map<string | null, number>();
+  for (const p of payments) totals.set(p.currency, (totals.get(p.currency) ?? 0) + p.amount);
+  return [...totals].map(([currency, total]) => ({ currency, total }));
 }
 
 const PaymentsTab = () => {
@@ -22,18 +33,13 @@ const PaymentsTab = () => {
     let cancelled = false;
     (async () => {
       try {
-        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
-        const res = await fetch('/api/portal/payments', { credentials: 'same-origin' });
-        const parsed = portalPaymentsResponseSchema.safeParse(await res.json());
+        const result = await portalGet('/api/portal/payments', portalPaymentsResponseSchema);
         if (cancelled) return;
-        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.payments) {
-          setError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your payments.');
+        if (!result.ok || !result.data.payments) {
+          setError((!result.ok && result.error) || 'Unable to load your payments.');
           return;
         }
-        const sorted = [...parsed.data.payments].sort(
-          (a, b) => new Date(b.Date).getTime() - new Date(a.Date).getTime()
-        );
-        setPayments(sorted);
+        setPayments(result.data.payments); // every work's, newest first, from the server
       } catch {
         if (!cancelled) setError('Unable to reach the server.');
       }
@@ -42,11 +48,6 @@ const PaymentsTab = () => {
       cancelled = true;
     };
   }, []);
-
-  const total = useMemo(
-    () => (payments || []).reduce((sum, p) => sum + (p.Payment || 0), 0),
-    [payments]
-  );
 
   if (error) {
     return (
@@ -82,14 +83,18 @@ const PaymentsTab = () => {
     <div className={styles.tabPanel}>
       <div className={styles.totalCard}>
         <div className={styles.totalLabel}>Total paid</div>
-        <div className={styles.totalValue}>{formatAmount(total)}</div>
+        {totalsByCurrency(payments).map((t) => (
+          <div key={t.currency ?? '-'} className={styles.totalValue}>
+            {formatAmount(t.total, t.currency)}
+          </div>
+        ))}
       </div>
 
       <ul className={styles.paymentList}>
         {payments.map((p, idx) => (
-          <li key={`${p.Date}-${idx}`} className={styles.paymentItem}>
-            <div className={styles.paymentDate}>{formatDate(p.Date)}</div>
-            <div className={styles.paymentAmount}>{formatAmount(p.Payment)}</div>
+          <li key={`${p.date}-${idx}`} className={styles.paymentItem}>
+            <div className={styles.paymentDate}>{formatDate(p.date)}</div>
+            <div className={styles.paymentAmount}>{formatAmount(p.amount, p.currency)}</div>
           </li>
         ))}
       </ul>

@@ -5,6 +5,7 @@ import cn from 'classnames';
 import { isOrthoWork, needsDetails } from '../../config/workTypeConfig';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { workBalance } from '../../utils/workBalance';
+import { useToday } from '../../hooks/useClock';
 import { isClinicDoctorName } from '@shared/clinic-doctor';
 import { ALIGNER_SET_WORK_TYPE_IDS, WORK_STATUS } from '@shared/treatment-taxonomy';
 import type { WorkRow } from '@shared/contracts/work.contract';
@@ -58,8 +59,12 @@ const TYPICAL_ORTHO_MONTHS = 18;
  * bar always moves and never implies completion before the work is finished. Other
  * work types get no bar at all — a filling added today used to read 5 % of an
  * 18-month course (audit FE-F7-16).
+ *
+ * `today` ('YYYY-MM-DD') is passed in, not read here: compiled, a clock read
+ * inside this call would be cached on `work` and the bar would stop moving
+ * (FE-F26-2). Both dates parse the same way, so the difference is whole days.
  */
-function progressPercentage(work: Work): number {
+function progressPercentage(work: Work, today: string): number {
     if (work.status === WORK_STATUS.FINISHED) return 100;
     if (work.status === WORK_STATUS.DISCONTINUED) return 0;
     if (!work.start_date) return 0;
@@ -69,7 +74,7 @@ function progressPercentage(work: Work): number {
         ? work.estimated_duration
         : TYPICAL_ORTHO_MONTHS;
     const totalMs = months * 30 * 24 * 60 * 60 * 1000;
-    const pct = Math.round(((Date.now() - start) / totalMs) * 100);
+    const pct = Math.round(((new Date(today).getTime() - start) / totalMs) * 100);
     return Math.min(95, Math.max(5, pct));
 }
 
@@ -100,6 +105,7 @@ const WorkCard = ({
     const { t } = useTranslation('works');
     const { t: tc } = useTranslation('common');
     const confirm = useConfirm();
+    const today = useToday();
     const menuId = useId();
     const [showActions, setShowActions] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -168,7 +174,7 @@ const WorkCard = ({
     const isOrtho = isOrthoWork(typeOfWork);
     const canAddAlignerSet = ALIGNER_SET_WORK_TYPE_IDS.includes(typeOfWork);
     const balance = workBalance(work);
-    const progress = progressPercentage(work);
+    const progress = progressPercentage(work, today);
     const hasDuration = work.estimated_duration != null && work.estimated_duration > 0;
 
     // The Clinic pseudo-doctor is a bucket, not a person: "Clinic", not "Dr. Clinic".

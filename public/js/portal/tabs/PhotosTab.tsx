@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PortalTimePoint, PortalPhoto } from '../portal.schemas';
 import {
   portalTimepointsResponseSchema,
   portalPhotosResponseSchema,
 } from '../portal.schemas';
+import { portalGet } from '../portalApi';
 import { formatLocaleDate } from '../../utils/formatters';
 import styles from '../portal.module.css';
 
@@ -25,6 +26,15 @@ function photoSrc(tp: string, name: string, size?: 'thumb'): string {
   return size === 'thumb' ? `${base}?size=thumb` : base;
 }
 
+/** Close the lightbox through its history entry when it has one (→ popstate closes it). */
+function leaveLightbox(close: () => void): void {
+  if ((window.history.state as { portalLightbox?: boolean } | null)?.portalLightbox) {
+    window.history.back();
+  } else {
+    close();
+  }
+}
+
 const PhotosTab = () => {
   const [tps, setTps] = useState<PortalTimePoint[] | null>(null);
   const [tpsError, setTpsError] = useState<string | null>(null);
@@ -38,15 +48,13 @@ const PhotosTab = () => {
     let cancelled = false;
     (async () => {
       try {
-        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
-        const res = await fetch('/api/portal/timepoints', { credentials: 'same-origin' });
-        const parsed = portalTimepointsResponseSchema.safeParse(await res.json());
+        const result = await portalGet('/api/portal/timepoints', portalTimepointsResponseSchema);
         if (cancelled) return;
-        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.timepoints) {
-          setTpsError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your photo history.');
+        if (!result.ok || !result.data.timepoints) {
+          setTpsError((!result.ok && result.error) || 'Unable to load your photo history.');
           return;
         }
-        const sorted = [...parsed.data.timepoints].sort(
+        const sorted = [...result.data.timepoints].sort(
           (a, b) => new Date(b.tp_date_time).getTime() - new Date(a.tp_date_time).getTime()
         );
         setTps(sorted);
@@ -76,17 +84,16 @@ const PhotosTab = () => {
     let cancelled = false;
     (async () => {
       try {
-        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
-        const res = await fetch(`/api/portal/photos/${encodeURIComponent(selectedTp)}`, {
-          credentials: 'same-origin',
-        });
-        const parsed = portalPhotosResponseSchema.safeParse(await res.json());
+        const result = await portalGet(
+          `/api/portal/photos/${encodeURIComponent(selectedTp)}`,
+          portalPhotosResponseSchema
+        );
         if (cancelled) return;
-        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.photos) {
-          setPhotosError((parsed.success ? parsed.data.error : undefined) || 'Unable to load photos.');
+        if (!result.ok || !result.data.photos) {
+          setPhotosError((!result.ok && result.error) || 'Unable to load photos.');
           return;
         }
-        setPhotos(parsed.data.photos);
+        setPhotos(result.data.photos);
       } catch {
         if (!cancelled) setPhotosError('Unable to reach the server.');
       } finally {
@@ -99,6 +106,37 @@ const PhotosTab = () => {
   }, [selectedTp]);
 
   const tabList = useMemo(() => tps || [], [tps]);
+
+  // ── Lightbox (FE-F23-12) ── Opening pushes a history entry, so the phone's Back
+  // gesture closes the photo instead of leaving the portal; every other way out
+  // (✕, backdrop, Escape) goes back through that entry, so the two never drift.
+  // Focus moves to ✕ on open and returns to the thumbnail on close.
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const openPhoto = (idx: number, opener: HTMLElement) => {
+    openerRef.current = opener;
+    window.history.pushState({ portalLightbox: true }, '');
+    setLightbox(idx);
+  };
+  const closePhoto = () => leaveLightbox(() => setLightbox(null));
+  useEffect(() => {
+    const onPop = () => setLightbox(null);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const isOpen = lightbox !== null;
+  useEffect(() => {
+    if (!isOpen) {
+      openerRef.current?.focus();
+      return;
+    }
+    closeButtonRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') leaveLightbox(() => setLightbox(null));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen]);
 
   if (tpsError) {
     return (
@@ -173,7 +211,7 @@ const PhotosTab = () => {
               key={p.name}
               type="button"
               className={styles.photoCell}
-              onClick={() => setLightbox(idx)}
+              onClick={(e) => openPhoto(idx, e.currentTarget)}
               aria-label={`View photo ${idx + 1}`}
             >
               <img
@@ -193,13 +231,18 @@ const PhotosTab = () => {
           className={styles.lightbox}
           role="dialog"
           aria-modal="true"
-          onClick={() => setLightbox(null)}
+          aria-label={`Photo ${lightbox + 1} of ${photos.length}`}
+          onClick={closePhoto}
         >
           <button
+            ref={closeButtonRef}
             type="button"
             className={styles.lightboxClose}
             aria-label="Close"
-            onClick={() => setLightbox(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              closePhoto();
+            }}
           >
             <i className="fas fa-times" aria-hidden="true" />
           </button>

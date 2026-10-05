@@ -35,6 +35,17 @@
   margin-bottom: 1rem;
 }
 
+/* An informational line above the sign-in form (e.g. "Your session has ended"). */
+.noticeBox {
+  background: #eef5ff;
+  border: 1px solid #b6d4fe;
+  color: #084298;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
 .loadingRow {
   display: flex;
   align-items: center;
@@ -474,13 +485,6 @@
   font-weight: 600;
   color: #1b2430;
   margin-bottom: 0.35rem;
-}
-
-.visitSummary {
-  color: #495057;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
 }
 
 .visitBadges {

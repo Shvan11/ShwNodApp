@@ -475,7 +475,10 @@ export type NextAppointmentRow = {
 /**
  * A patient's soonest appointment from today onward, or undefined when they
  * have none. Compared against `CURRENT_DATE` (not `LOCALTIMESTAMP`) so an
- * appointment earlier TODAY still counts as "next" for the rest of the day.
+ * appointment earlier TODAY still counts as "next" for the rest of the day —
+ * until the patient is dismissed from it: a visit that is over is not the next
+ * one, and a 10:00 visit used to read "Your next appointment" all evening
+ * (audit FE-F23-11).
  */
 export async function getNextAppointmentForPatient(
   personId: number
@@ -490,6 +493,7 @@ export async function getNextAppointmentForPatient(
      LEFT JOIN "employees" e ON a."dr_id" = e."id"
      WHERE a."person_id" = ${personId}
        AND a."app_date" >= CURRENT_DATE
+       AND (a."app_date" >= LOCALTIMESTAMP OR a."dismissed" IS NULL)
      ORDER BY a."app_date" ASC
      LIMIT 1`.execute(getKysely());
   return rows[0];

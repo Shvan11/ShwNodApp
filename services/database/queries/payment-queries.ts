@@ -16,14 +16,15 @@ import { toDateOnly } from '../../../utils/date.js';
 // type definitions
 
 /**
- * A single payment row for a patient, as projected by {@link getPayments}.
- * `Date` is `i.date_of_payment` (PG `date`), which the centralized pg parser
- * returns as a 'YYYY-MM-DD' string at runtime — hence the `string` type.
+ * One payment as the patient portal lists it ({@link getPortalPayments}).
+ * `date` is `i.date_of_payment` (PG `date` → 'YYYY-MM-DD'); `amount` is in the work's
+ * own `currency`, so totals are only ever summed per currency.
  */
-export interface Payment {
-  Payment: number;
-  Date: string;
-}
+export type PortalPayment = {
+  amount: number;
+  date: string;
+  currency: string | null;
+};
 
 interface InvoiceData {
   workid: number;
@@ -46,21 +47,21 @@ type PaymentRecord = {
 };
 
 /**
- * Retrieves payments for a given patient id.
+ * Every payment the patient has made, on any of their works, newest first — the
+ * patient portal's Payments tab.
+ *
+ * It used to read active works only (`works.status = 1`), so a patient whose treatment
+ * had finished saw "No payments recorded yet", and it carried no currency, so a USD
+ * work's payments read as bare numbers (audit FE-F23-2).
  */
-export function getPayments(PID: number): Promise<Payment[]> {
-  const db = getKysely();
-  return db
-    .selectFrom('patients as p')
-    .innerJoin('works as w', 'p.person_id', 'w.person_id')
+export function getPortalPayments(PID: number): Promise<PortalPayment[]> {
+  return getKysely()
+    .selectFrom('works as w')
     .innerJoin('invoices as i', 'w.work_id', 'i.work_id')
-    .where('w.status', '=', 1)
-    .where('p.person_id', '=', PID)
-    // Original projected `i.*` then mapped columns[1]=amount_paid, columns[2]=date_of_payment.
-    .select([
-      'i.amount_paid as Payment',
-      'i.date_of_payment as Date',
-    ])
+    .where('w.person_id', '=', PID)
+    .orderBy('i.date_of_payment', 'desc')
+    .orderBy('i.invoice_id', 'desc')
+    .select(['i.amount_paid as amount', 'i.date_of_payment as date', 'w.currency'])
     .execute();
 }
 

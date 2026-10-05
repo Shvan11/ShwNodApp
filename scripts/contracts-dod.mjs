@@ -49,7 +49,9 @@ const STRICT = process.env.STRICT === '1' || process.argv.includes('--strict');
 //       → 7  (the Google contacts response modeled; RE1).
 //       → 6  (lookup-admin `tables` modeled — the descriptor and its columns have one fixed
 //             shape even though the column SET varies per table; audit FE-F21-15).
-const BASELINE = { D1: 0, D2: 6 };
+//       → 5  (email-api `config` modeled — the SMTP settings are a fixed key set, typed;
+//             the loose map is what let the form post "false" for a boolean; FE-F22-2).
+const BASELINE = { D1: 0, D2: 5 };
 
 /** Recursively collect files under `dir` whose name ends with one of `exts`. */
 function walk(dir, exts, acc = []) {

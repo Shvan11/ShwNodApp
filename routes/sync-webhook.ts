@@ -14,7 +14,8 @@ import pg from 'pg';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
-import { ErrorResponses } from '../utils/error-response.js';
+import { ErrorResponses, sendData } from '../utils/error-response.js';
+import * as syncContract from '../shared/contracts/sync.contract.js';
 import { drainCdcNow } from '../services/sync/cdc/index.js';
 import { getLastDriftReport } from '../services/sync/cdc/drift-check.js';
 import { getLastClockReport } from '../services/sync/cdc/clock-check.js';
@@ -23,8 +24,6 @@ import { getPgPool } from '../services/database/kysely.js';
 import { validate } from '../middleware/validate.js';
 import { authorize } from '../middleware/auth.js';
 import { ADMIN_ROLES } from '../shared/auth/roles.js';
-import { promises as fs } from 'fs';
-import path from 'path';
 import sql from 'mssql';
 import config from '../config/config.js';
 import resourceManager from '../utils/resource-manager.js';
@@ -40,10 +39,6 @@ const syncTriggerBody = z.object({
   direction: z.enum(['sql-to-postgres', 'postgres-to-sql']).optional(),
 });
 type SyncTriggerBody = z.infer<typeof syncTriggerBody>;
-
-interface SyncState {
-  lastSyncTimestamp: string | null;
-}
 
 /**
  * Manual sync trigger endpoint (for testing/debugging)
@@ -100,39 +95,18 @@ router.post(
 );
 
 /**
- * Sync status endpoint
- * GET /api/sync/status
+ * Which CDC sinks this install has at all — env only, no network, so the Settings shell
+ * can show the Supabase / Dolphin status tabs only where they have something to report
+ * (audit FE-F22-7). It replaced `GET /api/sync/status`, which read the retired sync's
+ * `data/sync-state.json` and had no consumer left.
+ * GET /api/sync/features
  */
-router.get(
-  '/status',
-  async (_req: Request, res: Response): Promise<void> => {
-    try {
-      const stateFile = path.join(process.cwd(), 'data', 'sync-state.json');
-
-      let state: SyncState = { lastSyncTimestamp: null };
-      try {
-        state = JSON.parse(await fs.readFile(stateFile, 'utf8'));
-      } catch (err) {
-        // No state file yet (ENOENT) → keep the default; re-throw anything else.
-        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-      }
-
-      res.json({
-        success: true,
-        state: {
-          lastSync: state.lastSyncTimestamp,
-          isHealthy: state.lastSyncTimestamp
-            ? Date.now() - new Date(state.lastSyncTimestamp).getTime() <
-              30 * 60 * 1000 // within 30 min
-            : false
-        }
-      });
-    } catch (error) {
-      log.error('Sync status error', { error: (error as Error).message });
-      ErrorResponses.internalError(res, 'Failed to read sync status', error as Error);
-    }
-  }
-);
+router.get('/features', (_req: Request, res: Response): void => {
+  sendData(res, syncContract.features.response, {
+    supabase: !!process.env.SUPABASE_FAILOVER_DB_URL,
+    dolphin: !!config.database?.server,
+  });
+});
 
 /**
  * Live reachability check for the single Supabase mirror (read-only; never mutates anything):

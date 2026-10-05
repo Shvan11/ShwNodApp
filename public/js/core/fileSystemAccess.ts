@@ -331,12 +331,16 @@ async function pickFile(
 }
 
 /**
- * Pick an INI file specifically
+ * Pick an INI file specifically. `includeBackups` also lists `.backup` files — the
+ * Protocol Handlers page saves its backups as `ProtocolHandlers.ini.backup`, which an
+ * `.ini`-only filter hid from its own Restore picker (audit FE-F22-13).
  */
-export async function pickIniFile(): Promise<FileOperationResult<FileSystemFileHandle>> {
+export async function pickIniFile(
+  { includeBackups = false }: { includeBackups?: boolean } = {}
+): Promise<FileOperationResult<FileSystemFileHandle>> {
   return pickFile(
-    { 'text/plain': ['.ini', '.INI'] },
-    'INI Configuration Files'
+    { 'text/plain': includeBackups ? ['.ini', '.INI', '.backup'] : ['.ini', '.INI'] },
+    includeBackups ? 'INI files and backups' : 'INI Configuration Files'
   );
 }
 

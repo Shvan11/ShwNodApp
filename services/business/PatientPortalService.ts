@@ -18,6 +18,7 @@ import {
   recordFailedAttempt,
   setEnabled as dbSetEnabled,
   clearLockout as dbClearLockout,
+  endPortalSessions,
 } from '../database/queries/patient-portal-auth-queries.js';
 import {
   listPrivateForPatient,
@@ -126,6 +127,9 @@ export async function resetToDefaultPin(personId: number): Promise<string> {
 
 /**
  * Set (or replace) the patient's PIN. Stored as bcrypt hash.
+ *
+ * A new PIN also signs the patient out everywhere: a phone already signed in with
+ * the old one must not outlive it (audit FE-F23-3).
  */
 export async function setPin(personId: number, pin: string): Promise<void> {
   if (!isValidPin(pin)) {
@@ -133,6 +137,12 @@ export async function setPin(personId: number, pin: string): Promise<void> {
   }
   const hash = await bcrypt.hash(pin, BCRYPT_ROUNDS);
   await upsertPin(personId, hash);
+  await signOutEverywhere(personId, 'pin-changed');
+}
+
+async function signOutEverywhere(personId: number, reason: string): Promise<void> {
+  const ended = await endPortalSessions(personId);
+  if (ended > 0) log.info('Portal sessions ended', { personId, ended, reason });
 }
 
 /**
@@ -200,8 +210,10 @@ export async function getStatus(personId: number): Promise<PortalStatus> {
   };
 }
 
+/** Disabling access also signs the patient out everywhere (audit FE-F23-3). */
 export async function setEnabled(personId: number, enabled: boolean): Promise<void> {
   await dbSetEnabled(personId, enabled);
+  if (!enabled) await signOutEverywhere(personId, 'access-disabled');
 }
 
 export async function unlock(personId: number): Promise<void> {
@@ -219,8 +231,14 @@ function portalUrlFor(personId: number): string {
 
 /**
  * Render a QR code (data url) that points to the patient's portal login page.
+ *
+ * `usesDefaultAddress` is true when `PUBLIC_URL` is unset, i.e. the link carries the
+ * app's built-in address rather than this clinic's; the staff card warns before the
+ * QR is handed to a patient (audit FE-F23-9, as the Videos QR does).
  */
-export async function getQrDataUrl(personId: number): Promise<{ qr: string; url: string }> {
+export async function getQrDataUrl(
+  personId: number
+): Promise<{ qr: string; url: string; usesDefaultAddress: boolean }> {
   const url = portalUrlFor(personId);
   try {
     const qr = await QRCode.toDataURL(url, {
@@ -228,7 +246,7 @@ export async function getQrDataUrl(personId: number): Promise<{ qr: string; url:
       margin: 2,
       color: { dark: '#000000', light: '#ffffff' },
     });
-    return { qr, url };
+    return { qr, url, usesDefaultAddress: config.urls.publicUrlIsDefault };
   } catch (err) {
     log.error('Failed to generate portal QR code', {
       error: (err as Error).message,

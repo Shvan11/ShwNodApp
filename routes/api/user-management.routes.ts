@@ -18,6 +18,7 @@ import {
   deleteUser,
   getUserRoleStatus,
   countOtherActiveAdmins,
+  endUserSessions,
 } from '../../services/database/queries/user-queries.js';
 import * as userManagement from '../../shared/contracts/user-management.contract.js';
 import { ADMIN_ROLES, normalizeRole } from '../../shared/auth/roles.js';
@@ -107,9 +108,13 @@ router.put(
       const { userId } = req.params;
       const { newPassword } = req.body; // length enforced by validate()
 
-      await setUserPassword(parseInt(userId, 10), await hashPassword(newPassword));
+      const id = parseInt(userId, 10);
+      await setUserPassword(id, await hashPassword(newPassword));
+      // The old password must stop working everywhere it is already signed in, not
+      // just at the next login. An admin resetting their OWN password keeps this tab.
+      const ended = await endUserSessions(id, id === req.session.userId ? req.sessionID : undefined);
 
-      log.info(`Password reset for user ID ${userId} by ${req.session.username}`);
+      log.info(`Password reset for user ID ${userId} by ${req.session.username}`, { sessionsEnded: ended });
 
       sendData(res, userManagement.resetPassword.response, { message: 'Password reset successfully' });
     } catch (error) {
@@ -152,8 +157,17 @@ router.put(
       }
 
       await setUserRole(id, role);
+      // A session carries the role it logged in with, so a demotion only bites once
+      // the user's existing sessions are gone. Your own change applies to this tab
+      // in place instead of signing you out.
+      let ended = 0;
+      if (normalizeRole(target.role) !== role) {
+        const self = id === req.session.userId;
+        ended = await endUserSessions(id, self ? req.sessionID : undefined);
+        if (self) req.session.userRole = role;
+      }
 
-      log.info(`Role changed for user ID ${userId} to ${role} by ${req.session.username}`);
+      log.info(`Role changed for user ID ${userId} to ${role} by ${req.session.username}`, { sessionsEnded: ended });
 
       sendData(res, userManagement.updateRole.response, { message: 'Role updated successfully' });
     } catch (error) {
@@ -192,8 +206,11 @@ router.put(
       }
 
       await toggleUserActive(id);
+      // Deactivating must sign the user out now: login already refuses an inactive
+      // account, but an open session never asked again.
+      const ended = target.isActive ? await endUserSessions(id) : 0;
 
-      log.info(`User status toggled for ID ${userId} by ${req.session.username}`);
+      log.info(`User status toggled for ID ${userId} by ${req.session.username}`, { sessionsEnded: ended });
 
       sendData(res, userManagement.toggleUser.response, { message: 'User status updated' });
     } catch (error) {
@@ -232,8 +249,9 @@ router.delete(
       }
 
       await deleteUser(id);
+      const ended = await endUserSessions(id);
 
-      log.info(`User deleted: ID ${userId} by ${req.session.username}`);
+      log.info(`User deleted: ID ${userId} by ${req.session.username}`, { sessionsEnded: ended });
 
       sendData(res, userManagement.deleteUser.response, { message: 'User deleted successfully' });
     } catch (error) {

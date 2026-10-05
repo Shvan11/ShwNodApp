@@ -635,7 +635,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 </div>
 
                 {/* Portal Access */}
-                {validPersonId && <PortalAccessCard personId={validPersonId} />}
+                {validPersonId && caps.managePatientPortal && <PortalAccessCard personId={validPersonId} />}
             </div>
 
             {/* New Photo Session Dialog */}

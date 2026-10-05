@@ -69,6 +69,13 @@ const UniversalHeader = () => {
     // never refetches on navigation. Until it resolves, the name fallback shows.
     const { data: branding } = useQuery(brandingQuery());
     const clinicName = branding?.clinicName || DEFAULT_CLINIC_NAME;
+    // The browser tab follows the CONFIGURED name only (no built-in fallback):
+    // index.html ships a neutral title, which was this clinic's name on every
+    // install (audit FE-F23-8).
+    const configuredName = branding?.clinicName?.trim() || null;
+    useEffect(() => {
+        if (configuredName) document.title = configuredName;
+    }, [configuredName]);
 
     // Patient code from the URL (/patient/:code/...). Tells us whether we're
     // *currently* on a patient page and drives the last-sub-view persistence.

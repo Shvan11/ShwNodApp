@@ -2,6 +2,8 @@
  * Visit and wire-related database queries (PostgreSQL / Kysely).
  *
  * The HTML visit "Summary" is built in TS (`buildVisitSummary`), not concatenated in SQL.
+ * Only the staff chair display renders it (escaped, with an allowlist); the patient
+ * portal gets dates and flags instead (`getPortalVisits`).
  *
  * A visit's photo flags drive the parent work's i_photo_date / f_photo_date / debond_date /
  * status roll-up. There are no DB triggers for app logic, so that lives in every visit write
@@ -15,18 +17,19 @@ import { getActiveWID } from './patient-queries.js';
 import { recomputePatientType, recomputePatientTypeForWork } from './patient-type-classifier.js';
 
 // type definitions
-interface VisitSummary {
-  patient_name: string;
-  work_id: number;
+/**
+ * One visit as the patient portal shows it: the date and the event badges, nothing
+ * the clinician typed (owner decision, audit FE-F23-1).
+ */
+export type PortalVisit = {
   id: number;
-  visit_date: string;
+  visit_date: string; // PG `date` → 'YYYY-MM-DD'
   opg: boolean;
   i_photo: boolean;
-  f_photo: boolean;
   p_photo: boolean;
+  f_photo: boolean;
   appliance_removed: boolean;
-  Summary: string | null;
-}
+};
 
 interface LatestVisitSummary {
   visit_date: string;
@@ -241,38 +244,23 @@ async function resolveSummaryWID(PID: number): Promise<number | null> {
 }
 
 /**
- * Retrieves visit summaries for a given patient id. (was: ProVisitSum)
+ * The patient portal's visit list, newest first (was: ProVisitSum, via getVisitsSummary).
+ *
+ * Only the date and the event flags. The portal used to receive `buildVisitSummary`'s
+ * HTML, which it printed tag-for-tag, and which carried the clinician's free-text notes
+ * and the "Next:" instruction meant for the next appointment's staff. Owner decision
+ * 2026-10-05: patients see dates and badges, not clinical text (audit FE-F23-1).
  */
-export async function getVisitsSummary(PID: number): Promise<VisitSummary[]> {
+export async function getPortalVisits(PID: number): Promise<PortalVisit[]> {
   const WID = await resolveSummaryWID(PID);
   if (WID == null) return [];
-  const rows = await getKysely()
-    .selectFrom('visits as v')
-    .innerJoin('works as w', 'w.work_id', 'v.work_id')
-    .innerJoin('patients as p', 'p.person_id', 'w.person_id')
-    .leftJoin('wires as uw', 'uw.wire_id', 'v.upper_wire_id')
-    .leftJoin('wires as lw', 'lw.wire_id', 'v.lower_wire_id')
-    .where('v.work_id', '=', WID)
-    .orderBy('v.visit_date')
-    .select([
-      'p.patient_name', 'v.work_id', 'v.id', 'v.visit_date', 'v.opg', 'v.i_photo', 'v.f_photo',
-      'v.p_photo', 'v.appliance_removed', 'v.bracket_change', 'v.wire_bending', 'v.elastics',
-      'v.others', 'v.next_visit', 'uw.wire as UpperWireName', 'lw.wire as LowerWireName',
-    ])
+  return getKysely()
+    .selectFrom('visits')
+    .where('work_id', '=', WID)
+    .orderBy('visit_date', 'desc')
+    .orderBy('id', 'desc')
+    .select(['id', 'visit_date', 'opg', 'i_photo', 'p_photo', 'f_photo', 'appliance_removed'])
     .execute();
-
-  return rows.map((r) => ({
-    patient_name: r.patient_name,
-    work_id: r.work_id,
-    id: r.id,
-    visit_date: r.visit_date, // PG `date` → 'YYYY-MM-DD' string
-    opg: r.opg,
-    i_photo: r.i_photo,
-    f_photo: r.f_photo,
-    p_photo: r.p_photo,
-    appliance_removed: r.appliance_removed,
-    Summary: buildVisitSummary(r),
-  }));
 }
 
 /**

@@ -28,6 +28,8 @@ GET     /api/portal/photos/:tp/:name  [authenticatePatient -> validate(params,qu
 GET     /api/portal/visits  [authenticatePatient]
 GET     /api/portal/appointments/next  [authenticatePatient]
 GET     /api/portal/payments  [authenticatePatient]
+MOUNT   /api
+GET     /api/branding/public
 GET     /login.html
 GET     /portal | /portal/*splat
 USE     /api  [authenticate]
@@ -471,7 +473,7 @@ GET     /api/admin/google-drive/test
 MOUNT   /api/sync
 POST    /api/sync/trigger  [authorize(admin) -> validate(body)]
 POST    /api/sync/queue-notify  [authorize(admin)]
-GET     /api/sync/status
+GET     /api/sync/features
 GET     /api/sync/supabase-status
 GET     /api/sync/dolphin-status
 USE     /  [serveStatic]

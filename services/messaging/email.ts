@@ -8,6 +8,8 @@ import type { SendMailOptions } from 'nodemailer';
 import { sql } from 'kysely';
 import { getKysely } from '../database/kysely.js';
 import { log } from '../../utils/logger.js';
+import { isMaskedSecret } from '../../shared/masked-secret.js';
+import type { EmailConfigView } from '../../shared/contracts/email-api.contract.js';
 
 // ===========================================
 // TYPES
@@ -281,16 +283,25 @@ class EmailService {
   }
 
   /**
-   * Get current email configuration (with masked password)
+   * The stored configuration for the Settings form. The password is never sent, not
+   * even masked: the form only learns whether one is stored, and leaves its box empty
+   * ("leave blank to keep"), so nothing typed around a mask can be saved as the
+   * password (audit FE-F22-2).
    */
-  getConfig(): EmailConfig | null {
+  getConfig(): EmailConfigView | null {
     if (!this.config) {
       return null;
     }
-
+    const c = this.config;
+    const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
     return {
-      ...this.config,
-      smtp_password: '********', // Mask password
+      smtp_host: str(c.smtp_host),
+      smtp_port: typeof c.smtp_port === 'number' && Number.isFinite(c.smtp_port) ? c.smtp_port : undefined,
+      smtp_secure: typeof c.smtp_secure === 'boolean' ? c.smtp_secure : undefined,
+      smtp_user: str(c.smtp_user),
+      smtp_password_set: Boolean(c.smtp_password),
+      from_address: str(c.from_address),
+      from_name: str(c.from_name),
     };
   }
 
@@ -312,6 +323,10 @@ class EmailService {
 
       const db = getKysely();
       for (const [key, value] of Object.entries(newConfig)) {
+        // An empty or masked password means "keep the stored one" — never store it.
+        if (key.toLowerCase() === 'smtp_password' && (!value || isMaskedSecret(String(value)) || String(value) === '********')) {
+          continue;
+        }
         if (validKeys.includes(key.toLowerCase())) {
           const optionName = `EMAIL_${key.toUpperCase()}`;
           const optionValue = String(value);

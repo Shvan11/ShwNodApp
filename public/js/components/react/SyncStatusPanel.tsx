@@ -22,13 +22,23 @@ import styles from './SyncStatusPanel.module.css';
  */
 export const SYNC_STATUS_POLL_MS = 10_000;
 
-type Health = 'ok' | 'warn' | 'down' | 'off';
+type Health = 'ok' | 'warn' | 'down' | 'off' | 'captureOff';
 
 const HEALTH_LABEL: Record<Health, string> = {
     ok: 'Online',
     warn: 'Degraded',
     down: 'Unreachable',
     off: 'Disabled',
+    captureOff: 'Capture off',
+};
+
+/** The card/badge colour per state — capture-off is an outage, so it wears 'down'. */
+const HEALTH_CLASS: Record<Health, 'ok' | 'warn' | 'down' | 'off'> = {
+    ok: 'ok',
+    warn: 'warn',
+    down: 'down',
+    off: 'off',
+    captureOff: 'down',
 };
 
 /**
@@ -39,7 +49,11 @@ const HEALTH_LABEL: Record<Health, string> = {
 const STUCK_BACKLOG_SEC = 3600;
 
 function sinkHealth(s: SyncSinkStatus): Health {
-    if (!s.configured || !s.enabled) return 'off';
+    if (!s.configured) return 'off';
+    // This server is set to drain the sink, but the database has stopped RECORDING for it:
+    // every change from now on is lost to the sink, with no catch-up scan. That is the
+    // 2026-09-08 blackout, and it used to look exactly like a sink nobody uses (FE-F22-5).
+    if (!s.enabled) return s.envEnabled ? 'captureOff' : 'off';
     if (s.reachable === false) return 'down';
     if (s.stale || s.backlog > 0) return 'warn';
     return 'ok';
@@ -157,6 +171,29 @@ const ClockBanner = ({ clock }: { clock: SyncClockReport }) => {
     );
 };
 
+/**
+ * What to do about capture being off, said on the card itself: the changes are not
+ * being recorded at all, so nothing will catch up on its own (docs/sync-cdc.md).
+ */
+const CaptureOffNotice = ({ sink, since }: { sink: string; since: string | null }) => (
+    <div className={styles.errorBanner} role="alert">
+        <i className="fas fa-exclamation-triangle"></i>
+        <span>
+            This server is set to sync, but the database has stopped recording changes
+            {since ? ` (since ${formatTime(since)})` : ''}. Every change since then is missing from
+            this sink and will not be caught up on its own. Re-enable capture{' '}
+            {sink === 'reverse' ? 'on the Supabase database' : 'on the local database'} with{' '}
+            <code>UPDATE cdc_sink_control SET enabled = true WHERE sink = &apos;{sink}&apos;;</code>
+            {sink === 'failover' && (
+                <>
+                    {' '}then repair the mirror with <code>node scripts/reconcile-mirror.mjs --apply</code>
+                </>
+            )}
+            {' '}— see docs/sync-cdc.md.
+        </span>
+    </div>
+);
+
 export interface SyncStatusPanelProps {
     /**
      * The already-run status query. The caller owns the `useQuery` because
@@ -257,19 +294,21 @@ const SyncStatusPanel = ({
                 <div className={styles.cards}>
                     {sinks?.map((s) => {
                         const health = sinkHealth(s);
+                        const tone = HEALTH_CLASS[health];
                         // Fall back to the raw sink name so a sink added server-side
                         // renders as an unlabelled card instead of throwing.
                         const meta = sinkMeta[s.sink] ?? { label: s.sink, description: '' };
                         return (
-                            <div key={s.sink} className={`${styles.card} ${styles[health]}`}>
+                            <div key={s.sink} className={`${styles.card} ${styles[tone]}`}>
                                 <div className={styles.cardHeader}>
                                     <span className={styles.sinkName}>{meta.label}</span>
-                                    <span className={`${styles.badge} ${styles[health]}`}>
+                                    <span className={`${styles.badge} ${styles[tone]}`}>
                                         <span className={styles.dot}></span>
                                         {HEALTH_LABEL[health]}
                                     </span>
                                 </div>
                                 <p className={styles.sinkDescription}>{meta.description}</p>
+                                {health === 'captureOff' && <CaptureOffNotice sink={s.sink} since={s.updatedAt} />}
 
                                 <dl className={styles.rows}>
                                     <div className={styles.row}>

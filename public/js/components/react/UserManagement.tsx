@@ -5,14 +5,8 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, httpErrorMessage } from '@/core/http';
 import { authMeQuery } from '@/query/queries';
 import styles from './UserManagement.module.css';
-import { ROLE_LABELS, type UserRole } from '@shared/auth/roles';
+import { ROLE_LABELS, normalizeRole, type UserRole } from '@shared/auth/roles';
 import { MIN_PASSWORD_LENGTH } from '@shared/validation';
-
-interface UserInfo {
-  username: string;
-  fullName: string | null;
-  role: UserRole;
-}
 
 const ROLE_BADGE_CLASS: Record<UserRole, string> = {
   admin: styles.admin,
@@ -26,17 +20,16 @@ interface Message {
 }
 
 /**
- * User Management Component
- * - Change password
- * - (Future: Admin can manage users)
+ * Settings → Security: the signed-in user's own account — details, password, logout.
+ * (Managing other users is the admin-only Users tab, `AdminUserManagement`.)
  */
 export default function UserManagement() {
   const toast = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { data: meData } = useQuery(authMeQuery());
-  const me = meData as { success?: boolean; user?: UserInfo } | undefined;
-  const userInfo = me?.user ?? null;
+  const userInfo = meData?.user ?? null;
+  const role = normalizeRole(userInfo?.role);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -67,7 +60,7 @@ export default function UserManagement() {
 
     try {
       await postJSON('/api/auth/change-password', { currentPassword, newPassword });
-      setMessage({ type: 'success', text: 'Password changed successfully!' });
+      setMessage({ type: 'success', text: 'Password changed. Any other device signed in to this account has been signed out.' });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -90,7 +83,6 @@ export default function UserManagement() {
       // Logout successful - redirect to login (security-logout exception to React Router nav)
       window.location.href = '/login.html';
     } catch (err) {
-      console.error('Logout failed:', err);
       toast.error('Logout failed: ' + httpErrorMessage(err, 'Please try again.'));
     }
   };
@@ -117,8 +109,8 @@ export default function UserManagement() {
             <span>{userInfo.fullName || 'Not set'}</span>
 
             <strong>Role:</strong>
-            <span className={`${styles.userRoleBadge} ${ROLE_BADGE_CLASS[userInfo.role]}`}>
-              {ROLE_LABELS[userInfo.role]}
+            <span className={`${styles.userRoleBadge} ${role ? ROLE_BADGE_CLASS[role] : ''}`}>
+              {role ? ROLE_LABELS[role] : userInfo.role}
             </span>
           </div>
         ) : (
@@ -182,7 +174,7 @@ export default function UserManagement() {
           <div className={styles.passwordRequirements}>
             <strong>Password Requirements:</strong>
             <ul>
-              <li>Minimum 6 characters</li>
+              <li>Minimum {MIN_PASSWORD_LENGTH} characters</li>
               <li>Use a unique password not used elsewhere</li>
             </ul>
           </div>

@@ -5,7 +5,7 @@
 import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { verifyCredentials, hashPassword, authenticate, authorize } from '../middleware/auth.js';
-import { setUserPassword } from '../services/database/queries/user-queries.js';
+import { setUserPassword, endUserSessions } from '../services/database/queries/user-queries.js';
 import { log } from '../utils/logger.js';
 import type { LoginBody, ChangePasswordBody } from '../shared/contracts/auth.contract.js';
 import * as threeShapeOAuth from '../services/threeshape/oauth.js';
@@ -269,6 +269,9 @@ router.post(
         await new Promise<void>((resolve, reject) => {
           req.session.save((err) => (err ? reject(err) : resolve()));
         });
+        // Sign out every OTHER session of this account: someone who knew the old
+        // password and is already signed in must not keep their way in (FE-F22-1).
+        await endUserSessions(userId!, req.sessionID);
       } catch (sessionError) {
         log.error('Password changed but session rotation failed', {
           username: req.session?.username,

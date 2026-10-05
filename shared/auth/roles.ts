@@ -98,6 +98,13 @@ export interface RoleCapabilities {
    */
   manageSettings: boolean;
   manageUsers: boolean;
+  /**
+   * May see and run a patient's Portal Access card — status, enable, PIN reset, unlock
+   * (server: `authorize(FINANCE_ROLES)` on `/api/patients/:id/portal*`). The card used to
+   * render for every role, so a clinical login met "Insufficient permissions" on every
+   * patient's info page (audit FE-F22-4).
+   */
+  managePatientPortal: boolean;
 }
 
 /** Client-side show/hide capability flags derived from role — never re-derive ad hoc `isAdmin` booleans. */
@@ -114,6 +121,7 @@ export function roleCaps(role: UserRole | undefined): RoleCapabilities {
     manageWhatsApp: isAdmin || isFrontDesk,
     manageSettings: isAdmin,
     manageUsers: isAdmin,
+    managePatientPortal: isAdmin || isFrontDesk,
   };
 }
 

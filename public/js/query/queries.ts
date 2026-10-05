@@ -52,6 +52,7 @@ import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
 import * as slideshowContract from '@shared/contracts/slideshow.contract';
 import * as labCaseContract from '@shared/contracts/lab-case.contract';
+import * as syncContract from '@shared/contracts/sync.contract';
 import { qk } from './keys';
 import type { HttpError } from '@/core/http';
 // Type-only (erased at runtime → no import cycle with the hooks below). Stand row
@@ -1698,9 +1699,16 @@ export const whatsappGroupSettingsQuery = () =>
 export interface SyncSinkStatus {
   sink: string;
   configured: boolean;
-  // The endpoints also send `envEnabled` (the boot-time env flag). Deliberately
-  // not modelled: the UI shows `enabled`, the authoritative runtime capture flag
-  // the engine maintains, and showing both invited misreading one for the other.
+  /**
+   * The boot-time env flag: whether THIS server process drains the sink. Not shown as
+   * its own row (two switches side by side invited misreading one for the other); the
+   * card uses it for one thing — `envEnabled && !enabled` means the server expects to
+   * mirror but the database has stopped RECORDING changes, the 2026-09-08 blackout,
+   * which renders as a red "Capture off" alarm instead of a grey "Disabled" (audit
+   * FE-F22-5; owner decision 2026-10-05).
+   */
+  envEnabled: boolean;
+  /** `cdc_sink_control.enabled`: whether the database records changes for this sink. */
   enabled: boolean;
   stale: boolean;
   note: string | null;
@@ -1784,6 +1792,18 @@ export const supabaseStatusQuery = () =>
     queryKey: qk.settings.supabaseStatus(),
     // eslint-disable-next-line no-restricted-syntax -- raw out-of-surface sync status read (no contract)
     queryFn: ({ signal }) => fetchJSON<SyncSinkStatusResponse>('/api/sync/supabase-status', { signal }),
+  });
+
+/** GET /api/sync/features — which sinks this install has; never changes while it runs. */
+export const syncFeaturesQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.syncFeatures(),
+    queryFn: ({ signal }) =>
+      fetchJSON<syncContract.SyncFeaturesResponse>('/api/sync/features', {
+        signal,
+        schema: syncContract.features.response,
+      }),
+    staleTime: Infinity,
   });
 
 /** GET /api/sync/dolphin-status — Dolphin sink health. */

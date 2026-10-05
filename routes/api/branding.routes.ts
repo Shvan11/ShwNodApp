@@ -188,4 +188,22 @@ router.delete('/branding/logo', authorize(ADMIN_ROLES), async (_req: Request, re
   }
 });
 
+/**
+ * PRE-AUTH router (mounted in app/mount-routes.ts ahead of the `/api` auth gate):
+ * `GET /api/branding/public` → only the clinic's display name, for the staff login,
+ * the patient-portal sign-in and the browser-tab titles (audit FE-F23-8). The raw
+ * `CLINIC_NAME` row, no fallback: an install that never set it shows neutral wording,
+ * never another clinic's name.
+ */
+export const publicBrandingRouter = Router();
+publicBrandingRouter.get('/branding/public', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const name = (await getOption(NAME_OPTION))?.trim() ?? '';
+    sendData(res, branding.getPublicBranding.response, { clinicName: name.length > 0 ? name : null });
+  } catch (error) {
+    log.error('Error reading public branding', { error: (error as Error).message });
+    ErrorResponses.internalError(res, 'Failed to read branding', error as Error);
+  }
+});
+
 export default router;

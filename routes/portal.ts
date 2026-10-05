@@ -7,8 +7,8 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getTimePoints } from '../services/database/queries/timepoint-queries.js';
-import { getVisitsSummary } from '../services/database/queries/visit-queries.js';
-import { getPayments } from '../services/database/queries/payment-queries.js';
+import { getPortalVisits } from '../services/database/queries/visit-queries.js';
+import { getPortalPayments } from '../services/database/queries/payment-queries.js';
 import { getNextAppointmentForPatient } from '../services/database/queries/appointment-queries.js';
 import { authenticatePatient, portalLoginLimiter } from '../middleware/patientAuth.js';
 import { validate } from '../middleware/validate.js';
@@ -16,7 +16,6 @@ import {
   verifyPin,
   getVisiblePhotos,
   getPatientProfile,
-  getPrivateList,
 } from '../services/business/PatientPortalService.js';
 import { workingFilePath } from '../services/files/clinic-paths.js';
 import { getWorkingThumbnail } from '../services/files/thumbnail.service.js';
@@ -157,7 +156,9 @@ router.get(
 // --------------------------------------------------------------------------
 // GET /api/portal/timepoints
 //
-// Returns only timepoints that still have ≥1 non-private photo.
+// Every photo session of the patient's. Which photos a session shows (non-private,
+// rendered) is decided per session by /photos/:tp, so a session whose photos are
+// all private lists and then reads "No photos are available for this visit".
 // --------------------------------------------------------------------------
 router.get(
   '/timepoints',
@@ -166,18 +167,6 @@ router.get(
     try {
       const pid = req.session.patientId!;
       const allTps = await getTimePoints(String(pid));
-      const privateList = await getPrivateList(pid);
-
-      // Count private photos per timepoint
-      const privateByTp = new Map<string, number>();
-      for (const entry of privateList) {
-        privateByTp.set(entry.timepoint_code, (privateByTp.get(entry.timepoint_code) || 0) + 1);
-      }
-
-      // Filter timepoints: need at least one visible (non-private) photo
-      // We can't know exact counts without scanning the filesystem, so we
-      // just return all timepoints and let the photos endpoint return [].
-      // The frontend hides tabs with empty photo lists.
       res.json({ success: true, timepoints: allTps });
     } catch (error) {
       log.error('Portal /timepoints error', { error: (error as Error).message });
@@ -288,7 +277,7 @@ router.get(
 );
 
 // --------------------------------------------------------------------------
-// GET /api/portal/visits
+// GET /api/portal/visits — dates and event badges only (owner decision, FE-F23-1)
 // --------------------------------------------------------------------------
 router.get(
   '/visits',
@@ -296,7 +285,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const pid = req.session.patientId!;
-      const visits = await getVisitsSummary(pid);
+      const visits = await getPortalVisits(pid);
       res.json({ success: true, visits });
     } catch (error) {
       log.error('Portal /visits error', { error: (error as Error).message });
@@ -324,7 +313,7 @@ router.get(
 );
 
 // --------------------------------------------------------------------------
-// GET /api/portal/payments
+// GET /api/portal/payments — every work's payments, each in its work's currency (FE-F23-2)
 // --------------------------------------------------------------------------
 router.get(
   '/payments',
@@ -332,7 +321,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const pid = req.session.patientId!;
-      const payments = await getPayments(pid);
+      const payments = await getPortalPayments(pid);
       res.json({ success: true, payments });
     } catch (error) {
       log.error('Portal /payments error', { error: (error as Error).message });

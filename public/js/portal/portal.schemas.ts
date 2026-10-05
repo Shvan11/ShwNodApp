@@ -12,12 +12,13 @@ import { z } from 'zod';
 // Identity (GET /api/portal/me, POST /api/portal/login)
 // ---------------------------------------------------------------------------
 
+// `language` is sent but not read: the portal is English-only and stays LTR for every
+// patient until it is translated (owner decision 2026-10-05, audit FE-F23-5).
 export const portalPatientSchema = z.object({
   personId: z.number(),
   patientName: z.string().nullable(),
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
-  language: z.number().nullable(),
 });
 
 export const portalMeResponseSchema = z.object({
@@ -29,7 +30,6 @@ export const portalMeResponseSchema = z.object({
 export const loginResponseSchema = z.object({
   success: z.boolean(),
   patientName: z.string().nullable().optional(),
-  language: z.number().nullable().optional(),
   error: z.string().optional(),
   lockedUntil: z.string().optional(),
 });
@@ -38,9 +38,12 @@ export const loginResponseSchema = z.object({
 // Payments (GET /api/portal/payments)
 // ---------------------------------------------------------------------------
 
+// Every work's payments, newest first; `amount` is in the work's own `currency`
+// (audit FE-F23-2), so the tab totals per currency.
 export const portalPaymentRowSchema = z.object({
-  Payment: z.number(),
-  Date: z.string(),
+  amount: z.number(),
+  date: z.string(),
+  currency: z.string().nullable(),
 });
 export type PortalPaymentRow = z.infer<typeof portalPaymentRowSchema>;
 
@@ -72,23 +75,22 @@ export const portalNextAppointmentResponseSchema = z.object({
 // Visit history (GET /api/portal/visits)
 // ---------------------------------------------------------------------------
 
-export const portalVisitSummarySchema = z.object({
-  patient_name: z.string(),
-  work_id: z.number(),
+// Dates and event flags only, newest first — no clinical text (owner decision
+// 2026-10-05, audit FE-F23-1).
+export const portalVisitSchema = z.object({
   id: z.number(),
   visit_date: z.string(),
   opg: z.boolean(),
   i_photo: z.boolean(),
-  f_photo: z.boolean(),
   p_photo: z.boolean(),
+  f_photo: z.boolean(),
   appliance_removed: z.boolean(),
-  Summary: z.string().nullable(),
 });
-export type PortalVisitSummary = z.infer<typeof portalVisitSummarySchema>;
+export type PortalVisit = z.infer<typeof portalVisitSchema>;
 
 export const portalVisitsResponseSchema = z.object({
   success: z.boolean(),
-  visits: z.array(portalVisitSummarySchema).optional(),
+  visits: z.array(portalVisitSchema).optional(),
   error: z.string().optional(),
 });
 

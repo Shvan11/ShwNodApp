@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { resolve } from 'path'
 import { realpathSync } from 'fs'
@@ -39,16 +40,16 @@ export default defineConfig(({ mode }) => {
     react({
       // TypeScript React files
       include: /\.(tsx|ts)$/,
-      babel: {
-        plugins: [
-          ['babel-plugin-react-compiler', {
-            // React Compiler configuration
-            // Enables automatic memoization for all React components and hooks
-            runtimeModule: 'react/compiler-runtime'
-          }]
-        ]
-      }
     }),
+    // React Compiler (automatic memoization for every component and hook).
+    // plugin-react v6 has NO `babel` option: the compiler runs through
+    // @rolldown/plugin-babel + `reactCompilerPreset()`. The v5-style
+    // `react({ babel: { plugins: [...] } })` this replaced was silently
+    // ignored from the Vite 8 upgrade (2026-06-01) until 2026-10-05 — a JS
+    // config, so no type error, and the app just ran unmemoized (FE-F26-1).
+    // `npm run check:compiler` fails the gate if the build stops carrying the
+    // compiler's output.
+    babel({ presets: [reactCompilerPreset()] }),
     // Bundle treemap, opt-in via `npm run build:analyze` (sets ANALYZE=true).
     // Writes dist/stats.html so we can see what actually ships — e.g. Chart.js
     // is eagerly imported by the Stand chart components, so it loads even for

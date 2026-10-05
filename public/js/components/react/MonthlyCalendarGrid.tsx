@@ -14,8 +14,9 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import type { CalendarDay, CalendarData, CalendarAppointment } from './calendar.types';
 import { formatTime12, formatLocaleDate } from '../../utils/formatters';
-import { parseLocalDate } from '../../utils/calendarDate';
+import { parseLocalDate, toLocalDateString } from '../../utils/calendarDate';
 import { anchorFrom, type MenuAnchor } from '../../hooks/useFloatingMenu';
+import { useToday } from '../../hooks/useClock';
 import styles from './MonthlyCalendarGrid.module.css';
 
 interface MonthlyCalendarGridProps {
@@ -36,6 +37,10 @@ const MonthlyCalendarGrid = ({
 }: MonthlyCalendarGridProps) => {
     const [expandedDay, setExpandedDay] = useState<string | null>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+    // From the clock store, not `new Date()`: compiled, a render-time clock read
+    // is cached at mount and the highlight never leaves the day the page opened
+    // on (FE-F26-2).
+    const today = useToday();
 
     // Close expanded panel when clicking outside
     useEffect(() => {
@@ -59,7 +64,6 @@ const MonthlyCalendarGrid = ({
 
     const { days } = calendarData;
     const current = parseLocalDate(currentDate);
-    const todayString = new Date().toDateString();
 
     return (
         <div className={styles.monthlyCalendarGrid} ref={gridRef}>
@@ -80,7 +84,7 @@ const MonthlyCalendarGrid = ({
                     const currentMonth =
                         date.getMonth() === current.getMonth() &&
                         date.getFullYear() === current.getFullYear();
-                    const isToday = date.toDateString() === todayString;
+                    const isToday = toLocalDateString(date) === today;
                     const isHoliday = day.isHoliday || false;
                     const isExpanded = expandedDay === day.date;
                     const appointments = Array.isArray(day.appointments)

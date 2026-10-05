@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { PortalVisitSummary } from '../portal.schemas';
+import type { PortalVisit } from '../portal.schemas';
 import { portalVisitsResponseSchema } from '../portal.schemas';
+import { portalGet } from '../portalApi';
 import { formatLocaleDate } from '../../utils/formatters';
 import styles from '../portal.module.css';
 
@@ -10,26 +11,34 @@ function formatVisitDate(iso: string): string {
   return formatLocaleDate(iso, { year: 'numeric', month: 'short', day: 'numeric' }) || iso;
 }
 
+// A visit is its date and what happened at it; the clinician's notes stay with the
+// clinic (owner decision 2026-10-05, audit FE-F23-1). The list used to print the
+// staff summary's HTML, tags and all.
+function visitBadges(v: PortalVisit): { label: string; accent?: boolean }[] {
+  const badges: { label: string; accent?: boolean }[] = [];
+  if (v.opg) badges.push({ label: 'X-ray' });
+  if (v.i_photo) badges.push({ label: 'Initial photos' });
+  if (v.p_photo) badges.push({ label: 'Progress photos' });
+  if (v.f_photo) badges.push({ label: 'Final photos' });
+  if (v.appliance_removed) badges.push({ label: 'Appliance removed', accent: true });
+  return badges;
+}
+
 const VisitsTab = () => {
-  const [visits, setVisits] = useState<PortalVisitSummary[] | null>(null);
+  const [visits, setVisits] = useState<PortalVisit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (CLAUDE.md / audit N17): validates the raw body itself and reads res.ok/error.
-        const res = await fetch('/api/portal/visits', { credentials: 'same-origin' });
-        const parsed = portalVisitsResponseSchema.safeParse(await res.json());
+        const result = await portalGet('/api/portal/visits', portalVisitsResponseSchema);
         if (cancelled) return;
-        if (!res.ok || !parsed.success || !parsed.data.success || !parsed.data.visits) {
-          setError((parsed.success ? parsed.data.error : undefined) || 'Unable to load your visit history.');
+        if (!result.ok || !result.data.visits) {
+          setError((!result.ok && result.error) || 'Unable to load your visit history.');
           return;
         }
-        const sorted = [...parsed.data.visits].sort(
-          (a, b) => new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime()
-        );
-        setVisits(sorted);
+        setVisits(result.data.visits); // newest first, from the server
       } catch {
         if (!cancelled) setError('Unable to reach the server.');
       }
@@ -72,21 +81,26 @@ const VisitsTab = () => {
   return (
     <div className={styles.tabPanel}>
       <ul className={styles.visitList}>
-        {visits.map((v) => (
-          <li key={v.id} className={styles.visitItem}>
-            <div className={styles.visitDate}>{formatVisitDate(v.visit_date)}</div>
-            {v.Summary && <div className={styles.visitSummary}>{v.Summary}</div>}
-            <div className={styles.visitBadges}>
-              {v.opg && <span className={styles.visitBadge}>OPG</span>}
-              {v.i_photo && <span className={styles.visitBadge}>Photos</span>}
-              {v.appliance_removed && (
-                <span className={`${styles.visitBadge} ${styles.visitBadgeAccent}`}>
-                  Appliance removed
-                </span>
+        {visits.map((v) => {
+          const badges = visitBadges(v);
+          return (
+            <li key={v.id} className={styles.visitItem}>
+              <div className={styles.visitDate}>{formatVisitDate(v.visit_date)}</div>
+              {badges.length > 0 && (
+                <div className={styles.visitBadges}>
+                  {badges.map((b) => (
+                    <span
+                      key={b.label}
+                      className={b.accent ? `${styles.visitBadge} ${styles.visitBadgeAccent}` : styles.visitBadge}
+                    >
+                      {b.label}
+                    </span>
+                  ))}
+                </div>
               )}
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -366,6 +366,8 @@ export const qk = {
     supabaseStatus: () => ['settings', 'supabase-status'] as const,
     /** GET /api/sync/dolphin-status — Dolphin sink health (polled). */
     dolphinStatus: () => ['settings', 'dolphin-status'] as const,
+    /** GET /api/sync/features — which CDC sinks this install has (gates the two status tabs). */
+    syncFeatures: () => ['settings', 'sync-features'] as const,
     /** GET /api/telegram/status — Telegram bot status. */
     telegramStatus: () => ['settings', 'telegram-status'] as const,
     /** GET /api/integrations/telegram/status — Telegram MTProto integration status. */

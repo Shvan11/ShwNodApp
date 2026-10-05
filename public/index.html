@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#667eea">
-    <title>Shwan Orthodontics - Practice Management</title>
+    <!-- Neutral until the app reads the configured clinic name (UniversalHeader sets
+         document.title from Settings → General). It was this clinic's name on every
+         install (audit FE-F23-8). -->
+    <title>Practice Management</title>
 
     <!--
       Theme + language FOUC guard — runs BEFORE the inline <style> blocks and the
@@ -20,7 +23,9 @@
         // Theme
         var pref = 'auto';
         try { pref = localStorage.getItem('shwan_theme') || 'auto'; } catch (e) {}
-        if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'light';
+        // Same fallback as core/theme.ts (DEFAULT_THEME_PREFERENCE) — it used to be
+        // 'light' here, so a bad stored value painted light and then switched (FE-F23-13).
+        if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') pref = 'auto';
         var resolved = pref === 'auto'
           ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
           : pref;
@@ -69,18 +74,6 @@
       <link>s here). Font Awesome → App.tsx (global); GrapesJS CSS → its lazy
       editor chunk (GrapesJSEditor.tsx); PhotoSwipe → GridComponent.
     -->
-
-    <!-- Loading spinner animation for React.lazy() -->
-    <style>
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-
-    <!-- React and dependencies are bundled by Vite for optimal performance -->
-    <!-- Using latest stable React 19.1.0 with full bundling (best practice 2025) -->
-    <!-- No CDN imports - everything is optimized and tree-shaken in the build -->
 
     <!-- Global Styles -->
     <style>
@@ -156,29 +149,13 @@
         /* App container - top padding clears the fixed header. The offset is the
            responsive --header-height token (defined in css/base/tokens-primitive.css);
            full-height page shells subtract the same token from 100vh so the header
-           is never counted twice → no phantom scrollbar. #app-container is React-
-           rendered after window load, so variables.css is always present; the 50px
+           is never counted twice → no phantom scrollbar. #app-container is rendered
+           by React, after the CSS bundles load, so the token is defined; the 50px
            fallback is belt-and-braces. */
         #app-container {
             padding: 0;
             margin: 0;
             padding-top: var(--header-height, 50px);
-        }
-
-        /* Smooth transitions between routes */
-        .app-transition {
-            animation: fadeIn 0.2s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         /* Error boundary styles */
@@ -265,7 +242,10 @@
                         if (response.status === 401 && !redirecting) {
                             redirecting = true;
                             console.warn('[Auth] 401 Unauthorized detected - redirecting to login');
-                            window.location.href = '/login.html';
+                            // Carry the page so sign-in returns to it (audit FE-F23-7).
+                            var here = location.pathname + location.search + location.hash;
+                            window.location.href = here === '/' ? '/login.html'
+                                : '/login.html?next=' + encodeURIComponent(here);
                         }
                         return response;
                     });

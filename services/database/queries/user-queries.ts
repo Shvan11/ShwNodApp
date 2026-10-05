@@ -113,6 +113,26 @@ export async function deleteUser(userId: number): Promise<void> {
   await sql`DELETE FROM "users" WHERE "user_id" = ${userId}`.execute(getKysely());
 }
 
+/**
+ * Log a user out everywhere: delete their rows from the staff session store.
+ *
+ * A staff session carries the user's id and role from the moment of login, and
+ * `authenticate`/`authorize` trust it rather than re-reading `users` — so without
+ * this, deactivating, deleting or demoting someone (or resetting their password)
+ * changed nothing for a browser that was already signed in, and `rolling: true`
+ * kept that session alive for as long as it was used (audit FE-F22-1).
+ * `keepSid` spares the caller's own session (changing your own password must not
+ * sign you out of the tab you did it from). Returns the number of sessions ended.
+ */
+export async function endUserSessions(userId: number, keepSid?: string): Promise<number> {
+  const result = await sql`
+    DELETE FROM "staff_sessions"
+    WHERE "sess"->>'userId' = ${String(userId)}
+      AND "sid" IS DISTINCT FROM ${keepSid ?? null}
+  `.execute(getKysely());
+  return Number(result.numAffectedRows ?? 0n);
+}
+
 /** Role + active flag for one user, or undefined when there is no such user. */
 export async function getUserRoleStatus(userId: number): Promise<UserRoleStatus | undefined> {
   const { rows } = await sql<UserRoleStatus>`

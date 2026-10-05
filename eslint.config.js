@@ -340,6 +340,8 @@ export default [
       'public/js/components/react/AddPatientForm.tsx',
       'public/js/components/react/EditPatientComponent.tsx',
       'public/js/components/react/ViewPatientInfo.tsx',
+      // The patient-info page's Portal Access card (`patients:portal.*`, FE-F22-12).
+      'public/js/components/react/PortalAccessCard.tsx',
       'public/js/components/react/PortalActivityBell.tsx',
       'public/js/components/react/HeaderPopover.tsx',
       'public/js/components/react/TasksBell.tsx',

@@ -345,8 +345,21 @@ export const hasAppointment = {
 
 // GET /api/patients/:personId/portal — staff portal status + QR (inline literal).
 export const portalStatus = {
-  response: z.looseObject({ enabled: z.boolean() }),
+  // Fully modelled (it was `{ enabled }` + a hand-written client interface and a cast —
+  // audit FE-F22-12). `lockedUntil` is null once the lock has lapsed.
+  response: z.looseObject({
+    enabled: z.boolean(),
+    hasPin: z.boolean(),
+    lockedUntil: timestampString.nullable(),
+    lastLoginAt: timestampString.nullable(),
+    failedAttempts: z.number(),
+    qrDataUrl: z.string(),
+    portalUrl: z.string(),
+    /** `PUBLIC_URL` is unset, so `portalUrl` is the app's built-in address (FE-F23-9). */
+    usesDefaultAddress: z.boolean(),
+  }),
 } as const;
+export type PortalStatusResponse = z.infer<typeof portalStatus.response>;
 
 // GET /api/patients/:personId/photos/visibility — { privateImages: [{tp,name}] }.
 // `tp` is the session code as stored (`private_photos.timepoint_code`, text), so the
@@ -545,6 +558,7 @@ export type AlertSnoozeBody = z.infer<typeof alertSnooze.body>;
 export const resetPin = {
   response: z.object({ pin: z.string() }),
 } as const;
+export type ResetPinResponse = z.infer<typeof resetPin.response>;
 
 // POST /api/patients/:personId/portal/enable — { enabled } (fully enumerated → SSoT).
 export const portalEnable = {

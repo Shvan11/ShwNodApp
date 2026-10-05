@@ -12,6 +12,7 @@ import {
 import { applyResolvedTheme, getStoredThemePreference, resolveTheme } from '../core/theme';
 import { applyLanguageAttributes, getStoredLanguagePreference } from '../core/language';
 import { formatLocaleDate } from '../utils/formatters';
+import { appIsReachable } from '../core/serverHealth';
 import styles from './ChairDisplay.module.css';
 
 interface ImageEntry {
@@ -59,21 +60,9 @@ const renderVisitSummary = (raw: string): string => {
 /** How long to wait between server probes while the server is still down (grows to the last). */
 const RELOAD_PROBE_DELAYS_MS = [15_000, 30_000, 60_000];
 
-/**
- * Is the app itself answering? A reload while the server is still down behind
- * Caddy / the tunnel lands on the proxy's error page, which has no script to try
- * again, and the kiosk stays there (audit FE-F11-15d). `/health/basic` is
- * public, so any answer from the app — even with an expired session — is a yes.
- */
-async function appIsReachable(): Promise<boolean> {
-    try {
-        // eslint-disable-next-line no-restricted-syntax -- liveness probe of the public /health/basic, not an API read: no envelope, no CSRF, must not redirect on 401
-        const res = await fetch('/health/basic', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-        return res.ok;
-    } catch {
-        return false;
-    }
-}
+// A reload while the server is still down behind Caddy / the tunnel lands on the
+// proxy's error page, which has no script to try again, and the kiosk stays there
+// (audit FE-F11-15d) — so it reloads only once `appIsReachable()` (core/serverHealth).
 
 /** The idle clock fills half the shorter side, and follows a resize or rotation (FE-F11-15c). */
 const idleClockSize = (): number => Math.min(window.innerHeight * 0.5, window.innerWidth * 0.5);

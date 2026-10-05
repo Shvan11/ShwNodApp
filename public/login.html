@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - Shwan Orthodontics</title>
+  <title>Sign in</title>
   <style>
     * {
       margin: 0;
@@ -223,7 +223,7 @@
   <div class="login-container">
     <div class="logo">
       <div class="logo-icon">🦷</div>
-      <h1>Shwan Orthodontics</h1>
+      <h1 id="clinicName">Practice Management</h1>
       <p class="subtitle">Please sign in to continue</p>
     </div>
 
@@ -270,8 +270,8 @@
       </button>
     </form>
 
-    <div class="footer">
-      <p class="footer-text">© 2025 Shwan Orthodontics. All rights reserved.</p>
+    <div class="footer hidden" id="footer">
+      <p class="footer-text" id="footerText"></p>
     </div>
   </div>
 
@@ -329,6 +329,38 @@
       }
     }
 
+    // Where to go after sign-in: the page the web gate or the app's 401 net sent us
+    // from (?next=), or the dashboard. Only a same-origin path is followed, never
+    // another site (audit FE-F23-7 — it used to be /dashboard, always).
+    function destination() {
+      try {
+        const next = new URLSearchParams(location.search).get('next');
+        if (next && next.charAt(0) === '/') {
+          const url = new URL(next, location.origin);
+          if (url.origin === location.origin && url.pathname !== '/login.html') {
+            return url.pathname + url.search + url.hash;
+          }
+        }
+      } catch (e) { /* malformed → default */ }
+      return '/dashboard';
+    }
+
+    // The clinic's configured name (Settings → General), read through the one
+    // pre-auth branding endpoint. Every install used to say "Shwan Orthodontics"
+    // here (audit FE-F23-8); with no name set the page stays neutral.
+    async function showClinicName() {
+      try {
+        const response = await fetch('/api/branding/public', { credentials: 'include' });
+        const body = await response.json();
+        const name = body && body.success && body.data && body.data.clinicName;
+        if (typeof name !== 'string' || !name.trim()) return;
+        document.getElementById('clinicName').textContent = name;
+        document.title = 'Sign in — ' + name;
+        document.getElementById('footerText').textContent = '© ' + new Date().getFullYear() + ' ' + name;
+        document.getElementById('footer').classList.remove('hidden');
+      } catch (e) { /* keep the neutral wording */ }
+    }
+
     // Check if already logged in
     async function checkAuthStatus() {
       try {
@@ -340,7 +372,7 @@
         if (data.success && data.user) {
           showInfo('Already logged in. Redirecting...');
           setTimeout(() => {
-            window.location.href = '/dashboard';
+            window.location.href = destination();
           }, 1000);
         }
       } catch (error) {
@@ -376,7 +408,7 @@
 
           // Redirect after short delay
           setTimeout(() => {
-            window.location.href = '/dashboard';
+            window.location.href = destination();
           }, 1200);
         } else {
           showError(data.error || 'Login failed. Please try again.');
@@ -393,6 +425,7 @@
 
     // Check auth status on page load
     checkAuthStatus();
+    showClinicName();
 
     // No credential hints - manage users in Settings → User Management
   </script>

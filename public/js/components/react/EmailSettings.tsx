@@ -2,122 +2,102 @@ import { useState, useEffect, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { postJSON, httpErrorMessage } from '@/core/http';
+import { useToast } from '@/contexts/ToastContext';
 import { qk } from '@/query/keys';
 import { emailConfigQuery } from '@/query/queries';
-import Modal from './Modal';
-import ModalHeader, { type ModalHeaderVariant } from './ModalHeader';
+import type { EmailConfigBody, EmailConfigView } from '@shared/contracts/email-api.contract';
 
-interface EmailConfig {
-  smtp_host?: string;
-  smtp_port?: string;
-  smtp_secure?: string;
-  smtp_user?: string;
-  smtp_password?: string;
-  from_address?: string;
-  from_name?: string;
-  [key: string]: string | undefined;
+/**
+ * The form edits strings; the server stores typed values (port a number, SSL a
+ * boolean). Converting at both edges is what makes "Use SSL/TLS" savable: the select
+ * used to post `"false"` to a `z.boolean()` field (400 on every change), and a stored
+ * `false` displayed as "Yes", because `false || ''` matched no option (audit FE-F22-2).
+ */
+type FieldName =
+    | 'smtp_host'
+    | 'smtp_port'
+    | 'smtp_secure'
+    | 'smtp_user'
+    | 'smtp_password'
+    | 'from_address'
+    | 'from_name';
+type FormValues = Record<FieldName, string>;
+
+function toFormValues(c: EmailConfigView | undefined): FormValues {
+    return {
+        smtp_host: c?.smtp_host ?? '',
+        smtp_port: c?.smtp_port != null ? String(c.smtp_port) : '',
+        // The mailer is secure unless the option says false (services/messaging/email.ts).
+        smtp_secure: c?.smtp_secure === false ? 'false' : 'true',
+        smtp_user: c?.smtp_user ?? '',
+        // Never sent by the server — the box is for a NEW password only.
+        smtp_password: '',
+        from_address: c?.from_address ?? '',
+        from_name: c?.from_name ?? '',
+    };
 }
 
-interface ModalState {
-  show: boolean;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'error';
+function toBody(edits: Partial<FormValues>): EmailConfigBody {
+    const body: EmailConfigBody = {};
+    for (const [key, value] of Object.entries(edits) as [FieldName, string][]) {
+        if (key === 'smtp_secure') body.smtp_secure = value === 'true';
+        else if (key === 'smtp_port') body.smtp_port = Number(value);
+        else body[key] = value;
+    }
+    return body;
 }
 
 interface EmailSettingsProps {
-  onChangesUpdate?: (hasChanges: boolean) => void;
+    onChangesUpdate?: (hasChanges: boolean) => void;
 }
 
-// Map the modal's status type to the shared ModalHeader's tone + leading icon.
-const MODAL_VARIANT: Record<ModalState['type'], ModalHeaderVariant> = {
-  success: 'success',
-  error: 'danger',
-  info: 'info',
-};
-const MODAL_ICON: Record<ModalState['type'], string> = {
-  success: 'fas fa-check-circle',
-  error: 'fas fa-exclamation-circle',
-  info: 'fas fa-info-circle',
-};
-
 const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
+    const toast = useToast();
     const queryClient = useQueryClient();
-    const { data, isLoading: isConfigLoading, isError } = useQuery(emailConfigQuery());
-    // `email.config.response` types `config` as `z.unknown()` on purpose (free-form
-    // key/value map), so a single assertion off `unknown` is required here.
-    const config = (data?.config ?? {}) as EmailConfig;
-    const [pendingChanges, setPendingChanges] = useState<EmailConfig>({});
+    const { data, isLoading: isConfigLoading, isError, error } = useQuery(emailConfigQuery());
+    const saved = toFormValues(data?.config);
+    const passwordSet = data?.config.smtp_password_set ?? false;
+    const [edits, setEdits] = useState<Partial<FormValues>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
     const [isSending, setIsSending] = useState(false);
-    const [modal, setModal] = useState<ModalState>({ show: false, title: '', message: '', type: 'info' });
 
-    // The form is hidden while the config is loading or a save is in flight.
-    const isLoading = isConfigLoading || isSaving;
-
-    // Surface a load failure during render (adjust-state-during-render) rather than
-    // in an effect so the React Compiler can optimize it.
-    const [prevIsError, setPrevIsError] = useState(isError);
-    if (isError !== prevIsError) {
-        setPrevIsError(isError);
-        if (isError) {
-            setModal({ show: true, title: 'Error', message: 'Failed to load email settings. Please try again.', type: 'error' });
-        }
-    }
+    const hasChanges = Object.keys(edits).length > 0;
 
     useEffect(() => {
-        // Notify parent component about changes
-        if (onChangesUpdate) {
-            onChangesUpdate(Object.keys(pendingChanges).length > 0);
-        }
+        onChangesUpdate?.(hasChanges);
         // onChangesUpdate intentionally excluded to prevent infinite loop
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingChanges]);
+    }, [hasChanges]);
 
-    const showModal = (title: string, message: string, type: ModalState['type'] = 'info') => {
-        setModal({ show: true, title, message, type });
+    const handleInputChange = (field: FieldName, value: string) => {
+        setEdits((prev) => {
+            const next = { ...prev };
+            // A password box is only "changed" when something is typed in it.
+            const unchanged = field === 'smtp_password' ? value === '' : value === saved[field];
+            if (unchanged) delete next[field];
+            else next[field] = value;
+            return next;
+        });
     };
 
-    const hideModal = () => {
-        setModal({ show: false, title: '', message: '', type: 'info' });
-    };
-
-    const handleInputChange = (fieldName: string, newValue: string) => {
-        const originalValue = config[fieldName];
-
-        if (newValue !== originalValue) {
-            setPendingChanges(prev => ({
-                ...prev,
-                [fieldName]: newValue
-            }));
-        } else {
-            setPendingChanges(prev => {
-                const updated = { ...prev };
-                delete updated[fieldName];
-                return updated;
-            });
-        }
-    };
+    const value = (field: FieldName): string => edits[field] ?? saved[field];
 
     const saveChanges = async () => {
-        if (Object.keys(pendingChanges).length === 0) {
-            showModal('Info', 'No changes to save.', 'info');
+        if (!hasChanges || isSaving) return;
+        if (edits.smtp_port !== undefined && !/^\d{1,5}$/.test(edits.smtp_port)) {
+            toast.error('The SMTP port must be a number, e.g. 465 or 587.');
             return;
         }
-
         setIsSaving(true);
         try {
-            // A failed save throws from postJSON (non-2xx) → caught below.
-            await postJSON('/api/email/config', pendingChanges);
-            // Invalidate the SMTP-config cache so every observer refetches; awaited
-            // so `pendingChanges` is only cleared once the fresh config has landed.
+            await postJSON('/api/email/config', toBody(edits));
+            // Awaited so the edits clear only once the saved values are on screen.
             await queryClient.invalidateQueries({ queryKey: qk.settings.emailConfig() });
-            setPendingChanges({});
-            showModal('Success', 'Email configuration saved successfully!', 'success');
-        } catch (error) {
-            console.error('Error saving email configuration:', error);
-            showModal('Error', 'Failed to save email configuration: ' + httpErrorMessage(error, 'Unknown error'), 'error');
+            setEdits({});
+            toast.success('Email settings saved');
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to save the email settings'));
         } finally {
             setIsSaving(false);
         }
@@ -130,16 +110,11 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
             // { success, message?, error? } at 200 (semantic-success, NOT the envelope) —
             // see docs/shared-contract-progress.md. Left unguarded by design.
             // It is a POST because it opens an outbound SMTP connection.
-            const data = await postJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test', {});
-
-            if (data.success) {
-                showModal('Success', 'Email connection test successful! Configuration is valid.', 'success');
-            } else {
-                showModal('Error', `Connection test failed: ${data.message || data.error}`, 'error');
-            }
-        } catch (error) {
-            console.error('Error testing email connection:', error);
-            showModal('Error', 'Connection test failed: ' + httpErrorMessage(error, 'Unknown error'), 'error');
+            const result = await postJSON<{ success?: boolean; message?: string; error?: string }>('/api/email/test', {});
+            if (result.success) toast.success('Connection test passed — the saved settings work.');
+            else toast.error(`Connection test failed: ${result.message || result.error || 'unknown error'}`);
+        } catch (err) {
+            toast.error('Connection test failed: ' + httpErrorMessage(err, 'unknown error'));
         } finally {
             setIsTesting(false);
         }
@@ -148,28 +123,14 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
     const sendTestEmail = async () => {
         setIsSending(true);
         try {
-            // A failed send throws from postJSON (non-2xx) → caught below.
             await postJSON('/api/email/test-send', {});
-            showModal('Success', 'Test email sent successfully!', 'success');
-        } catch (error) {
-            console.error('Error sending test email:', error);
-            showModal('Error', 'Failed to send test email: ' + httpErrorMessage(error, 'Unknown error'), 'error');
+            toast.success('Test email sent');
+        } catch (err) {
+            toast.error('Failed to send the test email: ' + httpErrorMessage(err, 'unknown error'));
         } finally {
             setIsSending(false);
         }
     };
-
-    const discardChanges = () => {
-        setPendingChanges({});
-    };
-
-    const getCurrentValue = (fieldName: string): string => {
-        return Object.prototype.hasOwnProperty.call(pendingChanges, fieldName)
-            ? (pendingChanges[fieldName] ?? '')
-            : (config[fieldName] || '');
-    };
-
-    const hasChanges = Object.keys(pendingChanges).length > 0;
 
     return (
         <div className="email-settings">
@@ -181,13 +142,17 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                     </p>
                 </div>
 
-                {isLoading ? (
+                {isConfigLoading ? (
                     <div className="loading-indicator">
                         <i className="fas fa-spinner fa-spin"></i> Loading email configuration...
                     </div>
+                ) : isError ? (
+                    <div className="alert alert-warning">
+                        <i className="fas fa-exclamation-triangle"></i>{' '}
+                        {httpErrorMessage(error, 'Failed to load the email settings.')}
+                    </div>
                 ) : (
                     <div className="settings-form">
-                        {/* SMTP Host */}
                         <div className="form-group">
                             <label htmlFor="smtp_host">
                                 SMTP Host
@@ -197,14 +162,13 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 type="text"
                                 id="smtp_host"
                                 className="form-control"
-                                value={getCurrentValue('smtp_host')}
+                                value={value('smtp_host')}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('smtp_host', e.target.value)}
                                 placeholder="smtp.gmail.com"
                             />
                             <small className="form-text">SMTP server hostname</small>
                         </div>
 
-                        {/* SMTP Port */}
                         <div className="form-group">
                             <label htmlFor="smtp_port">
                                 SMTP Port
@@ -214,14 +178,13 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 type="number"
                                 id="smtp_port"
                                 className="form-control"
-                                value={getCurrentValue('smtp_port')}
+                                value={value('smtp_port')}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('smtp_port', e.target.value)}
                                 placeholder="465"
                             />
                             <small className="form-text">Port 465 (SSL) or 587 (TLS)</small>
                         </div>
 
-                        {/* SMTP Secure */}
                         <div className="form-group">
                             <label htmlFor="smtp_secure">
                                 Use SSL/TLS
@@ -229,7 +192,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                             <select
                                 id="smtp_secure"
                                 className="form-control"
-                                value={getCurrentValue('smtp_secure')}
+                                value={value('smtp_secure')}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => handleInputChange('smtp_secure', e.target.value)}
                             >
                                 <option value="true">Yes (SSL - Port 465)</option>
@@ -238,7 +201,6 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                             <small className="form-text">Enable secure connection</small>
                         </div>
 
-                        {/* SMTP Username */}
                         <div className="form-group">
                             <label htmlFor="smtp_user">
                                 SMTP Username / Email
@@ -248,28 +210,29 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 type="email"
                                 id="smtp_user"
                                 className="form-control"
-                                value={getCurrentValue('smtp_user')}
+                                value={value('smtp_user')}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('smtp_user', e.target.value)}
                                 placeholder="your-email@gmail.com"
                             />
                             <small className="form-text">Email account for sending</small>
                         </div>
 
-                        {/* SMTP Password */}
                         <div className="form-group">
                             <label htmlFor="smtp_password">
                                 SMTP Password / App Password
-                                <span className="required">*</span>
+                                {!passwordSet && <span className="required">*</span>}
                             </label>
                             <input
                                 type="password"
                                 id="smtp_password"
                                 className="form-control"
-                                value={getCurrentValue('smtp_password')}
+                                value={value('smtp_password')}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('smtp_password', e.target.value)}
-                                placeholder="Enter password or app-specific password"
+                                placeholder={passwordSet ? 'A password is saved — leave blank to keep it' : 'Enter password or app-specific password'}
+                                autoComplete="new-password"
                             />
                             <small className="form-text">
+                                {passwordSet ? 'Type a new password only to replace the saved one. ' : ''}
                                 For Gmail, use an{' '}
                                 <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">
                                     App Password
@@ -277,7 +240,6 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                             </small>
                         </div>
 
-                        {/* From Address */}
                         <div className="form-group">
                             <label htmlFor="from_address">
                                 From Email Address
@@ -286,14 +248,13 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 type="email"
                                 id="from_address"
                                 className="form-control"
-                                value={getCurrentValue('from_address')}
+                                value={value('from_address')}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('from_address', e.target.value)}
                                 placeholder="clinic@example.com"
                             />
                             <small className="form-text">Email address shown as sender</small>
                         </div>
 
-                        {/* From Name */}
                         <div className="form-group">
                             <label htmlFor="from_name">
                                 From Name
@@ -302,39 +263,37 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 type="text"
                                 id="from_name"
                                 className="form-control"
-                                value={getCurrentValue('from_name')}
+                                value={value('from_name')}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) => handleInputChange('from_name', e.target.value)}
-                                placeholder="Shwan Orthodontics"
+                                placeholder="The clinic's name"
                             />
                             <small className="form-text">Sender name displayed in emails</small>
                         </div>
 
-                        {/* Info about recipients */}
                         <div className="form-group">
                             <span>Email Recipients</span>
                             <div className="info-box">
                                 <i className="fas fa-info-circle"></i>
                                 <span>
-                                    Email notifications are sent to employees with "Receive Email" enabled.
+                                    Email notifications are sent to employees with &quot;Receive Email&quot; enabled.
                                     Manage recipients in <Link to="/settings/employees">Settings → Employees</Link>.
                                 </span>
                             </div>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="form-actions">
                             <div className="button-group-left">
                                 <button
                                     className="btn btn-primary"
                                     onClick={saveChanges}
-                                    disabled={!hasChanges || isLoading}
+                                    disabled={!hasChanges || isSaving}
                                 >
-                                    <i className="fas fa-save"></i> Save Changes
+                                    <i className="fas fa-save"></i> {isSaving ? 'Saving…' : 'Save Changes'}
                                 </button>
                                 <button
                                     className="btn btn-secondary"
-                                    onClick={discardChanges}
-                                    disabled={!hasChanges || isLoading}
+                                    onClick={() => setEdits({})}
+                                    disabled={!hasChanges || isSaving}
                                 >
                                     <i className="fas fa-undo"></i> Discard
                                 </button>
@@ -343,7 +302,8 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 <button
                                     className="btn btn-info"
                                     onClick={testConnection}
-                                    disabled={isTesting || isLoading}
+                                    disabled={isTesting || hasChanges}
+                                    title={hasChanges ? 'Save first — the test uses the saved settings' : undefined}
                                 >
                                     {isTesting ? (
                                         <><i className="fas fa-spinner fa-spin"></i> Testing...</>
@@ -354,7 +314,8 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                 <button
                                     className="btn btn-success"
                                     onClick={sendTestEmail}
-                                    disabled={isSending || isLoading}
+                                    disabled={isSending || hasChanges}
+                                    title={hasChanges ? 'Save first — the test uses the saved settings' : undefined}
                                 >
                                     {isSending ? (
                                         <><i className="fas fa-spinner fa-spin"></i> Sending...</>
@@ -368,35 +329,12 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                         {hasChanges && (
                             <div className="alert alert-warning">
                                 <i className="fas fa-exclamation-triangle"></i>
-                                You have unsaved changes. Click "Save Changes" to apply them.
+                                You have unsaved changes. Save them before testing — the tests use the saved settings.
                             </div>
                         )}
                     </div>
                 )}
             </div>
-
-            {/* Modal */}
-            <Modal
-                isOpen={modal.show}
-                onClose={hideModal}
-                contentClassName="modal-content"
-                ariaLabelledBy="email-settings-modal-title"
-            >
-                <ModalHeader
-                    variant={MODAL_VARIANT[modal.type]}
-                    titleId="email-settings-modal-title"
-                    icon={<i className={MODAL_ICON[modal.type]} />}
-                    title={modal.title}
-                />
-                <div className="modal-body">
-                    <p>{modal.message}</p>
-                </div>
-                <div className="modal-footer">
-                    <button className="btn btn-primary" onClick={hideModal}>
-                        OK
-                    </button>
-                </div>
-            </Modal>
         </div>
     );
 };

@@ -10,19 +10,23 @@
  * Without the token the server rejects the logout before the handler runs, so
  * the portal session would survive server-side even though the client cleared
  * its state — hence this is required, not cosmetic.
+ *
+ * Fetched fresh for every call, never cached: the token is HMAC-bound to the
+ * session id, which login regenerates and logout destroys. A token cached for the
+ * page's life was the FIRST session's, so the second Sign out in one page load
+ * (a parent signing in for two children) was refused 403 and that session stayed
+ * signed in (audit FE-F23-4). Logout is rare; one extra GET is nothing.
  */
-let token: string | null = null;
 
-/** Header object carrying the portal CSRF token (empty if it can't be fetched). */
+/** Header object carrying a portal CSRF token for the current session (empty if it can't be fetched). */
 export async function portalCsrfHeader(): Promise<Record<string, string>> {
-  if (!token) {
-    try {
-      // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (audit N17): self-contained portal CSRF bootstrap; a plain GET that must not route through the staff funnel.
-      const res = await fetch('/api/portal/csrf-token', { credentials: 'same-origin' });
-      if (res.ok) token = ((await res.json()) as { csrfToken?: string }).csrfToken ?? null;
-    } catch {
-      /* best-effort */
-    }
+  try {
+    // eslint-disable-next-line no-restricted-syntax -- portal Zod boundary (audit N17): self-contained portal CSRF bootstrap; a plain GET that must not route through the staff funnel.
+    const res = await fetch('/api/portal/csrf-token', { credentials: 'same-origin' });
+    if (!res.ok) return {};
+    const token = ((await res.json()) as { csrfToken?: string }).csrfToken;
+    return token ? { 'x-csrf-token': token } : {};
+  } catch {
+    return {};
   }
-  return token ? { 'x-csrf-token': token } : {};
 }
