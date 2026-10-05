@@ -8,19 +8,47 @@
  *
  * A recorded framing ("Continue editing", a reset) is applied by remounting the
  * cropper (`slot.framingKey`) with `initialCroppedAreaPercentages`, which react-easy-crop
- * honours on media load. An optional ghost of the same view from another session lies
- * on top (pointer-events none) as an alignment guide.
+ * honours on media load — through `CoverCropper` below, without which it lands on the
+ * wrong frame. An optional ghost of the same view from another session lies on top
+ * (pointer-events none) as an alignment guide.
  */
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import Cropper from 'react-easy-crop';
-import type { Area, MediaSize, Point } from 'react-easy-crop';
+import type { Area, CropperProps, MediaSize, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
 import type { CropArea, FramingArea, PhotoViewCode, SlotState } from './photoEditorTypes';
 import { aspectForView, gridLinesForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
 import { buildContentUrl } from '../files/fileHelpers';
 
-/** Inert crop handler for inactive slots (react-easy-crop requires onCropChange). */
-const noop = (): void => {};
+/**
+ * react-easy-crop, with its cover fit settled BEFORE a media load is measured.
+ *
+ * The library (6.2.3, and 5.5.7 before it) keeps the resolved fit in state but only
+ * writes it in componentDidUpdate, so the load of a freshly mounted cropper measures the
+ * photo as `contain` — smaller than it is drawn — and applies
+ * `initialCroppedAreaPercentages` in that space. One update later it corrects the fit and
+ * rescales the pan, but never the zoom, and reports the frame from the pan it had before
+ * the correction. On "Continue editing" that reopened a panned view off its saved
+ * position, and a rotated one zoomed in as well (7° on a 3:2 photo in a wide slot: 113%
+ * for a saved 105%), and marked both Unsaved untouched. A default framing (no pan, zoom
+ * 1) is the same in both spaces, which is why placing a new photo never showed it.
+ *
+ * Reported upstream as ValentinH/react-easy-crop#667 (the fix there is one line in
+ * `computeSizes`). Once a release carries it, this class can go — re-measure a Continue
+ * of a panned + rotated view first.
+ */
+class CoverCropper extends Cropper {
+  constructor(props: CropperProps) {
+    super(props);
+    const measure = this.onMediaLoad;
+    this.onMediaLoad = () => {
+      // With the photo loaded, getObjectFit() can tell which side covers the slot.
+      const fit = this.getObjectFit();
+      if (fit === this.state.mediaObjectFit) measure();
+      else this.setState({ mediaObjectFit: fit }, measure);
+    };
+  }
+}
 
 /**
  * Per-view framing guides, absolutely positioned over the slot content. The crop
@@ -50,8 +78,9 @@ interface Props {
   proxyMode: boolean;
   onCropChange: (crop: Point) => void;
   onZoomChange: (zoom: number) => void;
-  /** The frame in % of the flipped + rotated photo, and in its natural pixels. */
-  onCropComplete: (area: FramingArea, pixels: CropArea) => void;
+  /** The frame in % of the flipped + rotated photo, and in its natural pixels — reported
+   *  whenever it changes, whoever moved it (the user, a restore, a resize of the slot). */
+  onFrameChange: (area: FramingArea, pixels: CropArea) => void;
   /** Natural (post-EXIF) dims of the loaded media — the space the crop rect lives in. */
   onMediaLoaded: (size: { width: number; height: number }) => void;
   /** Another session's saved photo of this view, drawn faintly over the slot to line
@@ -120,7 +149,7 @@ const SlotCanvas = ({
   proxyMode,
   onCropChange,
   onZoomChange,
-  onCropComplete,
+  onFrameChange,
   onMediaLoaded,
   overlayUrl = null,
   overlayOpacity = 0.35,
@@ -199,26 +228,25 @@ const SlotCanvas = ({
 
   // Active and inactive slots render the SAME controlled cropper, so framing is
   // pixel-identical whether or not the slot is focused — no reset on blur. Only the
-  // focused slot is interactive for USER input (onCropChange/onZoomChange gated on
-  // `active`; inactive slots set pointer-events:none so a click falls through to
-  // the cell and a stray wheel/drag can't nudge an unfocused slot). But
-  // onCropComplete + onMediaLoaded are wired on EVERY populated slot: the cropper
-  // re-emits the crop rect programmatically on each media load (proxy/original
-  // toggle, flip reload) BEFORE onMediaLoaded fires, and recording both keeps the
-  // stored (croppedAreaPixels, mediaSize) pair in the same pixel space — gating
-  // them on `active` would strand inactive slots' rects in the previous media
-  // space. Because the cropper container is absolutely positioned, slot content
-  // never participates in layout — the cell stays locked to its view's aspect box
-  // and can't reflow when framing changes.
-  //
-  // While a recorded framing is pending, crop + zoom changes get through even on an
-  // inactive slot: applying it on load IS such a change, and dropping it would leave
-  // the slot showing the default frame while the editor holds the recorded one.
-  const acceptsChanges = active || !!slot.pendingFraming;
+  // focused slot takes USER input: an inactive one is closed to the pointer
+  // (pointer-events:none, so a click falls through to the cell and a stray drag can't
+  // nudge it) and to the keyboard (its crop area leaves the tab order, so the arrow
+  // keys can't either). Every callback, though, is wired on EVERY populated slot,
+  // because the cropper also moves things itself: it applies a recorded framing on
+  // load, and it rescales the pan — held in CSS pixels — whenever the slot is resized
+  // (window, sidebar divider, editor zoom). Those used to be dropped for an unselected
+  // slot, whose photo then slid under its frame on every resize. Likewise the frame is
+  // taken from onCropAreaChange, not onCropComplete: the library's own corrections
+  // report "complete" from the pan they are about to replace, and only announce the
+  // result as an area change. Recording frame + media size on each load keeps the stored
+  // (croppedAreaPixels, mediaSize) pair in the same pixel space (proxy/original toggle,
+  // flip reload). Because the cropper container is absolutely positioned, slot content
+  // never participates in layout — the cell stays locked to its view's aspect box and
+  // can't reflow when framing changes.
   return (
     <div className={styles.cropWrap}>
       {mediaUrl && (
-        <Cropper
+        <CoverCropper
           key={slot.framingKey}
           image={mediaUrl}
           crop={slot.crop}
@@ -240,9 +268,10 @@ const SlotCanvas = ({
           showGrid={false}
           objectFit="cover"
           initialCroppedAreaPercentages={slot.pendingFraming?.area}
-          onCropChange={acceptsChanges ? onCropChange : noop}
-          onZoomChange={acceptsChanges ? onZoomChange : undefined}
-          onCropComplete={(area: Area, areaPixels: Area) => onCropComplete(area, areaPixels)}
+          onCropChange={onCropChange}
+          onZoomChange={onZoomChange}
+          onCropAreaChange={(area: Area, areaPixels: Area) => onFrameChange(area, areaPixels)}
+          cropperProps={active ? undefined : { tabIndex: -1 }}
           onMediaLoaded={(ms: MediaSize) => onMediaLoaded({ width: ms.naturalWidth, height: ms.naturalHeight })}
           style={{
             // The cell's own border frames the crop; hide the cropper's internal

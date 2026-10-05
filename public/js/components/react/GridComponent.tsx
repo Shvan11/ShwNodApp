@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 
 import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, postJSON, putJSON, deleteJSON, httpErrorMessage } from '@/core/http';
+import { fetchJSON, postJSON, putJSON, deleteJSON, postFormData, httpErrorMessage } from '@/core/http';
 import { invalidatePatientPhotos } from '@/query/photos';
 import { reportClientError, describeHttpError } from '@/core/error-reporter';
 import { qk } from '@/query/keys';
@@ -10,6 +10,7 @@ import { timepointsQuery, galleryQuery, photoVisibilityQuery, brandingQuery, tak
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
+import * as shareContract from '@shared/contracts/share.contract';
 import tpStyles from './TimePointsSelector.module.css';
 import styles from './GridComponent.module.css';
 import EditTimepointModal from './EditTimepointModal';
@@ -18,13 +19,26 @@ import PhotoSessionDialog from './PhotoSessionDialog';
 import TimepointActionsMenu, { type DeleteScope, type FolderState } from './TimepointActionsMenu';
 import SessionListMenu from './SessionListMenu';
 import ShareSheet from './share/ShareSheet';
+import SlotContextMenu, { type SlotMenuItem } from './photo-editor/SlotContextMenu';
 import type { ShareSource } from './localsend/LocalSendShareModal';
 import { encodeRelPath, buildWorkingContentUrl } from './files/fileHelpers';
-import { parseViewTag, type PhotoViewCode } from '@shared/photo-views';
+import { parseViewTag, VIEW_CODES, type PhotoViewCode } from '@shared/photo-views';
 import { sessionFolderName } from '@shared/photo-session-folder';
 import { formatPhotoTakenAt } from '@/utils/formatters';
+import {
+    canCopyImage,
+    copyPhoto,
+    photoAsJpeg,
+    photoFileName,
+    saveBlob,
+    sessionZipName,
+    zipFiles,
+    type EyeBar,
+    type PhotoNameParts,
+} from '@/utils/photoExport';
 import sseAppointments from '../../services/sse-appointments';
 import { useDragScroll } from '../../hooks/useDragScroll';
+import { anchorFrom } from '../../hooks/useFloatingMenu';
 import { rememberPhotoTab } from '../../hooks/useLastPhotoTab';
 import PhotoSwipeLightbox from 'photoswipe/lightbox';
 import type { PhotoSwipe as PhotoSwipeInstance } from 'photoswipe/lightbox';
@@ -113,6 +127,10 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
     // LocalSend share modal — opened imperatively from the lightbox toolbar.
     const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
+    // Right-click menu on a grid photo (copy / download / open / send), and the
+    // "Download all" zip in progress.
+    const [photoMenu, setPhotoMenu] = useState<{ view: PhotoViewCode; x: number; y: number } | null>(null);
+    const [zipping, setZipping] = useState(false);
     // Time-point edit/delete UI state.
     const [menuFor, setMenuFor] = useState<{ tp: Timepoint; x: number; y: number } | null>(null);
     // Originals-folder existence for the open menu (null = still checking).
@@ -223,25 +241,26 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         { id: 'lf', view: 'i21', alt: 'Left' }
     ];
 
-    // File name mapping for share
-    const fileNameMap: Record<string, string> = {
-        'i10': 'Profile.jpg',
-        'i12': 'Rest.jpg',
-        'i13': 'Smile.jpg',
-        'i23': 'Upper.jpg',
-        'i24': 'Lower.jpg',
-        'i20': 'Right.jpg',
-        'i22': 'Center.jpg',
-        'i21': 'Left.jpg'
+    // What an exported photo is called: `{patient}_{session}_{view}.jpg` — the view
+    // alone ("Smile.jpg") collided across every patient and session in a Downloads
+    // folder. Read from the query cache at call time: the lightbox buttons run outside
+    // React's tree, from the render that built them, which can predate the session list.
+    const exportNameParts = (): PhotoNameParts => {
+        const patient = queryClient.getQueryData<patientContract.PatientInfo>(qk.patient.info(personId ?? ''));
+        const session = (queryClient.getQueryData<Timepoint[]>(qk.patient.timepoints(personId ?? '')) ?? [])
+            .find((tp) => tp.tp_code === tpCode);
+        return {
+            patientName: patient?.name || patient?.patient_name || (personId ? `Patient ${personId}` : null),
+            session: session
+                ? sessionFolderName(session.tp_description, session.tp_date_time) ?? session.tp_description
+                : null,
+        };
     };
 
-    // Get descriptive filename from image URL
+    // The export name for a photo given its /DolImgs URL.
     const getShareFileName = (imageUrl: string): string => {
-        // Drop any `?v=` cache-bust token before parsing the extension.
-        const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1).split('?')[0];
-        const extensionMatch = fileName.match(/\.([^.]+)$/);
-        const extension = extensionMatch ? extensionMatch[1] : '';
-        return fileNameMap[extension] || `patient_${personId}_photo.jpg`;
+        const view = getFileNameFromUrl(imageUrl).match(/\.(i\d+)$/i)?.[1]?.toLowerCase();
+        return view ? photoFileName(exportNameParts(), view) : `patient_${personId}_photo.jpg`;
     };
 
     // Pre-fetch blob for current slide (called on slide change, mobile only)
@@ -365,6 +384,128 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         personId
             ? buildWorkingContentUrl(personId, image.name, { thumb: 480, v: image.mtime })
             : fullResUrl(image);
+
+    // ── Taking photos out of the app: the grid's right-click menu + "Download all" ──
+    // All of it works from the full-resolution render (a copy is capped at
+    // COPY_MAX_EDGE — see photoExport). The browser's own "Copy image" / "Save image as"
+    // on a cell act on the 480px thumbnail above.
+
+    // The eye bar a view carries while Anonymize is on. It is drawn into whatever
+    // leaves the app, so a copy or a download matches the grid it was taken from.
+    const eyeBarFor = (view: PhotoViewCode): EyeBar | null =>
+        anonymize && EXTRA_ORAL_VIEWS.has(view) ? { top: ANON_BAR_TOP, height: ANON_BAR_HEIGHT } : null;
+
+    const copyPhotoToClipboard = async (view: PhotoViewCode, image: GalleryView) => {
+        // Re-encoding a render as PNG takes a second or so. Say so: a paste made
+        // straight away gets whatever was on the clipboard before.
+        const working = toast.info('Copying photo…', 30_000);
+        try {
+            await copyPhoto(fullResUrl(image), eyeBarFor(view));
+            toast.success('Photo copied');
+        } catch {
+            toast.error('Could not copy the photo');
+        } finally {
+            toast.removeToast(working);
+        }
+    };
+
+    const downloadPhoto = async (view: PhotoViewCode, image: GalleryView) => {
+        try {
+            saveBlob(await photoAsJpeg(fullResUrl(image), eyeBarFor(view)), photoFileName(exportNameParts(), view));
+        } catch {
+            toast.error('Could not download the photo');
+        }
+    };
+
+    // Every rendered view of this session, in grid order, as one zip.
+    const downloadAllPhotos = async () => {
+        if (!gallery || zipping) return;
+        setZipping(true);
+        try {
+            const parts = exportNameParts();
+            const files = await Promise.all(
+                VIEW_CODES.flatMap((view) => {
+                    const image = gallery[view];
+                    if (!image) return [];
+                    return [
+                        photoAsJpeg(fullResUrl(image), eyeBarFor(view)).then((blob) => ({
+                            name: photoFileName(parts, view),
+                            blob,
+                        })),
+                    ];
+                })
+            );
+            saveBlob(await zipFiles(files), sessionZipName(parts));
+        } catch {
+            toast.error('Could not download the photos');
+        } finally {
+            setZipping(false);
+        }
+    };
+
+    // Hand a photo to the share sheet (LocalSend / Telegram). Those transports read the
+    // file from the server's disk, so a photo carrying an eye bar — which exists only in
+    // this browser — is staged first, the way Compare stages its montage.
+    const sharePhoto = async (view: PhotoViewCode, image: GalleryView) => {
+        if (!personId) return;
+        // The sheet is a modal in #modal-root, which native fullscreen hides.
+        if (fsMode === 'native') exitFullscreen();
+        const displayName = photoFileName(exportNameParts(), view);
+        const eyeBar = eyeBarFor(view);
+        if (!eyeBar) {
+            setShareSources([{ source: 'patient-image', personId, ref: image.name, displayName }]);
+            return;
+        }
+        try {
+            const fd = new FormData();
+            fd.append('image', await photoAsJpeg(fullResUrl(image), eyeBar), displayName);
+            fd.append('personId', String(personId));
+            fd.append('displayName', displayName);
+            const staged = await postFormData<shareContract.StageResponse>('/api/share/stage', fd, {
+                schema: shareContract.stage.response,
+                timeoutMs: 120_000,
+            });
+            setShareSources([{ source: 'staged', personId, ref: staged.ref, displayName: staged.displayName }]);
+        } catch (err) {
+            toast.error(httpErrorMessage(err, 'Failed to prepare the photo for sharing'));
+        }
+    };
+
+    const menuImage = photoMenu ? gallery?.[photoMenu.view] ?? null : null;
+    const photoMenuItems = (view: PhotoViewCode, image: GalleryView): SlotMenuItem[] => {
+        const barred = !!eyeBarFor(view);
+        const covered = barred ? ' (eyes covered)' : '';
+        const copyable = canCopyImage();
+        return [
+            {
+                key: 'copy',
+                // No async clipboard on a plain-http origin.
+                label: copyable ? `Copy image${covered}` : 'Copy image — needs the https:// address',
+                icon: 'fa-copy',
+                disabled: !copyable,
+                onClick: () => void copyPhotoToClipboard(view, image),
+            },
+            {
+                key: 'download',
+                label: `Download${covered}`,
+                icon: 'fa-download',
+                onClick: () => void downloadPhoto(view, image),
+            },
+            {
+                key: 'open',
+                // The stored file itself, so this one cannot carry the bar.
+                label: barred ? 'Open in new tab (without the eye bar)' : 'Open in new tab',
+                icon: 'fa-external-link-alt',
+                onClick: () => window.open(fullResUrl(image), '_blank', 'noopener'),
+            },
+            {
+                key: 'send',
+                label: `Send to a device or Telegram${covered}`,
+                icon: 'fa-share-alt',
+                onClick: () => void sharePhoto(view, image),
+            },
+        ];
+    };
 
     // Initialize PhotoSwipe once the gallery is on screen. This effect runs after the
     // gallery DOM is committed, so the anchors already exist when there are real
@@ -1060,6 +1201,19 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 ].filter(Boolean).join(' ')}
             >
             <div className={styles.layoutControls}>
+                {/* Not while presenting: fullscreen shows the layout, nothing to export. */}
+                {!fsActive && (
+                    <button
+                        type="button"
+                        className={styles.layoutToolBtn}
+                        onClick={() => void downloadAllPhotos()}
+                        disabled={zipping || switching}
+                        title={anonymize ? 'Download all photos (zip) — eyes covered' : 'Download all photos (zip)'}
+                        aria-label="Download all photos as a zip"
+                    >
+                        <i className={`fas ${zipping ? 'fa-spinner fa-spin' : 'fa-download'}`} aria-hidden="true"></i>
+                    </button>
+                )}
                 <button
                     type="button"
                     className={`${styles.layoutToolBtn} ${anonymize ? styles.layoutToolBtnActive : ''}`}
@@ -1152,6 +1306,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             target="_blank"
                             rel="noreferrer"
                             className={styles.galleryCell}
+                            onContextMenu={(e) => {
+                                // Shift + right-click keeps the browser's own menu.
+                                if (e.shiftKey) return;
+                                e.preventDefault();
+                                // Mid-switch the cell still shows the previous session's photo.
+                                if (switching || !cell.view) return;
+                                setPhotoMenu({ view: cell.view, ...anchorFrom(e) });
+                            }}
                         >
                             <img
                                 id={cell.id}
@@ -1193,6 +1355,17 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                     );
                 })}
             </div>
+            {/* Inside the wrapper so it shows in native fullscreen; outside the gallery so
+                a click on it is not a lightbox click. The photo is looked up by view, so the
+                menu always acts on the render that is on screen now. */}
+            {photoMenu && menuImage && (
+                <SlotContextMenu
+                    x={photoMenu.x}
+                    y={photoMenu.y}
+                    items={photoMenuItems(photoMenu.view, menuImage)}
+                    onClose={() => setPhotoMenu(null)}
+                />
+            )}
             </div>
             )}
 

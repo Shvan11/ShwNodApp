@@ -68,6 +68,14 @@
   color: var(--text-primary);
 }
 
+.layoutToolBtn:disabled,
+.layoutToolBtn:disabled:hover {
+  background: var(--surface);
+  color: var(--text-secondary);
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* Anonymize toggle ON — red privacy accent, matching the visibility badge. */
 .layoutToolBtnActive,
 .layoutToolBtnActive:hover {

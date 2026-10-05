@@ -642,7 +642,7 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
         <main
           className={styles.gridArea}
           onClick={(e) => {
-            if (!(e.target as HTMLElement).closest('[data-slot-cell]')) setActiveView(null);
+            if (!(e.target as HTMLElement).closest('[data-slot-cell], [data-slot-menu]')) setActiveView(null);
           }}
         >
           <SlotGrid

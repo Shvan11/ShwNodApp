@@ -161,9 +161,9 @@ export function slotsReducer(state: SlotMap, action: Action): SlotMap {
       const p = slot.pendingFraming;
       if (!p) return put({ ...slot, mediaSize: action.size });
       // A pending framing was just applied by this load (initialCroppedAreaPercentages,
-      // right before this callback). Take its frame as the slot's: the cropper re-emits
-      // it only if the zoom moved, and its earlier emission on this load was the frame
-      // from BEFORE the restore.
+      // right before this callback). Take its frame as the slot's: the cropper reports
+      // it only if the pan or zoom moved, and a restore that lands where the cropper
+      // already stood would leave the slot holding the frame from BEFORE it.
       return put({
         ...slot,
         mediaSize: action.size,

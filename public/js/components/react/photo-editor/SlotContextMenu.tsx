@@ -36,6 +36,10 @@ const SlotContextMenu = ({ x, y, items, onClose }: Props) => {
       className={styles.menu}
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
       role="menu"
+      // Not "empty space": PhotoEditor clears the selected slot on a click outside a
+      // cell, and this menu is drawn outside one — "Continue editing" selected its
+      // slot and lost it again in the same click.
+      data-slot-menu=""
       tabIndex={-1}
       aria-label="Photo slot actions"
       onKeyDown={onKeyDown}

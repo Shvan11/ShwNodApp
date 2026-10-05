@@ -228,7 +228,7 @@ const SlotGrid = ({
                 proxyMode={proxyMode}
                 onCropChange={(c) => editor.setCrop(view, c)}
                 onZoomChange={(z) => editor.setZoom(view, z)}
-                onCropComplete={(area, pixels) => editor.setCropped(view, area, pixels)}
+                onFrameChange={(area, pixels) => editor.setCropped(view, area, pixels)}
                 onMediaLoaded={(s) => editor.setMediaSize(view, s)}
                 overlayUrl={overlayUrls[view] ?? null}
                 overlayOpacity={overlayOpacity}

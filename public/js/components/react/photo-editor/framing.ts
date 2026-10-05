@@ -3,7 +3,7 @@
  * readout), whether it differs from what is saved (the unsaved-changes guard and
  * Save), and the cropper geometry needed to re-apply a recorded framing.
  *
- * Geometry follows react-easy-crop (5.x): a framing is a frame rectangle in % of the
+ * Geometry follows react-easy-crop (6.x): a framing is a frame rectangle in % of the
  * bounding box of the photo after its flips and its rotation (`croppedAreaPercentages`).
  * The photo is turned clockwise by `rotation` degrees (CSS `rotate()`), and the render
  * (services/imaging/photo-render.service.ts) cuts the same rectangle at native
@@ -38,9 +38,9 @@ export function rotatedSize(width: number, height: number, rotation: number): Si
 /**
  * The frame in the media's natural pixels: what react-easy-crop reports as
  * `croppedAreaPixels` for these percentages (its `computeCroppedArea`, position
- * unrestricted). Applying a recorded framing needs it because the cropper re-emits the
- * rect only when the zoom changes — a restore that lands on the same zoom would leave
- * the slot holding the frame from before the restore.
+ * unrestricted). Applying a recorded framing needs it because the cropper reports the
+ * rect only when the pan or zoom changes — a restore that lands on the same pan and zoom
+ * would leave the slot holding the frame from before the restore.
  */
 export function areaToPixels(area: FramingArea, natural: Size, rotation: number, aspect: number): CropArea {
   const bbox = rotatedSize(natural.width, natural.height, rotation);
