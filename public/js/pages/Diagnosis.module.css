@@ -39,8 +39,8 @@
 }
 
 .btnBack:hover {
-    background: var(--primary-color);
-    color: var(--background-primary);
+    background: var(--primary-fill);
+    color: var(--color-white);
     transform: translateX(-2px);
 }
 
@@ -84,7 +84,7 @@
 }
 
 .diagnosisTab:hover {
-    color: var(--primary-color);
+    color: var(--blue-700);
     background: var(--background-secondary);
 }
 
@@ -233,18 +233,18 @@
 }
 
 .btnCancel:hover:not(:disabled) {
-    background: var(--error-color);
-    color: var(--background-primary);
-    border-color: var(--error-color);
+    background: var(--error-fill);
+    color: var(--color-white);
+    border-color: var(--error-fill);
 }
 
 .btnSave {
-    background: var(--success-color);
-    color: var(--background-primary);
+    background: var(--success-fill);
+    color: var(--color-white);
 }
 
 .btnSave:hover:not(:disabled) {
-    background: var(--success-dark);
+    background: var(--success-fill-hover);
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
 }
@@ -386,7 +386,7 @@
 }
 
 .deleteButton {
-    background-color: var(--error-color);
+    background-color: var(--error-fill);
     color: var(--color-white);
     /* Push the destructive action to the far start, away from Cancel/Save */
     margin-inline-end: auto;

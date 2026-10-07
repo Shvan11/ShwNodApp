@@ -110,7 +110,7 @@
 
 .loadingSpinner {
     font-size: var(--font-size-4xl);
-    color: var(--blue-300);
+    color: var(--blue-700);
     margin-bottom: var(--spacing-md);
 }
 
@@ -222,7 +222,7 @@
 
 .sortBtnActive {
     background-color: var(--surface);
-    color: var(--primary-color);
+    color: var(--blue-700);
     box-shadow: var(--shadow-sm);
     font-weight: var(--font-weight-semibold);
 }
@@ -413,28 +413,28 @@
 
 .actionButtons .rowActionSuccess:hover,
 .actionButtons .rowActionSuccess:focus-visible {
-    color: var(--success-600);
+    color: var(--success-700);
     border-color: var(--success-500);
     background-color: var(--success-50);
 }
 
 .actionButtons .rowActionPrimary:hover,
 .actionButtons .rowActionPrimary:focus-visible {
-    color: var(--blue-600);
+    color: var(--blue-700);
     border-color: var(--blue-500);
     background-color: var(--blue-50);
 }
 
 .actionButtons .rowActionWarning:hover,
 .actionButtons .rowActionWarning:focus-visible {
-    color: var(--warning-600);
+    color: var(--warning-700);
     border-color: var(--warning-500);
     background-color: var(--warning-50);
 }
 
 .actionButtons .rowActionDanger:hover,
 .actionButtons .rowActionDanger:focus-visible {
-    color: var(--error-600);
+    color: var(--error-700);
     border-color: var(--error-500);
     background-color: var(--error-50);
 }
@@ -472,7 +472,7 @@
 }
 
 .deleteModalWarning i {
-    color: var(--error-500);
+    color: var(--error-700);
     margin-right: var(--spacing-xs);
 }
 
@@ -518,7 +518,7 @@
     display: inline-flex;
     align-items: center;
     padding: var(--spacing-xs) var(--spacing-sm);
-    background-color: var(--primary-color);
+    background-color: var(--primary-fill);
     color: var(--color-white);
     border-radius: var(--radius-full);
     font-size: var(--font-size-xs);
@@ -571,7 +571,7 @@
 
 .filterChipRemove:hover {
     background-color: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
 }
 
 .advancedFiltersGrid {

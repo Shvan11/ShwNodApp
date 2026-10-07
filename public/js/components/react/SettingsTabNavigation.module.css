@@ -21,7 +21,7 @@
     margin: 0;
     font-weight: 700;
     letter-spacing: -0.5px;
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
 }
 
 /* Tab Buttons Container - No Scrollbar, Responsive Wrapping */
@@ -59,12 +59,12 @@
 
 .button:hover {
     background: color-mix(in oklch, var(--color-purple-light) 8%, transparent);
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     transform: translateY(-2px);
 }
 
 .button.active {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     background: linear-gradient(
         135deg,
         color-mix(in oklch, var(--color-purple-light) 10%, transparent) 0%,

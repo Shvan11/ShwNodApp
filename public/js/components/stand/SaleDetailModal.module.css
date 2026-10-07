@@ -131,7 +131,7 @@
 }
 
 .profitValue {
-  color: var(--success-600);
+  color: var(--success-700);
   font-weight: var(--font-weight-bold);
 }
 
@@ -199,7 +199,7 @@
 
 .voidReasonText {
   font-size: var(--font-size-sm);
-  color: var(--error-600);
+  color: var(--error-700);
   margin: 0;
 }
 
@@ -243,16 +243,16 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-white);
-  background: var(--error-600);
-  border: 1px solid var(--error-600);
+  background: var(--error-fill);
+  border: 1px solid var(--error-fill);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .btnVoid:hover {
-  background: var(--error-700);
-  border-color: var(--error-700);
+  background: var(--error-fill-hover);
+  border-color: var(--error-fill-hover);
 }
 
 /* Loading state */

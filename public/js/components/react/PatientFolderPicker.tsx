@@ -52,21 +52,21 @@ const PatientFolderPicker = ({ personId, selectedRelPath, onSelect }: Props) => 
                     disabled={!listing || listing.parent == null}
                     title="Up one folder"
                 >
-                    <i className="fas fa-arrow-up" /> Up
+                    <i className="fas fa-arrow-up" aria-hidden="true" /> Up
                 </button>
                 <span className={styles.breadcrumb} title={listing?.path || 'Patient folder'}>
-                    <i className="fas fa-folder-open" />{' '}
+                    <i className="fas fa-folder-open" aria-hidden="true" />{' '}
                     {listing?.path ? listing.path : 'Patient folder'}
                 </span>
             </div>
 
             {loading ? (
                 <div className={styles.state}>
-                    <i className="fas fa-spinner fa-spin" /> Loading…
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true" /> Loading…
                 </div>
             ) : error ? (
                 <div className={styles.state}>
-                    <i className="fas fa-exclamation-triangle" /> {error}
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true" /> {error}
                     <button type="button" className={styles.retryBtn} onClick={() => refetch()}>
                         Retry
                     </button>
@@ -85,7 +85,7 @@ const PatientFolderPicker = ({ personId, selectedRelPath, onSelect }: Props) => 
                                     onClick={() => setCurrentPath(entry.relPath)}
                                 >
                                     <span className={styles.thumb}>
-                                        <i className={`fas fa-folder ${styles.folderIcon}`} />
+                                        <i className={`fas fa-folder ${styles.folderIcon}`} aria-hidden="true" />
                                     </span>
                                     <span className={styles.name} title={entry.name}>{entry.name}</span>
                                 </button>
@@ -111,11 +111,11 @@ const PatientFolderPicker = ({ personId, selectedRelPath, onSelect }: Props) => 
                                             onError={() => markThumbError(entry.relPath)}
                                         />
                                     ) : (
-                                        <i className={`fas ${categoryIcon(entry)} ${styles.fileIcon}`} />
+                                        <i className={`fas ${categoryIcon(entry)} ${styles.fileIcon}`} aria-hidden="true" />
                                     )}
                                     {isSelected && (
                                         <span className={styles.check}>
-                                            <i className="fas fa-check-circle" />
+                                            <i className="fas fa-check-circle" aria-hidden="true" />
                                         </span>
                                     )}
                                 </span>

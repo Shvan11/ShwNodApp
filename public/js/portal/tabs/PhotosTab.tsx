@@ -7,6 +7,7 @@ import {
 import { portalGet } from '../portalApi';
 import { formatLocaleDate } from '../../utils/formatters';
 import styles from '../portal.module.css';
+import PortalIcon from '../PortalIcon';
 
 // English, like the rest of the portal's text — never the phone's own locale,
 // which on an Arabic phone renders Arabic-Indic digits (audit FE-F3-3).
@@ -161,7 +162,7 @@ const PhotosTab = () => {
     return (
       <div className={styles.tabPanel}>
         <div className={styles.emptyState}>
-          <i className={`fas fa-camera ${styles.emptyIcon}`} aria-hidden="true" />
+          <PortalIcon name="camera" className={styles.emptyIcon} />
           <p>No photos have been shared yet.</p>
         </div>
       </div>
@@ -244,7 +245,7 @@ const PhotosTab = () => {
               closePhoto();
             }}
           >
-            <i className="fas fa-times" aria-hidden="true" />
+            <PortalIcon name="close" />
           </button>
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss */}
           <img

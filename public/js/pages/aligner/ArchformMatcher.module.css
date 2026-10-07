@@ -29,7 +29,7 @@
 
 .searchBox input:focus {
     outline: none;
-    border-color: var(--blue-300);
+    border-color: var(--blue-600);
     box-shadow: var(--shadow-focus);
 }
 
@@ -203,15 +203,15 @@
     border: none;
     border-radius: var(--radius-md);
     cursor: pointer;
-    background-color: var(--success-color);
+    background-color: var(--success-fill);
     color: var(--color-white);
     font-weight: var(--font-weight-semibold);
     transition: var(--transition-base);
     white-space: nowrap;
 }
 
-.btnSave:hover {
-    opacity: 0.9;
+.btnSave:hover:not(:disabled) {
+    background: var(--success-fill-hover);
 }
 
 .btnSave:disabled {
@@ -226,7 +226,7 @@
     border-radius: var(--radius-md);
     cursor: pointer;
     background-color: var(--surface);
-    color: var(--error-color);
+    color: var(--error-700);
     font-weight: var(--font-weight-semibold);
     transition: var(--transition-base);
     white-space: nowrap;
@@ -283,7 +283,7 @@
 }
 
 .btnEdit:hover {
-    color: var(--primary-color);
+    color: var(--blue-700);
     background-color: var(--primary-100);
 }
 
@@ -305,7 +305,7 @@
 }
 
 .btnAutoRename:hover {
-    color: var(--warning-color);
+    color: var(--warning-800);
     background-color: var(--warning-100);
 }
 
@@ -354,6 +354,7 @@
 
 .btnSaveEdit:hover {
     background-color: var(--success-100);
+    color: var(--success-700);
 }
 
 .btnCancelEdit {
@@ -383,7 +384,7 @@
 }
 
 .btnEditPatient:hover {
-    color: var(--primary-color);
+    color: var(--blue-700);
     border-color: var(--primary-color);
     background-color: var(--primary-100);
 }
@@ -401,7 +402,7 @@
 }
 
 .btnDelete:hover {
-    color: var(--error-color);
+    color: var(--error-700);
     border-color: var(--error-color);
     background-color: var(--error-100);
 }
@@ -446,7 +447,7 @@
 
 .spinner {
     border: 4px solid var(--gray-100);
-    border-top: 4px solid var(--blue-300);
+    border-top: 4px solid var(--blue-600);
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -470,7 +471,7 @@
     font-size: 3rem;
     margin-bottom: 1rem;
     display: block;
-    color: var(--warning-color);
+    color: var(--warning-800);
 }
 
 .unavailableState h3 {
@@ -511,7 +512,7 @@
 .btnRetry {
     margin-top: var(--spacing-md);
     padding: 0.6rem 1.2rem;
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
@@ -521,7 +522,7 @@
 }
 
 .btnRetry:hover {
-    opacity: 0.9;
+    background: var(--primary-fill-hover);
 }
 
 /* Responsive */

@@ -4,7 +4,7 @@
  *
  * A timepoint has two footprints (see docs/photo-sessions.md):
  *   1. Rendered gallery files in the shared `working/` dir, named
- *      `{pid}0{tpCode}.{view}` — keyed by tpCode, what getImageSizes reads.
+ *      `{pid}{tpCode:02}.{view}` — keyed by tpCode, what getImageSizes reads.
  *   2. An optional originals folder `clinic1/{pid}/{tpName}_{DD-MM-YYYY}/` —
  *      keyed by name + date (the rename/delete of THAT folder is done via the
  *      file-explorer service; this module only computes its name).
@@ -28,7 +28,7 @@ export function timepointFolderName(tpName: string | null, tpDate: string | null
 
 /**
  * Permanently remove a timepoint's rendered gallery files from the shared
- * `working/` dir: `working/{pid}0{tpCode}.{view}` for every known view code.
+ * `working/` dir: `working/{pid}{tpCode:02}.{view}` for every known view code.
  * Best-effort per file (`force` ⇒ a missing file is fine); a real error (e.g.
  * a locked file) is logged but never thrown, so DB-authoritative deletion isn't
  * blocked by a filesystem hiccup. Names come from `workingFileNameVariants` over
@@ -63,7 +63,7 @@ export async function deleteWorkingFilesForTimepoint(
  * (used by the patient delete — patient-queries.ts#deletePatient only removes DB
  * rows + the originals folder, not these flat shared files). Takes the patient's
  * tpCodes (read before the DB cascade dropped them) and clears each via the
- * exact-filename helper — exact names, never a `{personId}0*` glob, because
+ * exact-filename helper — exact names, never a `{personId}*` glob, because
  * personIds can prefix each other (e.g. 71 vs 710) and collide in that scheme.
  */
 export async function deleteWorkingFilesForPatient(

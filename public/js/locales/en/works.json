@@ -27,6 +27,7 @@
     "addWork": "Add New Work"
   },
   "filter": {
+    "label": "Filter works by status",
     "all": "All Works",
     "active": "Active",
     "completed": "Completed",
@@ -184,6 +185,7 @@
     "namePlaceholder": "Type a name…",
     "phoneIdPlaceholder": "Phone or ID…",
     "pickHint": "Pick a patient from the list",
+    "lookupFailed": "Suggestions could not be loaded",
     "groupId": "ID",
     "groupPhone": "Phone",
     "loadingPreview": "Loading preview...",

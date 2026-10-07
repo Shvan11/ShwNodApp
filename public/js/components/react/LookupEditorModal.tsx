@@ -148,6 +148,10 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
         e.preventDefault();
+        // React bubbles a portal's events through the COMPONENT tree: opened from a
+        // dropdown that sits inside a form (the right-click manager), this submit would
+        // go on to submit that form too — saving and closing the dialog underneath.
+        e.stopPropagation();
         if (isSaving || !validate()) return;
 
         setIsSaving(true);
@@ -278,7 +282,7 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                 <>
                     <ModalHeader
                         titleId={TITLE_ID}
-                        icon={<i className={isEditMode ? 'fas fa-edit' : 'fas fa-plus'} />}
+                        icon={<i className={isEditMode ? 'fas fa-edit' : 'fas fa-plus'} aria-hidden="true" />}
                         title={isEditMode ? `Edit ${singularName}` : `Add ${singularName}`}
                         onClose={dismiss}
                         dense
@@ -325,12 +329,12 @@ const LookupEditorModal: React.FC<LookupEditorModalProps> = ({ isOpen, onClose, 
                             >
                                 {isSaving ? (
                                     <>
-                                        <i className="fas fa-spinner fa-spin"></i>
+                                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                         Saving...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fas fa-save"></i>
+                                        <i className="fas fa-save" aria-hidden="true"></i>
                                         {isEditMode ? 'Update' : 'Create'}
                                     </>
                                 )}

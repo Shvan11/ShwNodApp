@@ -110,7 +110,7 @@ function clampInt(v: number, lo: number, hi: number): number {
 let tmpSeq = 0;
 
 /**
- * Render one slot to `working/{personId}0{tpCode}.{view}` (lowercase, matching
+ * Render one slot to `working/{personId}{tpCode:02}.{view}` (lowercase, matching
  * getImageSizes). Atomic temp-file + rename on the working/ volume (no EXDEV).
  * Returns the written filename.
  */
@@ -332,7 +332,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
 }
 
 /**
- * Delete a single rendered view file `working/{personId}0{tpCode}.{view}` (the
+ * Delete a single rendered view file `working/{personId}{tpCode:02}.{view}` (the
  * cropped output) — backs the photo editor's per-view "Remove". Idempotent: a
  * missing file is a no-op. Guards mirror renderSlotToWorking so only a valid
  * (personId, tpCode, view) can ever form the path. Clears the legacy uppercase

@@ -244,20 +244,20 @@ const WorkDetailItem = ({
                                 onClick={() => setLabModalOpen(true)}
                                 title="Open lab case tracker"
                             >
-                                <i className="fas fa-flask"></i>{' '}
+                                <i className="fas fa-flask" aria-hidden="true"></i>{' '}
                                 {labBadgeText(detail)}
                             </button>
                         ) : (
                             <button type="button" className="btn btn-xs btn-secondary" onClick={() => setLabModalOpen(true)} title="Start Lab Flow">
-                                <i className="fas fa-flask"></i> Start Lab Flow
+                                <i className="fas fa-flask" aria-hidden="true"></i> Start Lab Flow
                             </button>
                         )
                     )}
                     <button type="button" className="btn btn-xs btn-secondary" title="Edit" onClick={enterEdit}>
-                        <i className="fas fa-pen"></i>
+                        <i className="fas fa-pen" aria-hidden="true"></i>
                     </button>
                     <button type="button" className="btn btn-xs btn-danger" title="Delete" onClick={handleDelete}>
-                        <i className="fas fa-trash"></i>
+                        <i className="fas fa-trash" aria-hidden="true"></i>
                     </button>
                 </div>
                 {isProstheticWork(typeOfWork) && (
@@ -329,7 +329,7 @@ const WorkDetailItem = ({
     return (
         <form className={cn(styles.card, styles.editCard)} onSubmit={handleSubmit}>
             <div className={styles.editTitle}>
-                <i className={config.icon}></i>
+                <i className={config.icon} aria-hidden="true"></i>
                 {' '}{isNew ? `New ${config.name} Item` : `Edit ${config.name} Item`}
             </div>
 

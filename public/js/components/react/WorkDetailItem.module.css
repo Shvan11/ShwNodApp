@@ -29,7 +29,7 @@
     padding: 0.125rem 0.5rem;
     border: none;
     border-radius: var(--radius-full);
-    background: var(--info-color);
+    background: var(--info-fill);
     color: var(--color-white);
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);

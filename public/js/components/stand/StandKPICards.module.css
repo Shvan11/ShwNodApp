@@ -34,7 +34,6 @@
 .cardLabel {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  opacity: 0.9;
   margin-bottom: var(--spacing-xs);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
@@ -49,29 +48,29 @@
 .cardCurrency {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-normal);
-  opacity: 0.8;
   margin-left: var(--spacing-xs);
 }
 
-/* Gradient variants */
+/* Gradient variants. BOTH stops carry the white text at 4.5:1: each used to run
+   out to a 300/400 pastel, where the figures read 1.5–2.5:1 (the teal card 1.4). */
 .purple {
-  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  background: linear-gradient(135deg, var(--palette-indigo-700), var(--purple-fill));
 }
 
 .blue {
-  background: linear-gradient(135deg, #2563eb, #60a5fa);
+  background: linear-gradient(135deg, var(--palette-blue-700), var(--palette-blue-600));
 }
 
 .green {
-  background: linear-gradient(135deg, #059669, #34d399);
+  background: linear-gradient(135deg, var(--palette-green-800), var(--palette-green-700));
 }
 
 .orange {
-  background: linear-gradient(135deg, #ea580c, #fb923c);
+  background: linear-gradient(135deg, var(--palette-orange-800), var(--palette-orange-700));
 }
 
 .teal {
-  background: linear-gradient(135deg, #0d9488, #5eead4);
+  background: linear-gradient(135deg, var(--palette-cyan-800), var(--palette-cyan-700));
 }
 
 /* Expiring soon badge */

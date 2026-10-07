@@ -24,7 +24,7 @@ export default function SalesHistoryTable({ sales, loading, canVoid, onView, onV
     <div className={styles.container}>
       <div className={styles.header}>
         <h3 className={styles.title}>
-          <i className="fas fa-history" />
+          <i className="fas fa-history" aria-hidden="true" />
           Sales History
         </h3>
       </div>
@@ -35,7 +35,7 @@ export default function SalesHistoryTable({ sales, loading, canVoid, onView, onV
         </div>
       ) : sales.length === 0 ? (
         <div className={styles.emptyState}>
-          <i className="fas fa-receipt" />
+          <i className="fas fa-receipt" aria-hidden="true" />
           <p>No sales found</p>
         </div>
       ) : (
@@ -100,7 +100,7 @@ export default function SalesHistoryTable({ sales, loading, canVoid, onView, onV
                           type="button"
                           title="View details"
                         >
-                          <i className="fas fa-eye" />
+                          <i className="fas fa-eye" aria-hidden="true" />
                           View
                         </button>
                         {!voided && canVoid && (
@@ -110,7 +110,7 @@ export default function SalesHistoryTable({ sales, loading, canVoid, onView, onV
                             type="button"
                             title="Void sale"
                           >
-                            <i className="fas fa-ban" />
+                            <i className="fas fa-ban" aria-hidden="true" />
                             Void
                           </button>
                         )}

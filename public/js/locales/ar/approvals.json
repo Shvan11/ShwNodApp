@@ -16,6 +16,23 @@
     "failed": "فشل",
     "stale": "لم يعد صالحًا"
   },
+  "summary": {
+    "workUpdate": "تعديل المعالجة رقم {{id}}",
+    "discountApply": "تطبيق خصم على المعالجة رقم {{id}}",
+    "discountRemove": "إزالة الخصم من المعالجة رقم {{id}}",
+    "workDelete": "حذف المعالجة رقم {{id}}",
+    "invoiceDelete": "حذف الدفعة رقم {{id}}",
+    "expenseUpdate": "تعديل المصروف رقم {{id}}",
+    "expenseDelete": "حذف المصروف رقم {{id}}",
+    "patientDelete": "حذف المريض رقم {{id}}"
+  },
+  "note": {
+    "superseded": "استُبدل بطلب أحدث",
+    "unknownAction": "نوع إجراء غير معروف",
+    "targetMissing": "السجل لم يعد موجودًا",
+    "targetChanged": "تغيّر السجل بعد تقديم الطلب",
+    "applyError": "خطأ في التطبيق: {{reason}}"
+  },
   "patientFallback": "المريض رقم {{id}}",
   "openPatient": "فتح {{name}} ← المعالجات",
   "bell": {

@@ -94,10 +94,10 @@ const ManageConfigsModal = ({ personId, configs, onRename, onDelete, onClose }: 
               onChange={(e) => setEditName(e.target.value)}
             />
             <button type="submit" className={styles.iconBtn} disabled={!editName.trim() || busy} title="Save">
-              <i className="fas fa-check" />
+              <i className="fas fa-check" aria-hidden="true" />
             </button>
             <button type="button" className={styles.iconBtn} onClick={cancelEdit} disabled={busy} title="Cancel">
-              <i className="fas fa-times" />
+              <i className="fas fa-times" aria-hidden="true" />
             </button>
           </form>
         </li>
@@ -116,10 +116,10 @@ const ManageConfigsModal = ({ personId, configs, onRename, onDelete, onClose }: 
               disabled={busy}
               title="Confirm delete"
             >
-              <i className="fas fa-trash" /> Delete
+              <i className="fas fa-trash" aria-hidden="true" /> Delete
             </button>
             <button type="button" className={styles.iconBtn} onClick={() => setConfirmId(null)} disabled={busy} title="Cancel">
-              <i className="fas fa-times" />
+              <i className="fas fa-times" aria-hidden="true" />
             </button>
           </div>
         </li>
@@ -138,7 +138,7 @@ const ManageConfigsModal = ({ personId, configs, onRename, onDelete, onClose }: 
         </div>
         <div className={styles.rowActions}>
           <button type="button" className={styles.iconBtn} onClick={() => startEdit(c)} title="Rename" aria-label={`Rename ${c.name}`}>
-            <i className="fas fa-pen" />
+            <i className="fas fa-pen" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -150,7 +150,7 @@ const ManageConfigsModal = ({ personId, configs, onRename, onDelete, onClose }: 
             title="Delete"
             aria-label={`Delete ${c.name}`}
           >
-            <i className="fas fa-trash" />
+            <i className="fas fa-trash" aria-hidden="true" />
           </button>
         </div>
       </li>
@@ -162,7 +162,7 @@ const ManageConfigsModal = ({ personId, configs, onRename, onDelete, onClose }: 
       <ModalHeader
         title="Manage saved presentations"
         titleId="slideshow-manage-title"
-        icon={<i className="fas fa-sliders" />}
+        icon={<i className="fas fa-sliders" aria-hidden="true" />}
         onClose={onClose}
       />
       <div className={styles.body}>

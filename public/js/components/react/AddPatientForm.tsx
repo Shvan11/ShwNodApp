@@ -16,9 +16,11 @@ import {
     referralSourcesQuery,
     addressesQuery,
     gendersQuery,
+    optionQuery,
 } from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import { WORK_TYPE_IDS } from '@shared/treatment-taxonomy';
+import { DEFAULT_WORK_CURRENCY_OPTION, parseWorkCurrency, type WorkCurrency } from '@shared/work-currency';
 import { PATIENT_LANGUAGE_OPTIONS } from '@shared/patient-language';
 import PhoneInput from './PhoneInput';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -131,7 +133,19 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
     const [intakeKind, setIntakeKind] = useState<IntakeKind>('consult');
     const [xrayWorkTypeId, setXrayWorkTypeId] = useState<string>(String(WORK_TYPE_IDS.OPG));
     const [intakeFee, setIntakeFee] = useState<string>(String(CONSULT_DEFAULT_FEE_IQD));
-    const [intakeCurrency, setIntakeCurrency] = useState<'IQD' | 'USD'>('IQD');
+    // The intake's currency starts at the clinic's default work currency (Settings →
+    // General), the same setting the work form seeds from: it was a literal 'IQD', one
+    // clinic's habit in a product sold to others (FE-F7-3's class). No default set =
+    // nothing preselected, and Save asks for a choice. A currency the user already
+    // picked is never replaced when the setting arrives.
+    const [intakeCurrency, setIntakeCurrency] = useState<WorkCurrency | ''>('');
+    const { data: defaultCurrencyOption } = useQuery(optionQuery(DEFAULT_WORK_CURRENCY_OPTION));
+    const defaultCurrency = parseWorkCurrency(defaultCurrencyOption?.value);
+    const [defaultCurrencyApplied, setDefaultCurrencyApplied] = useState(false);
+    if (!defaultCurrencyApplied && defaultCurrency) {
+        setDefaultCurrencyApplied(true);
+        if (!intakeCurrency) setIntakeCurrency(defaultCurrency);
+    }
 
     const [loading, setLoading] = useState(false);
     const [alert, setAlert] = useState<Alert>({ show: false, message: '', type: 'danger' });
@@ -266,6 +280,11 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             showAlert(t('intake.feeRequired'));
             return;
         }
+        // The auto-created work needs a currency even when it is free.
+        if (intakeKind !== 'regular' && !intakeCurrency) {
+            showAlert(t('intake.currencyRequired'));
+            return;
+        }
 
         // Build the explicit request payload: the flat patient fields + an `intake`
         // block ONLY when a non-regular intake is chosen (numbers coerced by the
@@ -273,9 +292,9 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
         // the new patient, created in the same transaction (FE-F6-1 — until then the
         // strict create body stripped it and the text was silently lost).
         const intake =
-            intakeKind === 'xray'
+            intakeKind === 'xray' && intakeCurrency
                 ? { kind: 'xray' as const, workTypeId: Number(xrayWorkTypeId), fee: feeNum, currency: intakeCurrency }
-                : intakeKind === 'consult'
+                : intakeKind === 'consult' && intakeCurrency
                     ? { kind: 'consult' as const, fee: feeNum, currency: intakeCurrency }
                     : undefined;
         const payload = intake ? { ...formData, intake } : formData;
@@ -291,7 +310,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
 
             succeeded = true;
             // The new patient belongs in the jump comboboxes and message pickers (FE-F6-9).
-            void queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
+            void queryClient.invalidateQueries({ queryKey: qk.lookups.patientLookupAll() });
             showAlert(
                 t('add.toast.success', { name: formData.patientName }),
                 'success',
@@ -340,7 +359,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel} htmlFor="add-patient-name">
-                        <i className="fas fa-signature"></i>
+                        <i className="fas fa-signature" aria-hidden="true"></i>
                         {t('fields.patientNameArabic')} <span className={styles.required}>*</span>
                     </label>
                     <input
@@ -361,7 +380,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-first-name">
-                        <i className="fas fa-user"></i>
+                        <i className="fas fa-user" aria-hidden="true"></i>
                         {t('fields.firstNameEnglish')}
                     </label>
                     <input
@@ -378,7 +397,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-last-name">
-                        <i className="fas fa-user"></i>
+                        <i className="fas fa-user" aria-hidden="true"></i>
                         {t('fields.lastNameEnglish')}
                     </label>
                     <input
@@ -398,7 +417,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-country-code">
-                        <i className="fas fa-globe"></i>
+                        <i className="fas fa-globe" aria-hidden="true"></i>
                         {t('fields.countryCode')}
                     </label>
                     <input
@@ -416,7 +435,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-phone">
-                        <i className="fas fa-phone"></i>
+                        <i className="fas fa-phone" aria-hidden="true"></i>
                         {t('fields.primaryPhone')}
                     </label>
                     <PhoneInput
@@ -432,7 +451,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-date-of-birth">
-                        <i className="fas fa-calendar"></i>
+                        <i className="fas fa-calendar" aria-hidden="true"></i>
                         {t('fields.dateOfBirth')}
                     </label>
                     <input
@@ -446,7 +465,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-gender">
-                        <i className="fas fa-venus-mars"></i>
+                        <i className="fas fa-venus-mars" aria-hidden="true"></i>
                         {t('fields.gender')}
                     </label>
                     <select
@@ -471,7 +490,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel}>
-                        <i className="fas fa-clipboard-check"></i>
+                        <i className="fas fa-clipboard-check" aria-hidden="true"></i>
                         {t('intake.label')}
                     </label>
                     <div className={styles.intakeRadios}>
@@ -503,7 +522,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     {intakeKind === 'xray' && (
                         <div className={styles.formGroup}>
                             <label className={styles.formLabel} htmlFor="add-xray-type">
-                                <i className="fas fa-x-ray"></i>
+                                <i className="fas fa-x-ray" aria-hidden="true"></i>
                                 {t('intake.xrayType')}
                             </label>
                             <select
@@ -520,7 +539,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     )}
                     <div className={styles.formGroup}>
                         <label className={styles.formLabel} htmlFor="add-intake-fee">
-                            <i className="fas fa-money-bill"></i>
+                            <i className="fas fa-money-bill" aria-hidden="true"></i>
                             {t('intake.fee')} <span className={styles.required}>*</span>
                         </label>
                         <input
@@ -538,15 +557,16 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     </div>
                     <div className={styles.formGroup}>
                         <label className={styles.formLabel} htmlFor="add-intake-currency">
-                            <i className="fas fa-coins"></i>
+                            <i className="fas fa-coins" aria-hidden="true"></i>
                             {t('fields.currency')}
                         </label>
                         <select
                             id="add-intake-currency"
                             value={intakeCurrency}
-                            onChange={(e) => setIntakeCurrency(e.target.value as 'IQD' | 'USD')}
+                            onChange={(e) => setIntakeCurrency(parseWorkCurrency(e.target.value) ?? '')}
                             className="form-control"
                         >
+                            {!intakeCurrency && <option value="">{t('intake.selectCurrency')}</option>}
                             <option value="IQD">{t('currencies.iqd')}</option>
                             <option value="USD">{t('currencies.usd')}</option>
                         </select>
@@ -562,7 +582,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-phone2">
-                        <i className="fas fa-phone-alt"></i>
+                        <i className="fas fa-phone-alt" aria-hidden="true"></i>
                         {t('fields.secondaryPhone')}
                     </label>
                     {/* The same masked input as the primary phone and the edit form, so a
@@ -575,7 +595,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 </div>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-email">
-                        <i className="fas fa-envelope"></i>
+                        <i className="fas fa-envelope" aria-hidden="true"></i>
                         {t('fields.emailAddress')}
                     </label>
                     <input
@@ -594,7 +614,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-language">
-                        <i className="fas fa-language"></i>
+                        <i className="fas fa-language" aria-hidden="true"></i>
                         {t('fields.language')}
                     </label>
                     <select
@@ -623,7 +643,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-referral-source">
-                        <i className="fas fa-handshake"></i>
+                        <i className="fas fa-handshake" aria-hidden="true"></i>
                         {t('fields.referralSource')}
                     </label>
                     <select
@@ -646,7 +666,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                     <label className={styles.formLabel} htmlFor="add-address">
-                        <i className="fas fa-map-marker-alt"></i>
+                        <i className="fas fa-map-marker-alt" aria-hidden="true"></i>
                         {t('fields.address')}
                     </label>
                     <select
@@ -674,7 +694,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel} htmlFor="add-notes">
-                        <i className="fas fa-sticky-note"></i>
+                        <i className="fas fa-sticky-note" aria-hidden="true"></i>
                         {t('fields.notes')}
                     </label>
                     <textarea
@@ -692,7 +712,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
             <div className={styles.formRow}>
                 <div className={`${styles.formGroup} ${styles.formGroupFullWidth}`}>
                     <label className={styles.formLabel} htmlFor="add-alerts">
-                        <i className="fas fa-exclamation-triangle"></i>
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                         {t('add.alerts')}
                     </label>
                     <textarea
@@ -738,7 +758,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 onClick={onCancel}
                 disabled={loading}
             >
-                <i className="fas fa-times"></i>
+                <i className="fas fa-times" aria-hidden="true"></i>
                 <span>{t('common.cancel')}</span>
             </button>
             <button
@@ -753,7 +773,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                     </>
                 ) : (
                     <>
-                        <i className="fas fa-save"></i>
+                        <i className="fas fa-save" aria-hidden="true"></i>
                         <span>{t('add.submit')}</span>
                     </>
                 )}
@@ -767,7 +787,7 @@ const AddPatientForm = ({ onSuccess, onCancel }: Props) => {
                 {/* Compact header: title + actions share one row (desktop) */}
                 <div className={styles.formHeader}>
                     <h2 className={styles.addPatientTitle}>
-                        <i className="fas fa-user-plus"></i>
+                        <i className="fas fa-user-plus" aria-hidden="true"></i>
                         {t('add.title')}
                     </h2>
                     {!isMobile && (

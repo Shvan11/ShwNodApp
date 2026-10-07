@@ -129,7 +129,7 @@
 /* Video Grid */
 .videoGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: var(--spacing-lg);
 }
 
@@ -222,7 +222,7 @@
 .categoryBadge {
   display: inline-block;
   padding: 4px 10px;
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
   font-size: 12px;
   border-radius: var(--radius-sm);
@@ -261,12 +261,12 @@
 }
 
 .actionBtn:hover {
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
 }
 
 .actionBtn.deleteBtn:hover {
-  background: var(--error-color);
+  background: var(--error-fill);
   color: var(--color-white);
 }
 
@@ -540,9 +540,9 @@ textarea.formInput {
 }
 
 .copyBtn:hover {
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
-  border-color: var(--primary-color);
+  border-color: var(--primary-fill);
 }
 
 .qrModalFooter {

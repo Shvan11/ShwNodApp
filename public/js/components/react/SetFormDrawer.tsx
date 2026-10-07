@@ -420,7 +420,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                 className={`form-tab ${activeTab === 'details' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('details')}
                             >
-                                <i className="fas fa-teeth"></i>
+                                <i className="fas fa-teeth" aria-hidden="true"></i>
                                 <span>Aligner Details</span>
                             </button>
                             <button
@@ -428,7 +428,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                 className={`form-tab ${activeTab === 'resources' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('resources')}
                             >
-                                <i className="fas fa-link"></i>
+                                <i className="fas fa-link" aria-hidden="true"></i>
                                 <span>Resources & Payment</span>
                             </button>
                             <button
@@ -436,7 +436,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                 className={`form-tab ${activeTab === 'settings' ? 'active' : ''}`}
                                 onClick={() => setActiveTab('settings')}
                             >
-                                <i className="fas fa-cog"></i>
+                                <i className="fas fa-cog" aria-hidden="true"></i>
                                 <span>Notes & Settings</span>
                             </button>
                         </div>
@@ -449,11 +449,11 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                             <button type="submit" className="btn btn-primary" disabled={saving}>
                                 {saving ? (
                                     <>
-                                        <i className="fas fa-spinner fa-spin"></i> Saving...
+                                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
+                                        <i className="fas fa-save" aria-hidden="true"></i> {set ? 'Update Set' : 'Create Set'}
                                     </>
                                 )}
                             </button>
@@ -614,7 +614,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                         {formData.set_pdf_url ? (
                                             <div className="pdf-uploaded-status">
                                                 <div className="pdf-status-header">
-                                                    <i className="fas fa-file-pdf"></i>
+                                                    <i className="fas fa-file-pdf" aria-hidden="true"></i>
                                                     <span>PDF Uploaded</span>
                                                 </div>
                                                 <div className="pdf-status-actions">
@@ -623,7 +623,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                         className="btn btn-secondary btn-sm"
                                                         onClick={() => window.open(formData.set_pdf_url, '_blank')}
                                                     >
-                                                        <i className="fas fa-external-link-alt"></i> View PDF
+                                                        <i className="fas fa-external-link-alt" aria-hidden="true"></i> View PDF
                                                     </button>
                                                     <button
                                                         type="button"
@@ -633,11 +633,11 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                     >
                                                         {deletingPdf ? (
                                                             <>
-                                                                <i className="fas fa-spinner fa-spin"></i> Deleting...
+                                                                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Deleting...
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <i className="fas fa-trash"></i> Delete PDF
+                                                                <i className="fas fa-trash" aria-hidden="true"></i> Delete PDF
                                                             </>
                                                         )}
                                                     </button>
@@ -651,7 +651,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                         className="btn btn-secondary pdf-upload-btn-full"
                                                         onClick={openFolder}
                                                     >
-                                                        <i className="fas fa-folder-open"></i> Open Patient Folder
+                                                        <i className="fas fa-folder-open" aria-hidden="true"></i> Open Patient Folder
                                                     </button>
                                                 )}
                                                 <input
@@ -664,11 +664,11 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                                                 />
                                                 {pdfFile && (
                                                     <div className="pdf-file-selected">
-                                                        <i className="fas fa-check-circle"></i> {pdfFile.name} selected
+                                                        <i className="fas fa-check-circle" aria-hidden="true"></i> {pdfFile.name} selected
                                                     </div>
                                                 )}
                                                 <div className="pdf-file-hint">
-                                                    <i className="fas fa-info-circle"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
+                                                    <i className="fas fa-info-circle" aria-hidden="true"></i> The folder path is automatically copied to your clipboard when you click "Choose File". Paste it in the file dialog address bar to navigate to the set folder.
                                                 </div>
                                             </div>
                                         )}
@@ -735,7 +735,7 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                             <div className="form-field-checkbox">
                                 {cannotReactivate() ? (
                                     <div className="warning-message-box">
-                                        <i className="fas fa-info-circle"></i>
+                                        <i className="fas fa-info-circle" aria-hidden="true"></i>
                                         <strong>Old Inactive Set:</strong> This set cannot be reactivated because there are newer sets with batches.
                                     </div>
                                 ) : (
@@ -760,11 +760,11 @@ const SetFormDrawer: React.FC<SetFormDrawerProps> = ({
                             <button type="submit" className="btn btn-primary" disabled={saving}>
                                 {saving ? (
                                     <>
-                                        <i className="fas fa-spinner fa-spin"></i> Saving...
+                                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fas fa-save"></i> {set ? 'Update Set' : 'Create Set'}
+                                        <i className="fas fa-save" aria-hidden="true"></i> {set ? 'Update Set' : 'Create Set'}
                                     </>
                                 )}
                             </button>

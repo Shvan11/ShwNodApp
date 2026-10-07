@@ -9,6 +9,8 @@ import { sql, type ExpressionBuilder } from 'kysely';
 import type { DB } from '../../../types/db.js';
 import { getKysely } from '../kysely.js';
 import { log } from '../../../utils/logger.js';
+// `%`, `_` and `\` in a search term are text, not wildcards (FE-F18-7).
+import { escapeLike } from '../../../utils/like-pattern.js';
 import type { AlignerPatient } from '../../../shared/contracts/aligner.contract.js';
 // The work-type ids that can carry an aligner set — from the taxonomy SSoT, not a literal.
 import { ALIGNER_SET_WORK_TYPE_IDS } from '../../../shared/treatment-taxonomy.js';
@@ -32,11 +34,6 @@ function unreadDoctorNotes(eb: PatientListEb) {
 
 /** Search hits returned at most; the screen says when there are more. */
 export const SEARCH_LIMIT = 50;
-
-/** `%`, `_` and `\` in a search term are text, not wildcards (FE-F18-7). */
-function escapeLike(term: string): string {
-  return term.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
 
 /**
  * Get all aligner patients (all doctors)

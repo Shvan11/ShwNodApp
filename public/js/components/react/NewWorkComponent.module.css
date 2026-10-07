@@ -49,7 +49,7 @@
     /* The status-conflict message is several lines (FE-F7-13). */
     white-space: pre-line;
     background-color: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-md);
     border-left: var(--border-width-thick) solid var(--error-500);
@@ -67,7 +67,7 @@
 .errorClose {
     background: none;
     border: none;
-    color: var(--error-600);
+    color: var(--error-700);
     font-size: var(--font-size-xl);
     cursor: pointer;
     padding: 0;
@@ -116,7 +116,7 @@
 }
 
 .required {
-    color: var(--error-500);
+    color: var(--error-700);
     margin-left: var(--spacing-xs);
 }
 
@@ -245,6 +245,7 @@
 /* Tabs */
 .workTabs {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-xs);
     border-bottom: var(--border-width-medium) solid var(--gray-200);
     margin-bottom: var(--spacing-sm);
@@ -272,12 +273,12 @@
 }
 
 .workTab:hover {
-    color: var(--indigo-600);
+    color: var(--indigo-700);
     background-color: var(--gray-100);
 }
 
 .workTabActive {
-    color: var(--indigo-600);
+    color: var(--indigo-700);
     border-bottom-color: var(--indigo-600);
     background-color: var(--gray-50);
 }
@@ -294,6 +295,7 @@
 /* Form Actions */
 .formActions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--spacing-sm);
     margin-top: var(--spacing-sm);
     padding-top: var(--spacing-sm);
@@ -392,7 +394,7 @@
 }
 
 .statusCompleted {
-    color: var(--success-600);
+    color: var(--success-700);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -423,7 +425,7 @@
 
 .checkboxLabel span i {
     margin-right: var(--spacing-xs);
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .formHint {
@@ -433,13 +435,13 @@
 }
 
 .textWarning {
-    color: var(--warning-600);
+    color: var(--warning-700);
 }
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
     .newWorkForm {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     /* Ensure consistent touch-friendly input sizing on mobile */

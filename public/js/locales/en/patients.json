@@ -62,7 +62,9 @@
     },
     "fee": "Fee",
     "feePlaceholder": "Amount charged",
-    "feeRequired": "Enter a fee greater than 0 for an X-ray or Consult intake."
+    "feeRequired": "Enter a fee greater than 0 for an X-ray or Consult intake.",
+    "selectCurrency": "Select Currency",
+    "currencyRequired": "Choose the currency for this intake."
   },
   "common": {
     "cancel": "Cancel"

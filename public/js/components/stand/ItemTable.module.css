@@ -155,14 +155,16 @@
 }
 
 .expiryExpired {
-  background-color: var(--error-200);
-  color: var(--error-700);
+  background-color: var(--error-fill);
+  color: var(--color-white);
   font-weight: var(--font-weight-semibold);
 }
 
-/* Inactive row */
-.inactiveRow {
-  opacity: 0.55;
+/* Inactive row: gray, not faded (at 55% opacity its text read under 3:1).
+   The last cell holds Reactivate, which stays a live, coloured button. */
+.inactiveRow td:not(:last-child) {
+  color: var(--text-secondary);
+  filter: grayscale(1);
 }
 
 /* Action Buttons */
@@ -197,6 +199,7 @@
 
 .btnEdit:hover {
   background-color: var(--blue-50);
+  color: var(--blue-700);
 }
 
 .btnRestock {
@@ -206,15 +209,17 @@
 
 .btnRestock:hover {
   background-color: var(--success-50);
+  color: var(--success-700);
 }
 
 .btnAdjust {
-  color: var(--warning-500);
-  border-color: var(--warning-500);
+  color: var(--warning-700);
+  border-color: var(--warning-700);
 }
 
 .btnAdjust:hover {
   background-color: var(--warning-50);
+  color: var(--warning-700);
 }
 
 .btnMovements {
@@ -233,6 +238,7 @@
 
 .btnDelete:hover {
   background-color: var(--error-50);
+  color: var(--error-700);
 }
 
 /* Loading State */

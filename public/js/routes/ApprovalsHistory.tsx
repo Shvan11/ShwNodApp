@@ -6,7 +6,7 @@ import { httpErrorMessage } from '@/core/http';
 import { LANGUAGES } from '@/core/language';
 import { useLanguage } from '../contexts/LanguageContext';
 import { approvalsHistoryQuery } from '@/query/queries';
-import { ACTION_LABEL_KEY } from '@/services/approvals';
+import { ACTION_LABEL_KEY, approvalNoteText, approvalSummaryText } from '@/services/approvals';
 import type { ApprovalRow, ApprovalStatus } from '@shared/contracts/approvals.contract';
 import styles from './ApprovalsHistory.module.css';
 
@@ -66,12 +66,13 @@ const ApprovalsHistory = () => {
         if (statusFilter !== ANY && r.status !== statusFilter) return false;
         if (kindFilter !== ANY && r.kind !== kindFilter) return false;
         if (!q) return true;
+        // Search what the table shows: the summary and note in this language.
         return (
-            r.summary.toLowerCase().includes(q) ||
+            approvalSummaryText(r, t).toLowerCase().includes(q) ||
             (r.patient_name ?? '').toLowerCase().includes(q) ||
             r.requested_by.toLowerCase().includes(q) ||
             (r.reviewed_by ?? '').toLowerCase().includes(q) ||
-            (r.review_note ?? '').toLowerCase().includes(q)
+            approvalNoteText(r.review_note, t).toLowerCase().includes(q)
         );
     });
 
@@ -155,7 +156,7 @@ const ApprovalsHistory = () => {
                                             <span className={r.kind === 'approval' ? styles.kindHold : styles.kindNotice} aria-hidden="true" />
                                             {t(`action.${ACTION_LABEL_KEY[r.action_type]}`)}
                                         </td>
-                                        <td className={styles.summaryCell}>{r.summary}</td>
+                                        <td className={styles.summaryCell}>{approvalSummaryText(r, t)}</td>
                                         <td>
                                             {r.person_id != null && patientName ? (
                                                 <button
@@ -179,7 +180,7 @@ const ApprovalsHistory = () => {
                                                 ? <>{r.reviewed_by ? `${r.reviewed_by} · ` : ''}{formatStamp(r.reviewed_at)}</>
                                                 : '—'}
                                         </td>
-                                        <td className={styles.noteCell}>{r.review_note ?? ''}</td>
+                                        <td className={styles.noteCell}>{approvalNoteText(r.review_note, t)}</td>
                                     </tr>
                                 );
                             })}

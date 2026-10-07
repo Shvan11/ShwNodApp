@@ -161,7 +161,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                     title={t('nav.disabledTooltip')}
                 >
                     <div className="nav-item-icon">
-                        <i className={item.icon} />
+                        <i className={item.icon} aria-hidden="true" />
                     </div>
                     <span className="nav-item-label">{item.label}</span>
                 </div>
@@ -176,7 +176,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                 title={item.label}
             >
                 <div className="nav-item-icon">
-                    <i className={item.icon} />
+                    <i className={item.icon} aria-hidden="true" />
                 </div>
                 <span className="nav-item-label">{item.label}</span>
             </Link>
@@ -293,7 +293,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 title={t('photos.tooltipDisabled')}
                             >
                                 <div className="nav-item-icon">
-                                    <i className="fas fa-images" />
+                                    <i className="fas fa-images" aria-hidden="true" />
                                 </div>
                                 <span className="nav-item-label">{t('photos.labelFallback')}</span>
                             </div>
@@ -304,7 +304,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                                 title={t('photos.tooltip')}
                             >
                                 <div className="nav-item-icon">
-                                    <i className="fas fa-images" />
+                                    <i className="fas fa-images" aria-hidden="true" />
                                 </div>
                                 <span className="nav-item-label">{photosLabel}</span>
                             </Link>
@@ -324,7 +324,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         title={isNewPatient ? t('csImaging.tooltipDisabled') : t('csImaging.tooltip')}
                     >
                         <div className="nav-item-icon">
-                            <i className="fas fa-radiation" />
+                            <i className="fas fa-radiation" aria-hidden="true" />
                         </div>
                         <span className="nav-item-label">{t('csImaging.label')}</span>
                     </div>
@@ -339,7 +339,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                         title={isNewPatient ? t('folder.tooltipDisabled') : t('folder.tooltip')}
                     >
                         <div className="nav-item-icon">
-                            <i className="fas fa-folder-open" />
+                            <i className="fas fa-folder-open" aria-hidden="true" />
                         </div>
                         <span className="nav-item-label">{t('folder.label')}</span>
                     </div>
@@ -366,7 +366,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? t('moreActions.tooltipDisabled') : t('moreActions.tooltip')}
                         >
                             <div className="nav-item-icon">
-                                <i className="fas fa-ellipsis-h" />
+                                <i className="fas fa-ellipsis-h" aria-hidden="true" />
                             </div>
                             <span className="nav-item-label">{t('moreActions.label')}</span>
                         </div>
@@ -394,7 +394,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             onClick={() => setMoreActionsExpanded(false)}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-exchange-alt" />
+                                <i className="fas fa-exchange-alt" aria-hidden="true" />
                             </div>
                             <span className="action-item-label">{t('flyout.comparePhotos')}</span>
                         </Link>
@@ -405,7 +405,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             onClick={() => setMoreActionsExpanded(false)}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-film" />
+                                <i className="fas fa-film" aria-hidden="true" />
                             </div>
                             <span className="action-item-label">{t('flyout.presentation')}</span>
                         </Link>
@@ -416,7 +416,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             onClick={() => setMoreActionsExpanded(false)}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-x-ray" />
+                                <i className="fas fa-x-ray" aria-hidden="true" />
                             </div>
                             <span className="action-item-label">{t('flyout.xrays')}</span>
                         </Link>
@@ -427,7 +427,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             onClick={() => setMoreActionsExpanded(false)}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-cube" />
+                                <i className="fas fa-cube" aria-hidden="true" />
                             </div>
                             <span className="action-item-label">{t('flyout.scans')}</span>
                         </Link>
@@ -478,7 +478,7 @@ const Navigation = ({ personId, currentPage }: NavigationProps) => {
                             title={isNewPatient ? t('flyout.newPhotoSessionDisabledTooltip') : t('flyout.newPhotoSessionTooltip')}
                         >
                             <div className="action-item-icon">
-                                <i className="fas fa-camera" />
+                                <i className="fas fa-camera" aria-hidden="true" />
                             </div>
                             <span className="action-item-label">{t('flyout.newPhotoSession')}</span>
                         </Link>

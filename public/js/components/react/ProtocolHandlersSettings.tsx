@@ -503,7 +503,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         return (
             <div key={sectionName} className={sharedStyles.configGroup}>
                 <h4>
-                    <i className={sectionIcons[sectionName] || 'fas fa-cog'}></i>
+                    <i className={sectionIcons[sectionName] || 'fas fa-cog'} aria-hidden="true"></i>
                     {sectionTitles[sectionName] || sectionName}
                 </h4>
 
@@ -546,15 +546,15 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
     const renderBrowserNotSupported = () => (
         <div className={`${sharedStyles.connectionStatus} ${sharedStyles.error}`}>
             <div className={sharedStyles.statusHeader}>
-                <i className="fas fa-browser"></i>
+                <i className="fas fa-browser" aria-hidden="true"></i>
                 <span>Browser Not Supported</span>
             </div>
             <div className={sharedStyles.statusDetails}>
                 <p>The File System Access API is required to edit local configuration files.</p>
                 <p className={styles.supportNotice}>Please use one of these browsers:</p>
                 <ul className={styles.supportList}>
-                    <li><i className="fab fa-chrome"></i>Google Chrome 86+</li>
-                    <li><i className="fab fa-edge"></i>Microsoft Edge 86+</li>
+                    <li><i className="fab fa-chrome" aria-hidden="true"></i>Google Chrome 86+</li>
+                    <li><i className="fab fa-edge" aria-hidden="true"></i>Microsoft Edge 86+</li>
                 </ul>
                 <p className={styles.fallbackNote}>
                     Alternatively, you can manually edit the file at:<br />
@@ -566,7 +566,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
     const renderFileSelection = () => (
         <div className={sharedStyles.configGroup}>
-            <h4><i className="fas fa-file-alt"></i> Select Configuration File</h4>
+            <h4><i className="fas fa-file-alt" aria-hidden="true"></i> Select Configuration File</h4>
             <p className={styles.sectionLead}>
                 To edit the protocol handler configuration, you need to select the INI file on your local computer.
             </p>
@@ -580,12 +580,12 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
             >
                 {isLoading ? (
                     <>
-                        <i className="fas fa-spinner fa-spin"></i>
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                         Loading...
                     </>
                 ) : (
                     <>
-                        <i className="fas fa-folder-open"></i>
+                        <i className="fas fa-folder-open" aria-hidden="true"></i>
                         Select INI File
                     </>
                 )}
@@ -595,7 +595,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
     const renderPermissionRequest = () => (
         <div className={sharedStyles.configGroup}>
-            <h4><i className="fas fa-key"></i> Permission Required</h4>
+            <h4><i className="fas fa-key" aria-hidden="true"></i> Permission Required</h4>
             <p className={styles.sectionLead}>
                 The browser needs permission to access the configuration file.
             </p>
@@ -608,14 +608,14 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 className={`${sharedStyles.btn} ${sharedStyles.btnPrimary}`}
                 onClick={requestFilePermission}
             >
-                <i className="fas fa-key"></i>
+                <i className="fas fa-key" aria-hidden="true"></i>
                 Grant Permission
             </button>
             <button
                 className={`${sharedStyles.btn} ${sharedStyles.btnSecondary} ${styles.spacedButton}`}
                 onClick={changeFile}
             >
-                <i className="fas fa-file"></i>
+                <i className="fas fa-file" aria-hidden="true"></i>
                 Select Different File
             </button>
         </div>
@@ -623,7 +623,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
     const renderFileInfo = () => (
         <div className={sharedStyles.configGroup}>
-            <h4><i className="fas fa-file-alt"></i> File Status</h4>
+            <h4><i className="fas fa-file-alt" aria-hidden="true"></i> File Status</h4>
             <div className={styles.fileInfoRow}>
                 <div>
                     <strong>File:</strong>{' '}
@@ -644,7 +644,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     className={`${sharedStyles.btnLink} ${styles.changeFileButton}`}
                     onClick={changeFile}
                 >
-                    <i className="fas fa-exchange-alt"></i>
+                    <i className="fas fa-exchange-alt" aria-hidden="true"></i>
                     Change File
                 </button>
             </div>
@@ -659,7 +659,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
         <div className={sharedStyles.container}>
             <div className={sharedStyles.section}>
                 <h3 className={sharedStyles.sectionTitle}>
-                    <i className="fas fa-link"></i>
+                    <i className="fas fa-link" aria-hidden="true"></i>
                     Protocol Handler Configuration
                 </h3>
                 <p className={sharedStyles.sectionDescription}>
@@ -668,7 +668,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                 </p>
 
                 <div className={styles.infoNotice}>
-                    <i className="fas fa-info-circle"></i>
+                    <i className="fas fa-info-circle" aria-hidden="true"></i>
                     <div>
                         <div>
                             <strong>Note:</strong> This page edits the INI file on <strong>this computer</strong>.
@@ -694,13 +694,13 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     <>
                         {isLoading ? (
                             <div className={sharedStyles.loadingSpinner}>
-                                <i className="fas fa-spinner fa-spin"></i>
+                                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                 <span>Loading protocol handler configuration...</span>
                             </div>
                         ) : configError ? (
                             <div className={`${sharedStyles.connectionStatus} ${sharedStyles.error}`}>
                                 <div className={sharedStyles.statusHeader}>
-                                    <i className="fas fa-exclamation-circle"></i>
+                                    <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                                     <span>Configuration Error</span>
                                 </div>
                                 <div className={sharedStyles.statusDetails}>{configError}</div>
@@ -709,14 +709,14 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                                         className={`${sharedStyles.btn} ${sharedStyles.btnSecondary}`}
                                         onClick={reloadConfig}
                                     >
-                                        <i className="fas fa-redo"></i>
+                                        <i className="fas fa-redo" aria-hidden="true"></i>
                                         Retry
                                     </button>
                                     <button
                                         className={`${sharedStyles.btn} ${sharedStyles.btnSecondary} ${styles.spacedButton}`}
                                         onClick={changeFile}
                                     >
-                                        <i className="fas fa-file"></i>
+                                        <i className="fas fa-file" aria-hidden="true"></i>
                                         Select Different File
                                     </button>
                                 </div>
@@ -735,7 +735,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                                 {Object.keys(config).length === 0 && (
                                     <div className={sharedStyles.configGroup}>
                                         <p className={styles.emptyMessage}>
-                                            <i className="fas fa-info-circle"></i>
+                                            <i className="fas fa-info-circle" aria-hidden="true"></i>
                                             No configuration found in file. The file may be empty or have an invalid format.
                                         </p>
                                     </div>
@@ -756,12 +756,12 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                     >
                         {isSaving ? (
                             <>
-                                <i className="fas fa-spinner fa-spin"></i>
+                                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                 Saving...
                             </>
                         ) : (
                             <>
-                                <i className="fas fa-save"></i>
+                                <i className="fas fa-save" aria-hidden="true"></i>
                                 {hasChanges
                                     ? `Save Configuration (${totalChanges} changes)`
                                     : 'Save Configuration'
@@ -774,7 +774,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                         className={`${sharedStyles.btn} ${sharedStyles.btnSecondary}`}
                         onClick={createBackup}
                     >
-                        <i className="fas fa-copy"></i>
+                        <i className="fas fa-copy" aria-hidden="true"></i>
                         Create Backup
                     </button>
 
@@ -782,7 +782,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                         className={`${sharedStyles.btn} ${sharedStyles.btnWarning}`}
                         onClick={restoreFromBackup}
                     >
-                        <i className="fas fa-undo"></i>
+                        <i className="fas fa-undo" aria-hidden="true"></i>
                         Restore from Backup
                     </button>
 
@@ -791,7 +791,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
                         onClick={reloadConfig}
                         disabled={isLoading}
                     >
-                        <i className="fas fa-sync-alt"></i>
+                        <i className="fas fa-sync-alt" aria-hidden="true"></i>
                         Reload
                     </button>
                 </div>
@@ -799,7 +799,7 @@ const ProtocolHandlersSettings = ({ onChangesUpdate }: ProtocolHandlersSettingsP
 
             {hasChanges && (
                 <div className={sharedStyles.restartWarning}>
-                    <i className="fas fa-info-circle"></i>
+                    <i className="fas fa-info-circle" aria-hidden="true"></i>
                     <span>Protocol handlers will use the new settings immediately after saving.</span>
                 </div>
             )}

@@ -38,7 +38,14 @@ import { publicBrandingRouter } from '../routes/api/branding.routes.js';
 import portalRoutes from '../routes/portal.js';
 import { workingDir } from '../services/files/clinic-paths.js';
 import { imageCacheControl } from '../utils/image-cache-control.js';
+import { buildCacheControl } from '../utils/build-cache-control.js';
 import { log } from '../utils/logger.js';
+import { ErrorResponses } from '../utils/error-response.js';
+
+/** The JSON 404 for an /api path no router claimed. Named: it shows in the route-table snapshot. */
+function apiNotFound(_req: Request, res: Response): void {
+  ErrorResponses.notFound(res, 'Endpoint');
+}
 
 /**
  * Register every route, static mount and error handler on `app`.
@@ -209,8 +216,22 @@ export async function mountRoutes(app: Express, wsEmitter: EventEmitter): Promis
   // won. A second mount at the same path was dead weight.
   app.use('/api/sync', syncWebhookRoutes);
 
-  // Serve built SPA files (AFTER auth check, so protected)
-  app.use(express.static('./dist'));
+  // Every /api router is mounted above, so a request still unanswered here names an
+  // endpoint that does not exist. Without this it fell through to the SPA catch-all
+  // and came back 200 with index.html: a removed or mistyped endpoint read as a JSON
+  // parse failure in the client instead of a 404 (and a non-GET got Express's HTML
+  // "Cannot POST"). Must stay AFTER the last /api mount and before the static files.
+  app.use('/api', apiNotFound);
+
+  // Serve built SPA files (AFTER auth check, so protected; `/assets/*` is let
+  // through the gate in middleware/auth.ts — the portal and login pages need it).
+  // Hashed assets are immutable, the HTML shells always revalidate: see
+  // utils/build-cache-control.ts for what the default cost.
+  app.use(express.static('./dist', {
+      setHeaders: (res, filePath) => {
+          res.setHeader('Cache-Control', buildCacheControl(filePath));
+      },
+  }));
 
   // Final catch-all for SPA routing
   app.use('/', webRoutes);

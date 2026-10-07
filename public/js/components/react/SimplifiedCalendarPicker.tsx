@@ -202,6 +202,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
                 role="button"
                 tabIndex={canBook ? 0 : -1}
                 aria-disabled={!canBook}
+                aria-pressed={isSelected}
                 onClick={() => canBook && handleSlotClick(slot)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); canBook && handleSlotClick(slot); } }}
             >
@@ -221,7 +222,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
                     </div>
                 ) : (
                     <div className={styles.slotEmpty}>
-                        <i className="fas fa-check-circle"></i> {t('calendar.slotAvailable')}
+                        <i className="fas fa-check-circle" aria-hidden="true"></i> {t('calendar.slotAvailable')}
                     </div>
                 )}
             </div>
@@ -268,7 +269,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
 
                 {/* View Full Calendar Button */}
                 <Link to="/calendar" className={styles.fullCalendarLink}>
-                    <i className="fas fa-calendar-alt"></i> {t('calendar.fullCalendar')}
+                    <i className="fas fa-calendar-alt" aria-hidden="true"></i> {t('calendar.fullCalendar')}
                 </Link>
 
                 <div className={styles.calendarHeader}>
@@ -334,13 +335,15 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
                                 role="button"
                                 tabIndex={isClickable ? 0 : -1}
                                 aria-disabled={!isClickable}
+                                aria-pressed={dayInfo.isSelected}
+                                aria-label={`${formatScheduleDate(dayInfo.date, language)}, ${tooltip}`}
                                 onClick={() => isClickable && setSelectedDate(dayInfo.date)}
                                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); isClickable && setSelectedDate(dayInfo.date); } }}
                                 title={tooltip}
                             >
                                 <span className={styles.dayNum}>{dayInfo.day}</span>
                                 {dayInfo.isHoliday && (
-                                    <span className={styles.holidayIndicator}><i className="fas fa-star"></i></span>
+                                    <span className={styles.holidayIndicator}><i className="fas fa-star" aria-hidden="true"></i></span>
                                 )}
                                 {dayInfo.appointmentCount > 0 && !dayInfo.isPast && !dayInfo.isHoliday && (
                                     <span className={styles.slotCount}>{dayInfo.appointmentCount}</span>
@@ -351,7 +354,7 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
                 </div>
 
                 <button type="button" className={styles.todayBtn} onClick={() => goToDate(new Date())}>
-                    <i className="fas fa-calendar-day"></i> {t('header.today')}
+                    <i className="fas fa-calendar-day" aria-hidden="true"></i> {t('header.today')}
                 </button>
             </div>
 
@@ -359,22 +362,22 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
             <div className={styles.scheduleColumn}>
                 {!selectedDate ? (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-hand-pointer"></i>
+                        <i className="fas fa-hand-pointer" aria-hidden="true"></i>
                         <p>{t('calendar.selectDatePrompt')}</p>
                     </div>
                 ) : loading ? (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-spinner fa-spin"></i>
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                         <p>{t('calendar.loading')}</p>
                     </div>
                 ) : error ? (
                     <div className={cn(styles.emptyState, styles.error)}>
-                        <i className="fas fa-exclamation-triangle"></i>
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                         <p>{error}</p>
                     </div>
                 ) : availableSlots.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-calendar-times"></i>
+                        <i className="fas fa-calendar-times" aria-hidden="true"></i>
                         <p>{t('calendar.noSlots')}</p>
                     </div>
                 ) : (
@@ -397,10 +400,10 @@ const SimplifiedCalendarPicker = ({ onSelectDateTime, initialDate }: SimplifiedC
                                     onClick={() => setShowExtendedSlots(!showExtendedSlots)}
                                 >
                                     <span className={styles.afternoonToggleText}>
-                                        <i className="fas fa-clock"></i>
+                                        <i className="fas fa-clock" aria-hidden="true"></i>
                                         {showExtendedSlots ? t('calendar.hideExtended') : t('calendar.showExtended')}
                                     </span>
-                                    <i className={cn('fas fa-chevron-down', styles.afternoonToggleIcon, { [styles.expanded]: showExtendedSlots })}></i>
+                                    <i className={cn('fas fa-chevron-down', styles.afternoonToggleIcon, { [styles.expanded]: showExtendedSlots })} aria-hidden="true"></i>
                                 </button>
                             )}
                             {visibleSlots.map(renderSlot)}

@@ -61,7 +61,7 @@ Navigation / ViewPatientInfo
 **202** immediately, then renders each framed slot **in the background** (heavy
 full-res sharp encodes of up to 8 ~15 MP views would otherwise peg the request and
 risk the 30 s timeout). Per slot: `autoOrient → flip/flop → rotate → extract →
-resize → jpeg`, written atomically to `working/{personId}0{tpCode}.i{viewCode}`,
+resize → jpeg`, written atomically to `working/{personId}{tpCode:02}.i{viewCode}`,
 plus a row upserted into `time_point_images`. On completion the route emits
 `PHOTO_TIMEPOINT_RENDERED` over SSE so the open photo grid refetches (the SSE key is
 `tpCode`, camelCase — see the note in `photo-editor.routes.ts`). See
@@ -128,7 +128,7 @@ re-editing (`shared/photo-views.ts` + `services/imaging/photo-original-tags.ts`)
   (`services/database/queries/timepoint-queries.ts`) reads the local table, ordered by
   date then code. Used by the staff grid, Navigation, Compare, slideshow and the
   patient portal (`routes/portal.ts`).
-- **View images** — served at **`/DolImgs/{personId}0{tpCode}.i{viewCode}`**
+- **View images** — served at **`/DolImgs/{personId}{tpCode:02}.i{viewCode}`**
   (`express.static(workingDir())` in `index.ts`; the `/DolImgs` mount name is
   historical). `getImageSizes()` (`services/imaging/index.ts`, the gallery endpoint)
   probes the 8 fixed filenames on disk — lower case first, then the Dolphin-era upper
@@ -144,9 +144,12 @@ re-editing (`shared/photo-views.ts` + `services/imaging/photo-original-tags.ts`)
 
 ### The 8 standard view codes (grid layout)
 
-The filename prefix is `{personId}0{tpCode}` (e.g. patient 4073, tpCode 0 →
-`407300`). The **working** file uses lowercase `.i{view}`; the DB `image_file`
-uses uppercase `.I{type}` (the view code minus the leading `i`).
+The filename prefix is `{personId}{tpCode as two digits}`, Dolphin's own rule (e.g.
+patient 4073, tpCode 0 → `407300`; patient 634, tpCode 12 → `63412`). Build it with
+`services/files/working-file-names.ts`, never by hand: until 2026-10-07 the app wrote
+`{personId}0{tpCode}`, which only matches Dolphin for sessions 0–9. The **working**
+file uses lowercase `.i{view}`; the DB `image_file` uses uppercase `.I{type}` (the view
+code minus the leading `i`).
 
 | Grid pos | Working file (`i` lower) | DB `image_type` | DB `image_file` (`I` upper) | `image_types.description` | How to identify |
 | --- | --- | --- | --- | --- | --- |
@@ -289,15 +292,14 @@ using the recognition column in [§3](#the-8-standard-view-codes-grid-layout). V
 completeness: exactly one photo per view, all 8 present. Apply the L/R rule for the
 two buccals with care.
 
-**3. Place files into `working/`** — prefix `= {personId}0{tpCode}` (note the literal
-`0`; for personIDs that prefix one another this exact form avoids collisions). Per
-view:
+**3. Place files into `working/`** — prefix `= {personId}{tpCode as two digits}`
+(`407300` for session 0, `407312` for session 12), Dolphin's rule. Per view:
 
 ```js
 // node (sharp is a project dep, CommonJS-importable)
 const sharp = require('sharp'), fs = require('fs');
 const JPEG = { quality: 95, mozjpeg: true, chromaSubsampling: '4:4:4' };
-const prefix = '407300';                 // personId 4073 + '0' + tpCode 0
+const prefix = '407300';                 // personId 4073 + tpCode 0 as two digits
 const work = 'C:/clinic1/working';
 
 // facial w/ EXIF rotation  → bake upright

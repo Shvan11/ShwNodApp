@@ -110,7 +110,7 @@ const HolidayQuickModal = ({
                 <ModalHeader
                     title={existingHoliday ? 'Edit Holiday' : 'Add Holiday'}
                     titleId="holiday-quick-modal-title"
-                    icon={<i className="fas fa-calendar-times" />}
+                    icon={<i className="fas fa-calendar-times" aria-hidden="true" />}
                     onClose={onClose}
                 />
 
@@ -118,7 +118,7 @@ const HolidayQuickModal = ({
                     <div className="modal-body">
                         {/* Date display */}
                         <div className="holiday-date-display">
-                            <i className="fas fa-calendar-day"></i>
+                            <i className="fas fa-calendar-day" aria-hidden="true"></i>
                             <span>{formatDate(date)}</span>
                         </div>
 
@@ -126,7 +126,7 @@ const HolidayQuickModal = ({
                         {showWarning && appointmentWarning && (
                             <div className="holiday-warning-banner">
                                 <div className="warning-icon">
-                                    <i className="fas fa-exclamation-triangle"></i>
+                                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                 </div>
                                 <div className="warning-content">
                                     <strong>{appointmentWarning.count} appointment(s)</strong> scheduled on this date
@@ -135,7 +135,7 @@ const HolidayQuickModal = ({
                                     </div>
                                     {appointmentWarning.appointments?.slice(0, 3).map((apt, idx) => (
                                         <div key={idx} className="warning-appointment">
-                                            <i className="fas fa-user"></i>
+                                            <i className="fas fa-user" aria-hidden="true"></i>
                                             {apt.patient_name}
                                         </div>
                                     ))}
@@ -151,7 +151,7 @@ const HolidayQuickModal = ({
                         {appointmentCheckFailed && (
                             <div className="holiday-warning-banner" role="alert">
                                 <div className="warning-icon">
-                                    <i className="fas fa-exclamation-triangle"></i>
+                                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                 </div>
                                 <div className="warning-content">
                                     <strong>Could not check this date for appointments.</strong>
@@ -207,12 +207,12 @@ const HolidayQuickModal = ({
                         >
                             {saving ? (
                                 <>
-                                    <i className="fas fa-spinner fa-spin"></i>
+                                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                     Saving...
                                 </>
                             ) : (
                                 <>
-                                    <i className="fas fa-check"></i>
+                                    <i className="fas fa-check" aria-hidden="true"></i>
                                     {existingHoliday ? 'Update' : 'Add'} Holiday
                                 </>
                             )}

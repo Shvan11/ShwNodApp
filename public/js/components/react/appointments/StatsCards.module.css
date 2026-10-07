@@ -96,22 +96,22 @@
 
 .cardTotal .icon {
     background-color: var(--blue-50);
-    color: var(--blue-500);
+    color: var(--blue-700);
 }
 
 .cardPresent .icon {
     background-color: var(--success-50);
-    color: var(--success-600);
+    color: var(--success-700);
 }
 
 .cardRemaining .icon {
     background-color: var(--indigo-50);
-    color: var(--indigo-500);
+    color: var(--indigo-700);
 }
 
 .cardWaiting .icon {
     background-color: var(--warning-50);
-    color: var(--warning-color);
+    color: var(--warning-800);
 }
 
 .content {

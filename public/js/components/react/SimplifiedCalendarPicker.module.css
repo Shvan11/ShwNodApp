@@ -64,7 +64,7 @@
 }
 
 .jumpBtn:hover {
-    background: var(--indigo-500);
+    background: var(--palette-indigo-600);
     transform: translateX(2px);
 }
 
@@ -200,7 +200,7 @@
 
 .calendarDay.hasSlots {
     background: var(--success-50);
-    color: var(--success-600);
+    color: var(--success-700);
 }
 
 .calendarDay.selected {
@@ -212,7 +212,7 @@
 
 .calendarDay.holiday {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     border: 2px solid var(--error-300);
     cursor: not-allowed;
 }
@@ -240,12 +240,12 @@
     position: absolute;
     top: 2px;
     right: 2px;
-    background: var(--blue-700);
+    background: var(--palette-blue-600);
     color: var(--color-white);
-    font-size: 9px;
+    font-size: 0.6875rem;
     font-weight: var(--font-weight-bold);
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -256,7 +256,7 @@
     position: absolute;
     top: 2px;
     right: 2px;
-    color: var(--error-500);
+    color: var(--error-700);
     font-size: 8px;
 }
 
@@ -637,9 +637,9 @@
     }
 
     .slotCount {
-        width: 14px;
-        height: 14px;
-        font-size: 8px;
+        width: 16px;
+        height: 16px;
+        font-size: 0.625rem;
     }
 
     .timeSlot {

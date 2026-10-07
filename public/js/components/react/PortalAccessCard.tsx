@@ -149,13 +149,13 @@ const PortalAccessCard = ({ personId }: Props) => {
   return (
     <div className={viewStyles.patientInfoCard}>
       <h3 className={viewStyles.patientCardTitle}>
-        <i className={`fas fa-qrcode ${viewStyles.piIconGap}`}></i>
+        <i className={`fas fa-qrcode ${viewStyles.piIconGap}`} aria-hidden="true"></i>
         {t('portal.title')}
       </h3>
 
       {loading && (
         <div className={styles.loadingRow}>
-          <i className="fas fa-spinner fa-spin"></i> {t('portal.loading')}
+          <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> {t('portal.loading')}
         </div>
       )}
 
@@ -226,7 +226,7 @@ const PortalAccessCard = ({ personId }: Props) => {
               onClick={handleResetPin}
               disabled={busyAction === 'reset'}
             >
-              <i className="fas fa-key"></i>{' '}
+              <i className="fas fa-key" aria-hidden="true"></i>{' '}
               {status.hasPin ? t('portal.resetPin') : t('portal.createPin')}
             </button>
             {isLocked && (
@@ -236,7 +236,7 @@ const PortalAccessCard = ({ personId }: Props) => {
                 onClick={handleUnlock}
                 disabled={busyAction === 'unlock'}
               >
-                <i className="fas fa-unlock"></i> {t('portal.unlock')}
+                <i className="fas fa-unlock" aria-hidden="true"></i> {t('portal.unlock')}
               </button>
             )}
           </div>
@@ -289,7 +289,7 @@ const PortalAccessCard = ({ personId }: Props) => {
               <i
                 className={
                   copyState === 'copied' ? 'fas fa-check' : 'fas fa-copy'
-                }
+                } aria-hidden="true"
               ></i>{' '}
               {copyState === 'copied' ? t('portal.pinModal.copied') : t('portal.pinModal.copy')}
             </button>

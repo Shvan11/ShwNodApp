@@ -231,7 +231,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             await putJSON(`/api/patients/${pid}`, formData);
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
             // The name and phones feed the jump comboboxes and message pickers (FE-F6-9).
-            queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
+            queryClient.invalidateQueries({ queryKey: qk.lookups.patientLookupAll() });
 
             toast.success(t('edit.toast.success'));
             // Close the form on success — return to the page the user came from
@@ -322,7 +322,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                 return;
             }
             queryClient.invalidateQueries({ queryKey: qk.patient.all(pid) });
-            queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
+            queryClient.invalidateQueries({ queryKey: qk.lookups.patientLookupAll() });
             if (data.folderRemoved === false) {
                 toast.warning(t('edit.toast.deleteFolderWarning'));
             } else {
@@ -345,7 +345,7 @@ const EditPatientComponent = ({ personId }: Props) => {
             <div className={styles.editPatientContainer}>
                 <div className={styles.editPatientError} role="alert">
                     <div>
-                        <i className="fas fa-lock"></i> {t('edit.notPermitted')}
+                        <i className="fas fa-lock" aria-hidden="true"></i> {t('edit.notPermitted')}
                     </div>
                 </div>
             </div>
@@ -355,7 +355,7 @@ const EditPatientComponent = ({ personId }: Props) => {
     if (loading) {
         return (
             <div className={styles.editPatientLoading}>
-                <i className={`fas fa-spinner fa-spin ${styles.editPatientLoadingSpinner}`}></i>
+                <i className={`fas fa-spinner fa-spin ${styles.editPatientLoadingSpinner}`} aria-hidden="true"></i>
                 <p>{t('edit.loading')}</p>
             </div>
         );
@@ -365,7 +365,7 @@ const EditPatientComponent = ({ personId }: Props) => {
         <div className={styles.editPatientContainer}>
             <div className={styles.editPatientHeader}>
                 <h2 className={styles.editPatientTitle}>
-                    <i className="fas fa-user-edit"></i>
+                    <i className="fas fa-user-edit" aria-hidden="true"></i>
                     {t('edit.title')}
                 </h2>
                 {patientData && (
@@ -401,7 +401,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                     className={`btn btn-danger ${styles.deleteBtnPush}`}
                     disabled={saving || deleting}
                 >
-                    <i className="fas fa-trash"></i> {t('edit.delete.button')}
+                    <i className="fas fa-trash" aria-hidden="true"></i> {t('edit.delete.button')}
                 </button>
                 <button
                     type="button"
@@ -409,7 +409,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                     className="btn btn-secondary"
                     disabled={saving}
                 >
-                    <i className="fas fa-times"></i> {t('common.cancel')}
+                    <i className="fas fa-times" aria-hidden="true"></i> {t('common.cancel')}
                 </button>
                 <button
                     type="submit"
@@ -419,11 +419,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                 >
                     {saving ? (
                         <>
-                            <i className="fas fa-spinner fa-spin"></i> {t('edit.saving')}
+                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> {t('edit.saving')}
                         </>
                     ) : (
                         <>
-                            <i className="fas fa-save"></i> {t('edit.save')}
+                            <i className="fas fa-save" aria-hidden="true"></i> {t('edit.save')}
                         </>
                     )}
                 </button>
@@ -481,9 +481,9 @@ const EditPatientComponent = ({ personId }: Props) => {
                         title={t('edit.translateTitle')}
                     >
                         {translating ? (
-                            <><i className="fas fa-spinner fa-spin"></i> {t('edit.translating')}</>
+                            <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> {t('edit.translating')}</>
                         ) : (
-                            <><i className="fas fa-language"></i> {t('edit.translateButton')}</>
+                            <><i className="fas fa-language" aria-hidden="true"></i> {t('edit.translateButton')}</>
                         )}
                     </button>
                 </div>
@@ -700,7 +700,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                         className="btn btn-secondary"
                         disabled={saving}
                     >
-                        <i className="fas fa-times"></i> {t('common.cancel')}
+                        <i className="fas fa-times" aria-hidden="true"></i> {t('common.cancel')}
                     </button>
                     <button
                         type="submit"
@@ -709,11 +709,11 @@ const EditPatientComponent = ({ personId }: Props) => {
                     >
                         {saving ? (
                             <>
-                                <i className="fas fa-spinner fa-spin"></i> {t('edit.saving')}
+                                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> {t('edit.saving')}
                             </>
                         ) : (
                             <>
-                                <i className="fas fa-save"></i> {t('edit.save')}
+                                <i className="fas fa-save" aria-hidden="true"></i> {t('edit.save')}
                             </>
                         )}
                     </button>
@@ -734,7 +734,7 @@ const EditPatientComponent = ({ personId }: Props) => {
                 <div className={styles.deleteModalContent}>
                     <p>{t('edit.delete.confirmQuestion', { name: patientData?.patient_name ?? formData.patient_name })}</p>
                     <p className={styles.deleteModalWarning}>
-                        <i className="fas fa-exclamation-triangle"></i> {t('edit.delete.warning')}
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> {t('edit.delete.warning')}
                     </p>
                     <div className={styles.deleteModalActions}>
                         <button onClick={() => setShowDeleteConfirm(false)} className="btn btn-light" disabled={deleting}>

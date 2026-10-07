@@ -40,7 +40,7 @@
 
 /* Add Doctor Button */
 .btnAdd {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: none;
@@ -54,9 +54,9 @@
 }
 
 .btnAdd:hover:not(:disabled) {
-    background: var(--blue-300);
+    background: var(--primary-fill-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px color-mix(in oklch, var(--blue-300) 30%, transparent);
+    box-shadow: 0 4px 8px color-mix(in oklch, var(--primary-color) 30%, transparent);
 }
 
 .btnAdd:disabled {
@@ -122,7 +122,7 @@
 }
 
 .required {
-    color: var(--error-400);
+    color: var(--error-700);
 }
 
 .fieldHelp {
@@ -158,10 +158,10 @@
 }
 
 .btnCancel {
-    background: var(--secondary-color);
+    background: var(--secondary-fill);
     color: var(--color-white);
     padding: 0.75rem 1.5rem;
-    border: 1px solid var(--secondary-color);
+    border: 1px solid var(--secondary-fill);
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
@@ -172,15 +172,15 @@
 }
 
 .btnCancel:hover {
-    background: var(--secondary-hover);
-    border-color: var(--secondary-hover);
+    background: var(--secondary-fill-hover);
+    border-color: var(--secondary-fill-hover);
 }
 
 .btnSave {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
     padding: 0.75rem 1.5rem;
-    border: 1px solid var(--primary-color);
+    border: 1px solid var(--primary-fill);
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
@@ -191,8 +191,8 @@
 }
 
 .btnSave:hover {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
+    background: var(--primary-fill-hover);
+    border-color: var(--primary-fill-hover);
 }
 
 /* Doctors List */
@@ -287,7 +287,7 @@
 }
 
 .emailValue i {
-    color: var(--info-500);
+    color: var(--info-700);
 }
 
 .noEmail {
@@ -353,11 +353,12 @@
 .btnEdit:hover {
     background: var(--info-200);
     transform: scale(1.1);
+    color: var(--info-800);
 }
 
 .btnDelete {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
 }
 
 .btnDelete:hover {
@@ -392,18 +393,18 @@
 
 .errorContainer i {
     font-size: 3rem;
-    color: var(--error-400);
+    color: var(--error-700);
     margin-bottom: 1rem;
 }
 
 .errorContainer p {
-    color: var(--error-600);
+    color: var(--error-700);
     font-size: 1.1rem;
     margin-bottom: 1.5rem;
 }
 
 .btnRetry {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
     padding: 0.75rem 1.5rem;
     border: none;
@@ -417,7 +418,7 @@
 }
 
 .btnRetry:hover {
-    background: var(--blue-300);
+    background: var(--primary-fill-hover);
 }
 
 /* Responsive adjustments */

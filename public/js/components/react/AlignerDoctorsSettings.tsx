@@ -119,7 +119,7 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
         return (
             <div className={styles.container}>
                 <div className={styles.loadingContainer}>
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <p>Loading doctors...</p>
                 </div>
             </div>
@@ -130,10 +130,10 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
         return (
             <div className={styles.container}>
                 <div className={styles.errorContainer}>
-                    <i className="fas fa-exclamation-triangle"></i>
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <p>Error: {error}</p>
                     <button onClick={() => refetch()} className={styles.btnRetry}>
-                        <i className="fas fa-redo"></i> Retry
+                        <i className="fas fa-redo" aria-hidden="true"></i> Retry
                     </button>
                 </div>
             </div>
@@ -145,7 +145,7 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
             <div className={styles.sectionHeader}>
                 <div className={styles.headerContent}>
                     <h2>
-                        <i className="fas fa-user-md"></i>
+                        <i className="fas fa-user-md" aria-hidden="true"></i>
                         Aligner Doctors
                     </h2>
                     <p className={styles.sectionDescription}>
@@ -157,7 +157,7 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
                     onClick={handleAdd}
                     disabled={showAddForm}
                 >
-                    <i className="fas fa-plus"></i>
+                    <i className="fas fa-plus" aria-hidden="true"></i>
                     Add Doctor
                 </button>
             </div>
@@ -173,7 +173,7 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
                 {(dismiss) => (<>
                 <ModalHeader
                     titleId="aligner-doctor-modal-title"
-                    icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} />}
+                    icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} aria-hidden="true" />}
                     title={editingId ? 'Edit Doctor' : 'Add New Doctor'}
                     onClose={dismiss}
                 />
@@ -232,7 +232,7 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
             <div className={styles.list}>
                 {doctors.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-user-md"></i>
+                        <i className="fas fa-user-md" aria-hidden="true"></i>
                         <p>No doctors found</p>
                         <p className={styles.emptyStateHint}>Click "Add Doctor" to create your first doctor entry</p>
                     </div>
@@ -254,13 +254,13 @@ const AlignerDoctorsSettings = (_props: AlignerDoctorsSettingsProps) => {
                                     <tr key={doctor.dr_id}>
                                         <td>{doctor.dr_id}</td>
                                         <td className={styles.doctorName}>
-                                            <i className="fas fa-user-md"></i>
+                                            <i className="fas fa-user-md" aria-hidden="true"></i>
                                             {doctorLabel(doctor.doctor_name)}
                                         </td>
                                         <td>
                                             {doctor.doctor_email ? (
                                                 <span className={styles.emailValue}>
-                                                    <i className="fas fa-envelope"></i>
+                                                    <i className="fas fa-envelope" aria-hidden="true"></i>
                                                     {doctor.doctor_email}
                                                 </span>
                                             ) : (

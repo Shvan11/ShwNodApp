@@ -234,7 +234,7 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set }: PaymentFormDrawerPr
 
                     {errors.submit && (
                         <div className="error-alert">
-                            <i className="fas fa-exclamation-circle"></i>
+                            <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                             {errors.submit}
                         </div>
                     )}
@@ -253,12 +253,12 @@ const PaymentFormDrawer = ({ isOpen, onClose, onSave, set }: PaymentFormDrawerPr
                 >
                     {saving ? (
                         <>
-                            <i className="fas fa-spinner fa-spin"></i>
+                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                             Saving...
                         </>
                     ) : (
                         <>
-                            <i className="fas fa-check"></i>
+                            <i className="fas fa-check" aria-hidden="true"></i>
                             Save Payment
                         </>
                     )}

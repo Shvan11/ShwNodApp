@@ -1,6 +1,7 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { Suspense, type ComponentType } from 'react';
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { RouteErrorBoundary } from '../error-boundaries/RouteErrorBoundary';
+import { lazyWithPreload } from '../../router/lazyWithPreload';
 
 /**
  * Each patient sub-page is its own lazy chunk.
@@ -13,32 +14,32 @@ import { RouteErrorBoundary } from '../error-boundaries/RouteErrorBoundary';
  * `preloaders` is the single source of truth shared by the lazy components and
  * `preloadPatientPage()` below, so the loader can warm the exact chunk it's
  * about to render — collapsing the route-chunk → page-chunk waterfall the split
- * would otherwise introduce. One page string → one factory; 'work' and
+ * would otherwise introduce. One page string → one component; 'work' and
  * 'diagnosis' share the Diagnosis chunk.
  */
-const preloaders = new Map<string, () => Promise<unknown>>();
+const preloaders = new Map<string, () => Promise<void>>();
 
 function lazyPage<T extends ComponentType<any>>(
     pages: string[],
     factory: () => Promise<{ default: T }>
 ) {
-    for (const p of pages) preloaders.set(p, factory);
-    return lazy(factory);
+    const Page = lazyWithPreload(factory);
+    for (const p of pages) preloaders.set(p, Page.preload);
+    return Page;
 }
 
 /**
- * Warm a patient sub-page's chunk ahead of render. Called from
- * patientShellLoader at route-match so the page chunk downloads in parallel with
- * the loader's data fetch and the PatientShell chunk (mirrors routes.config's
- * `.preload()`). Fire-and-forget; unknown/empty pages no-op (the chunk simply
- * loads on render via Suspense). Swallow rejections — a genuinely unloadable
- * chunk still surfaces on the render path, where App.tsx's preloadError handler
- * self-heals; this speculative warm-up must not log spurious [client-error].
+ * Load a patient sub-page's chunk ahead of render. patientShellLoader awaits
+ * this beside its data, so the page mounts already loaded and never shows the
+ * content spinner below: showing it, even for one tick, costs React's 300 ms
+ * fallback throttle (audit FE-F26-3; `lazyWithPreload` has the detail). Resolves
+ * for an unknown or empty page (the chunk then loads on render via Suspense) and
+ * never rejects — a chunk that cannot load still surfaces on the render path,
+ * where the chunk self-heal lives, and a warm-up must not file a [client-error].
  */
-export function preloadPatientPage(page: string | null | undefined): void {
-    if (!page) return;
-    const factory = preloaders.get(page);
-    if (factory) void factory().catch(() => {});
+export function preloadPatientPage(page: string | null | undefined): Promise<void> {
+    const preload = page ? preloaders.get(page) : undefined;
+    return preload ? preload() : Promise.resolve();
 }
 
 const GridComponent = lazyPage(['photos'], () => import('./GridComponent'));
@@ -335,7 +336,7 @@ const ContentRenderer = ({ personId, page = 'photos', params = {} }: ContentRend
                 return (
                     <div className="unknown-page">
                         <div className="error-message">
-                            <i className="fas fa-question-circle"></i>
+                            <i className="fas fa-question-circle" aria-hidden="true"></i>
                             <h3>Page Not Found</h3>
                             <p>The page "{page}" is not available.</p>
                         </div>

@@ -186,12 +186,19 @@ export const qk = {
     implantManufacturers: () => ['lookups', 'implant-manufacturers'] as const,
     /** GET /api/shades — dental shade systems + values (Bridge/Veneers work items). */
     shades: () => ['lookups', 'shades'] as const,
+    /** GET /api/timepoint-names — the common photo-session names (New / Edit Photo Session). */
+    timepointNames: () => ['lookups', 'timepoint-names'] as const,
     /** GET /api/labs — labs from the "Lab" expense subcategories (Bridge/Veneers work items). */
     labs: () => ['lookups', 'labs'] as const,
     alertTypes: () => ['lookups', 'alert-types'] as const,
     wires: () => ['lookups', 'wires'] as const,
     operators: () => ['lookups', 'operators'] as const,
-    patientPhones: () => ['lookups', 'patient-phones'] as const,
+    /** Prefix over every patient-typeahead answer. Invalidate it after a patient is
+     *  added, renamed, given another phone or deleted, or the boxes keep offering the
+     *  old rows for as long as an answer stays fresh (FE-F6-9). */
+    patientLookupAll: () => ['lookups', 'patient-lookup'] as const,
+    /** GET /api/patients/lookup — one typeahead answer (`usePatientLookup`). */
+    patientLookup: (params: object) => ['lookups', 'patient-lookup', params] as const,
     /** GET /api/doctors — doctor options (appointment/calendar filters). */
     doctors: () => ['lookups', 'doctors'] as const,
     /** GET /api/work-doctors — who a work can be attributed to (the work form's Doctor select). */

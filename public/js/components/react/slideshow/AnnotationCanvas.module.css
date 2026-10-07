@@ -77,6 +77,7 @@
 }
 
 .widthActive {
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- selected tool on the always-dark presentation toolbar */
   background: var(--color-white);
 }
 

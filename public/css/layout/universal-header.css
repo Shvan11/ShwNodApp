@@ -44,6 +44,10 @@
 .logo-section {
     display: flex;
     align-items: center;
+    /* A 16px line of text was the whole Home target. */
+    min-height: 2rem;
+    /* Lets the name inside shrink to an ellipsis (see .clinic-name). */
+    min-width: 0;
     margin-inline-end: var(--spacing-xl);
     cursor: pointer;
 }
@@ -69,9 +73,20 @@
     color: var(--color-white);
     font-size: 1.2rem;
     font-weight: var(--font-weight-bold);
+    /* It was an <h1> and took this from the heading reset. */
+    line-height: var(--line-height-tight);
     margin: 0;
     transition: all 0.2s ease;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    /* One line, always. The left region is what is left over once the tabs and the
+       right-hand group have taken their width, and with a patient tab open that is
+       less than the name between 1025 and ~1310 px: the name wrapped onto two lines
+       (46 px in a 50 px bar) and, under ~1230 px, ran on over the first tab. A name
+       that does not fit is cut with an ellipsis; its `title` has it in full. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .clinic-name:hover {
@@ -92,9 +107,13 @@
     align-items: center;
 }
 
+/* The chips are DARK glass. As white glass (10% resting, 25% on the active item)
+   they lifted the bar under their own label: white read 4.0:1 at the gradient's
+   light end and 3.0:1 on the current page's button. The border and, on the
+   current page, a white rule along the bottom carry the state instead. */
 .nav-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.12);
+    border: 2px solid rgba(255, 255, 255, 0.25);
     color: var(--color-white);
     padding: 0.6rem 1.2rem;
     border-radius: var(--radius-lg);
@@ -111,16 +130,16 @@
 }
 
 .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(0, 0, 0, 0.22);
+    border-color: rgba(255, 255, 255, 0.5);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
 .nav-btn.active {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.85);
+    box-shadow: inset 0 -3px 0 var(--color-white), 0 4px 15px rgba(0, 0, 0, 0.15);
 }
 
 .nav-btn i {
@@ -149,50 +168,64 @@
    button bright and clearly "working" (NOT the dimmed disabled look); the spinner
    icon + aria-busy carry the state, and re-clicks are swallowed in the handler. */
 .nav-btn.pending {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.6);
     cursor: progress;
 }
 
 .nav-btn.pending:hover {
     transform: none;
     box-shadow: none;
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.6);
 }
 
 /* Sticky patient tab — the patient pill, plus a close ("forget this patient")
-   chip shown once the tab is backgrounded (we've navigated off that patient's page). */
+   chip shown once the tab is backgrounded (we've navigated off that patient's page).
+   The chip is a sibling button drawn over the tab's trailing edge: nested inside the
+   tab's own <button> it was invisible to assistive tech (FE-F25-10). */
 .patient-nav-wrap {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
 }
 
-/* Close ("forget this patient") chip tucked inside the tab on its trailing
-   edge, browser-tab style — faint by default, red circle on hover. */
+/* Room for the chip. */
+.patient-nav.has-close {
+    padding-inline-end: 2.25rem;
+}
+
+/* Browser-tab style — faint by default, red circle on hover. 24px, the minimum
+   pointer target; it was 20px at 65% opacity. */
 .patient-nav-close {
+    position: absolute;
+    inset-inline-end: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    margin-inline-start: 0.15rem;
-    margin-inline-end: -0.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
     color: var(--color-white);
     background: transparent;
     border: none;
     border-radius: var(--radius-full);
     cursor: pointer;
-    opacity: 0.65;
+    opacity: 0.8;
     transition: background 0.2s ease, opacity 0.2s ease;
-    flex-shrink: 0;
 }
 
-.patient-nav-close:hover {
-    background: var(--danger-color);
+.patient-nav-close:hover,
+.patient-nav-close:focus-visible {
+    background: var(--error-fill);
     opacity: 1;
+}
+
+.patient-nav-close:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 1px;
 }
 
 .patient-nav-close i {
@@ -214,8 +247,8 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.375rem 0.75rem;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.12);
+    border: 2px solid rgba(255, 255, 255, 0.25);
     border-radius: var(--radius-lg);
     color: var(--color-white);
     transition: all 0.3s ease;
@@ -225,8 +258,8 @@
 }
 
 .user-info:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.22);
+    border-color: rgba(255, 255, 255, 0.4);
 }
 
 .user-info i {
@@ -248,11 +281,24 @@
 
 .user-role {
     font-size: 0.75rem;
-    opacity: 0.85;
     text-transform: capitalize;
 }
 
 /* Responsive Design */
+
+/* Laptop widths: the three regions only just fit, so the name gives up a little
+   size and gap here instead of being cut (at 1280 px with a patient tab open the
+   left region is 222 px; an 18-letter name needs 202 px at this size). */
+@media (max-width: 1366px) {
+    .logo-section {
+        margin-inline-end: var(--spacing-md);
+    }
+
+    .clinic-name {
+        font-size: 1.1rem;
+    }
+}
+
 @media (max-width: 1024px) {
     .header-container {
         padding: 0.5rem 1rem;
@@ -269,10 +315,6 @@
 
     .logo-section {
         margin-inline-end: 0.5rem;
-    }
-
-    .clinic-name {
-        font-size: 1.1rem;
     }
 
     .header-center {
@@ -330,9 +372,6 @@
 
     .clinic-name {
         font-size: 0.9375rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 
     .header-center {

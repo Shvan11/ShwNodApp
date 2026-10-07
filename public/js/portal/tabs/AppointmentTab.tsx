@@ -5,6 +5,7 @@ import { portalGet } from '../portalApi';
 import { formatLocaleDate, formatLocaleTime } from '../../utils/formatters';
 import { isClinicDoctorName } from '@shared/clinic-doctor';
 import styles from '../portal.module.css';
+import PortalIcon from '../PortalIcon';
 
 function formatAppointmentDate(iso: string): { date: string; time: string } {
   // English, like the rest of the portal's text — never the phone's own locale (FE-F3-3).
@@ -61,7 +62,7 @@ const AppointmentTab = () => {
     return (
       <div className={styles.tabPanel}>
         <div className={styles.emptyState}>
-          <i className={`fas fa-calendar-check ${styles.emptyIcon}`} aria-hidden="true" />
+          <PortalIcon name="calendar-check" className={styles.emptyIcon} />
           <p>No upcoming appointments scheduled.</p>
           <p className={styles.emptyHint}>Contact the clinic to book your next visit.</p>
         </div>
@@ -82,12 +83,12 @@ const AppointmentTab = () => {
         {time && <div className={styles.appointmentTime}>at {time}</div>}
         {doctor && (
           <div className={styles.appointmentRow}>
-            <i className="fas fa-user-md" aria-hidden="true" /> Dr. {doctor}
+            <PortalIcon name="doctor" /> Dr. {doctor}
           </div>
         )}
         {appt.app_detail && (
           <div className={styles.appointmentRow}>
-            <i className="fas fa-clipboard-list" aria-hidden="true" /> {appt.app_detail}
+            <PortalIcon name="clipboard-list" /> {appt.app_detail}
           </div>
         )}
       </div>

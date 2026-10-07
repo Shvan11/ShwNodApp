@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import sseAppointments, { type Freshness } from '../services/sse-appointments';
-import { toLocalDateString } from '../utils/calendarDate';
+import { useToday } from './useClock';
 
 // Periodic safety net for missed SSE messages on the today view.
 const PERIODIC_SYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -33,8 +33,6 @@ export interface UseAppointmentsSyncReturn {
   dataFreshness: Freshness;
 }
 
-const getTodayDate = (): string => toLocalDateString(new Date());
-
 /**
  * Real-time appointment sync — **today-only by design.**
  *
@@ -55,7 +53,9 @@ export function useAppointmentsSync(
 
   // Single source of truth for "should this hook do anything real-time?"
   // Drives every effect below. Non-today => static view, no subscriptions.
-  const isViewingToday = currentDate === getTodayDate();
+  // useClock's "today": this is derived in render, where a `new Date()` would be
+  // cached, and a board left on tomorrow's date must go live at midnight (FE-F26-8).
+  const isViewingToday = currentDate === useToday();
 
   // Keep refs to the latest callback + date so the debounced trigger always
   // invokes the current closure without recreating the debouncer every render.

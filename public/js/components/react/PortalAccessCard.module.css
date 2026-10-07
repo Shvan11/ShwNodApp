@@ -66,7 +66,7 @@
 }
 
 .valueWarning {
-  color: var(--warning-color);
+  color: var(--warning-800);
   font-weight: 500;
 }
 
@@ -146,7 +146,7 @@
   padding: 0.75rem 1rem;
   background: var(--bg-muted);
   border-radius: 8px;
-  color: var(--primary-color);
+  color: var(--blue-700);
   margin-bottom: var(--spacing-md);
   user-select: all;
 }

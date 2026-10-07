@@ -18,12 +18,11 @@ test('dashboard renders behind auth', async ({ page }) => {
 
 test('patient page loads a real patient through the shell loader', async ({ page, request }) => {
   // Pick a real person id via the API (read-only) instead of hardcoding one.
-  // /api/patients/phones rows are { id, name, phone } (patient.contract.ts).
-  const res = await request.get('/api/patients/phones');
+  // /api/patients/search answers { patients: [{ person_id, … }] } (patient.contract.ts).
+  const res = await request.get('/api/patients/search?limit=1');
   expect(res.ok()).toBeTruthy();
-  const body = (await res.json()) as { data?: Array<{ id?: number }> } | Array<{ id?: number }>;
-  const patients = Array.isArray(body) ? body : (body.data ?? []);
-  const personId = patients.find((p) => typeof p.id === 'number')?.id;
+  const body = (await res.json()) as { data?: { patients?: Array<{ person_id?: number }> } };
+  const personId = body.data?.patients?.find((p) => typeof p.person_id === 'number')?.person_id;
   test.skip(personId === undefined, 'no patients in this database');
 
   await page.goto(`/patient/${personId}/works`);

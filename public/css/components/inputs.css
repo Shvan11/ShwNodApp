@@ -2,7 +2,7 @@
 
 /* Required field indicator (asterisk in form labels) */
 .required {
-    color: var(--error-500);
+    color: var(--error-700);
     font-weight: var(--font-weight-bold);
 }
 
@@ -87,144 +87,11 @@ textarea.form-control {
     min-width: 0;
 }
 
-/* Validation States */
-
 /* RTL Text Direction Support */
 .text-rtl {
     direction: rtl;
     text-align: right;
 }
-
-/* ===================================
-   REACT SELECT GLOBAL STYLES
-   =================================== */
-/* React-Select component styling to match form-control inputs */
-.pm-select__control {
-    min-height: var(--input-height);
-    height: var(--input-height);
-    border-color: var(--gray-300);
-    border-radius: var(--radius-md);
-    border-width: var(--border-width-thin);
-    box-shadow: none;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-    background-color: var(--surface);
-}
-
-.pm-select__control:hover {
-    border-color: var(--primary-color);
-}
-
-.pm-select__control--is-focused {
-    border-color: var(--primary-color);
-    box-shadow: var(--shadow-focus);
-}
-
-.pm-select__control--is-disabled {
-    background-color: var(--gray-100);
-    opacity: 1;
-    cursor: not-allowed;
-}
-
-.pm-select__value-container {
-    padding: var(--spacing-xs) var(--spacing-md);
-    height: calc(var(--input-height) - 2px);
-}
-
-.pm-select__placeholder {
-    color: var(--text-placeholder);
-    font-size: var(--font-size-base);
-}
-
-.pm-select__single-value {
-    color: var(--text-primary);
-    font-size: var(--font-size-base);
-}
-
-.pm-select__input-container {
-    color: var(--text-primary);
-    font-size: var(--font-size-base);
-}
-
-.pm-select__menu {
-    z-index: var(--z-index-dropdown);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    border: var(--border-width-thin) solid var(--gray-200);
-    margin-top: var(--spacing-xs);
-    background-color: var(--surface-elevated);
-}
-
-.pm-select__menu-list {
-    padding: var(--spacing-xs);
-}
-
-.pm-select__option {
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-base);
-    color: var(--text-primary);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background-color var(--transition-fast);
-}
-
-.pm-select__option:hover {
-    background-color: var(--blue-50);
-}
-
-.pm-select__option--is-focused {
-    background-color: var(--blue-50);
-}
-
-.pm-select__option--is-selected {
-    background-color: var(--primary-color);
-    color: var(--color-white);
-}
-
-.pm-select__multi-value {
-    background-color: var(--blue-100);
-    border-radius: var(--radius-sm);
-    margin: var(--spacing-xs);
-}
-
-.pm-select__multi-value__label {
-    color: var(--blue-700);
-    font-size: var(--font-size-sm);
-    padding: var(--spacing-xs) var(--spacing-sm);
-}
-
-.pm-select__multi-value__remove {
-    color: var(--blue-700);
-    cursor: pointer;
-    transition: background-color var(--transition-fast);
-}
-
-.pm-select__multi-value__remove:hover {
-    background-color: var(--blue-200);
-    color: var(--blue-800);
-}
-
-.pm-select__clear-indicator,
-.pm-select__dropdown-indicator {
-    color: var(--gray-500);
-    transition: color var(--transition-fast);
-    cursor: pointer;
-    padding: var(--spacing-xs);
-}
-
-.pm-select__clear-indicator:hover,
-.pm-select__dropdown-indicator:hover {
-    color: var(--text-secondary);
-}
-
-.pm-select__indicator-separator {
-    background-color: var(--gray-300);
-}
-
-.pm-select__loading-indicator {
-    color: var(--primary-color);
-}
-
-/* Form Input - Legacy class used by Diagnosis, Statistics, etc. */
 
 /* Responsive Input Adjustments */
 @media (max-width: 768px) {
@@ -232,21 +99,5 @@ textarea.form-control {
         font-size: var(--font-size-base);
         padding: var(--spacing-sm) var(--spacing-md);
         height: var(--input-height);
-    }
-
-    .pm-select__control {
-        min-height: var(--input-height);
-        height: var(--input-height);
-    }
-
-    .pm-select__value-container {
-        height: calc(var(--input-height) - 2px);
-    }
-
-    .pm-select__placeholder,
-    .pm-select__single-value,
-    .pm-select__input-container,
-    .pm-select__option {
-        font-size: var(--font-size-base);
     }
 }

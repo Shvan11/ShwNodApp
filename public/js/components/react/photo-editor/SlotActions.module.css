@@ -42,7 +42,7 @@
 
 .btn:hover:not(:disabled) {
   background: var(--background-secondary);
-  color: var(--primary-color);
+  color: var(--blue-700);
 }
 
 .btn:disabled {
@@ -51,16 +51,16 @@
 }
 
 .active {
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
 }
 
 .active:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
   color: var(--color-white);
 }
 
 .danger:hover:not(:disabled) {
-  background: var(--error-color);
+  background: var(--error-fill);
   color: var(--color-white);
 }

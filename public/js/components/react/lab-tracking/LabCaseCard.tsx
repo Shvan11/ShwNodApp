@@ -5,7 +5,7 @@ import { labelForStage } from '@/config/labStages';
 import { useAdvanceLabCase } from '@/hooks/useLabCases';
 import { useToast } from '@/contexts/ToastContext';
 import { httpErrorMessage } from '@/core/http';
-import { toLocalDateString } from '@/utils/calendarDate';
+import { useToday, useNowMinute } from '@/hooks/useClock';
 import { formatLocaleDate } from '@/utils/formatters';
 import styles from './LabCaseCard.module.css';
 
@@ -16,17 +16,20 @@ interface LabCaseCardProps {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function daysSince(dateStr: string): number {
+// The clock comes in as an argument (the component reads it through useClock):
+// a `new Date()` in a helper called from render is cached by the React Compiler
+// with the block around it, and goes stale on a screen left open (FE-F26-8).
+function daysSince(dateStr: string, now: number): number {
     const d = new Date(dateStr);
     if (Number.isNaN(d.getTime())) return 0;
-    return Math.max(0, Math.floor((Date.now() - d.getTime()) / MS_PER_DAY));
+    return Math.max(0, Math.floor((now - d.getTime()) / MS_PER_DAY));
 }
 
-function isOverdue(dueDate: string | null, status: string): boolean {
+function isOverdue(dueDate: string | null, status: string, today: string): boolean {
     if (!dueDate || status === 'delivered' || status === 'cancelled') return false;
-    // LOCAL today: toISOString() is the UTC date, which between 00:00 and 03:00
-    // Baghdad time is still yesterday, so a case due yesterday read as not overdue.
-    return dueDate < toLocalDateString(new Date());
+    // `today` is the LOCAL date: the UTC one is still yesterday between 00:00 and
+    // 03:00 Baghdad time, so a case due yesterday read as not overdue.
+    return dueDate < today;
 }
 
 /**
@@ -41,10 +44,14 @@ const LabCaseCard = ({ labCase, onOpen }: LabCaseCardProps) => {
     // A double click on Confirm sent two advances; the second was refused and
     // toasted an error after the success (FE-F20-7d).
     const submittingRef = useRef(false);
+    // A board left open for days: "overdue" turns at midnight and "Nd in stage"
+    // counts up without a data change.
+    const today = useToday();
+    const nowMinute = useNowMinute();
 
     const currentIdx = LAB_STAGE_META.findIndex((m) => m.key === labCase.status);
     const nextStage = currentIdx >= 0 ? LAB_STAGE_META[currentIdx + 1] : undefined;
-    const overdue = isOverdue(labCase.due_date, labCase.status);
+    const overdue = isOverdue(labCase.due_date, labCase.status, today);
 
     const [quickOpen, setQuickOpen] = useState(false);
     const [target, setTarget] = useState<LabStage | ''>('');
@@ -113,7 +120,7 @@ const LabCaseCard = ({ labCase, onOpen }: LabCaseCardProps) => {
                     {labCase.shade && <span>{labCase.shade}</span>}
                 </div>
                 <div className={styles.footerLine}>
-                    <span className={styles.aging}>{daysSince(labCase.status_changed_at)}d in stage</span>
+                    <span className={styles.aging}>{daysSince(labCase.status_changed_at, nowMinute)}d in stage</span>
                     {labCase.due_date && (
                         <span className={cn(styles.due, overdue && styles.dueOverdue)}>
                             {overdue ? 'Overdue: ' : 'Due '}{formatLocaleDate(labCase.due_date) || labCase.due_date}

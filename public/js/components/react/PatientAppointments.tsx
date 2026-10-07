@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useNowMinute } from '@/hooks/useClock';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     const appointments = data?.appointments ?? [];
     const error = queryError ? httpErrorMessage(queryError, t('form.errorUnknown')) : null;
     const deletingRef = useRef(false);
+    const nowMinute = useNowMinute();
 
     const handleEdit = (appointmentId: number): void => {
         // The form reads the appointment by id itself (audit FE-F10-1).
@@ -70,15 +72,16 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
     // The weekday + meridiem localize; day/month/year stay Western digits.
     const formatDateTime = (dateTime: string): string => formatAppointmentListDateTime(new Date(dateTime), language);
 
-    const isPastAppointment = (dateTime: string): boolean => {
-        return new Date(dateTime) < new Date();
-    };
+    // Against useClock's minute, not `new Date()`: read in render, the clock is
+    // cached with the block around it and an appointment never turns "past" on a
+    // page left open (FE-F26-8).
+    const isPastAppointment = (dateTime: string): boolean => new Date(dateTime).getTime() <= nowMinute;
 
     if (loading) {
         return (
             <div className={styles.container}>
                 <div className={styles.loadingState}>
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <p>{t('list.loading')}</p>
                 </div>
             </div>
@@ -89,10 +92,10 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         return (
             <div className={styles.container}>
                 <div className={styles.errorState}>
-                    <i className="fas fa-exclamation-circle"></i>
+                    <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                     <p>{error}</p>
                     <button onClick={() => refetch()} className={cn('btn', styles.btnRetry)}>
-                        <i className="fas fa-redo"></i> {t('list.retry')}
+                        <i className="fas fa-redo" aria-hidden="true"></i> {t('list.retry')}
                     </button>
                 </div>
             </div>
@@ -103,26 +106,26 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
         <div className={styles.container}>
             <div className={styles.header}>
                 <h2>
-                    <i className="fas fa-calendar-check"></i> {t('list.title')}
+                    <i className="fas fa-calendar-check" aria-hidden="true"></i> {t('list.title')}
                 </h2>
                 <button
                     className={cn('btn', styles.btnNewAppointment)}
                     onClick={() => navigate(`/patient/${personId}/new-appointment`)}
                 >
-                    <i className="fas fa-plus"></i> {t('list.newAppointment')}
+                    <i className="fas fa-plus" aria-hidden="true"></i> {t('list.newAppointment')}
                 </button>
             </div>
 
             {appointments.length === 0 ? (
                 <div className={styles.emptyState}>
-                    <i className="fas fa-calendar-times"></i>
+                    <i className="fas fa-calendar-times" aria-hidden="true"></i>
                     <h3>{t('list.emptyTitle')}</h3>
                     <p>{t('list.emptyText')}</p>
                     <button
                         className={cn('btn', styles.btnNewAppointment)}
                         onClick={() => navigate(`/patient/${personId}/new-appointment`)}
                     >
-                        <i className="fas fa-plus"></i> {t('list.scheduleFirst')}
+                        <i className="fas fa-plus" aria-hidden="true"></i> {t('list.scheduleFirst')}
                     </button>
                 </div>
             ) : (
@@ -137,7 +140,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                             >
                                 <div className={styles.main}>
                                     <div className={styles.icon}>
-                                        <i className={`fas ${isPast ? 'fa-check-circle' : 'fa-calendar'}`}></i>
+                                        <i className={`fas ${isPast ? 'fa-check-circle' : 'fa-calendar'}`} aria-hidden="true"></i>
                                     </div>
                                     <div className={styles.details}>
                                         <div className={styles.date}>
@@ -148,7 +151,7 @@ const PatientAppointments = ({ personId }: PatientAppointmentsProps) => {
                                         </div>
                                         {appointment.DrName && (
                                             <div className={styles.doctor}>
-                                                <i className="fas fa-user-md"></i> {appointment.DrName}
+                                                <i className="fas fa-user-md" aria-hidden="true"></i> {appointment.DrName}
                                             </div>
                                         )}
                                     </div>

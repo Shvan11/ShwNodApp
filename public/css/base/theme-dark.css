@@ -20,9 +20,26 @@
    --success-dark) but which are defined as `var(--other)` auto-follow
    their target and need no entry here. Names left out entirely keep
    their light value in dark mode — accepted; renaming them is out of
-   scope. NOTE: `--white` (the back-compat surface alias) intentionally
-   flips to a dark surface here; the few `color/border: var(--white)`
-   text uses on filled buttons were migrated to `var(--color-white)`.
+   scope. Brand white is `--color-white` (fixed in both themes).
+
+   Which end of a ramp to use — the rule that keeps a pairing readable
+   in both themes:
+     • FILL under white text → a `--*-fill` token (`--primary-fill`,
+       `--success-fill`, `--info-fill`, `--secondary-fill`, `--error-fill`,
+       `--warning-fill`, each with a `-hover`), or a fixed `--palette-*`
+       step that reads 4.5:1 under white (blue/indigo 600, green/cyan/
+       orange 700). NOT `--primary-color` and its siblings, and not a
+       ramp's 500/600: here those are BRIGHT, because they are also the
+       link, icon and border colours on a dark surface, and white on them
+       read 2.0–2.8:1 (audit FE-F25-1). Never a 700–900 step, a
+       `--*-dark(er)` name or a `--text-*` token either: those flip to
+       PALE tints here.
+     • TEXT on a themed surface → `--text-*`, or the 700–800 end of a
+       ramp (dark in light, pale here), which is also the ink for a
+       ramp's own 50–200 tint. Never `--gray-300/400/500`: in dark they
+       are border tones.
+     • A fill that stays yellow (`--warning-color`) takes fixed dark ink
+       (`--palette-gray-900`), never `--text-primary`.
    =================================================================== */
 
 @media screen {
@@ -47,8 +64,6 @@
         --hover-bg: var(--palette-night-700);
         --bg-color: var(--palette-night-900);
         --bg-muted: var(--palette-night-700);
-        --white: var(--palette-night-800);
-        /* back-compat surface alias — flips; brand white is --color-white */
 
         /* ===========================================================
            Text — flattened to ~2 tiers on the dark canvas.
@@ -68,7 +83,6 @@
         --border-color: var(--palette-night-500);
         --border: var(--palette-night-500);
         --border-light: var(--palette-night-600);
-        --border-accent: var(--palette-night-500);
 
         /* ===========================================================
            Gray ramp — full cool-slate inversion (50 ⇄ 900)
@@ -87,6 +101,17 @@
         /* ===========================================================
            Brand-interactive — brightened for a dark canvas
            =========================================================== */
+        /* Solid fills under white text (see tokens-semantic.css). The colour tokens
+           below stay BRIGHT for links, icons and borders on the dark surface; white
+           on them was 2.0–2.8:1, so a fill must not use them (FE-F25-1). */
+        --primary-fill: var(--palette-blue-600);
+        --primary-fill-hover: var(--palette-blue-700);
+        --success-fill: var(--palette-green-700);
+        --info-fill: var(--palette-cyan-700);
+        --secondary-fill: #2e7d32;
+        --secondary-fill-hover: #1b5e20;
+        --error-fill: var(--palette-red-600);
+
         --primary-color: #4dabf7;
         --primary-hover: #74c0fc;
         --primary-light: #a5d8ff;
@@ -110,16 +135,11 @@
            Extended named colours (status-adjacent)
            =========================================================== */
         --neutral-gray: #9aa3b2;
-        --neutral-gray-dark: #6b7585;
         --warning-orange: #ffa726;
         --warning-orange-dark: #ffb74d;
-        --error-pink: #f06595;
         --error-red: #ff6b6b;
         --error-red-dark: #ff8787;
         --error-red-light: #ff8787;
-        --success-darker: #86efac;
-        --pink-100: #3a1f30;
-        --error-alpha: rgba(255, 107, 107, 0.3);
 
         /* ===========================================================
            Hue scales — flip extremes, keep solid mids
@@ -192,7 +212,6 @@
         /* Amber */
         --amber-50: #2a2410;
         --amber-300: #fcd34d;
-        --amber-600: #d97706;
         --amber-800: #fcd34d;
 
         /* Purple accent stays vivid (reads well on dark) */
@@ -201,21 +220,16 @@
         /* ===========================================================
            Extended state colours (tint / dark pairs) — inverted
            =========================================================== */
-        --success-dark: #86efac;
         --success-light: #14271c;
         --error-dark: #fca5a5;
         --error-light: #3a1a1d;
         --warning-dark: #fcd34d;
         --warning-light: #3a2f12;
-        --info-dark: #67e8f9;
         --info-light: #13282e;
 
         /* ===========================================================
            Gradients
            =========================================================== */
-        --gradient-primary: linear-gradient(45deg, #1a3b39, #11151c);
-        --gradient-secondary: linear-gradient(45deg, #1c3a31, #11151c);
-        /* --gradient-accent (teal → purple) stays vivid; not overridden. */
         /* Appointments sub-header: teal (light) → neutral slate on the dark canvas. */
         --appointments-header-bg: linear-gradient(135deg, var(--palette-night-500) 0%, var(--palette-night-700) 100%);
         /* Universal header: darkened + desaturated so the fixed bar sits on the
@@ -234,23 +248,18 @@
         --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.45);
         --shadow-focus: 0 0 0 3px rgba(77, 171, 247, 0.35);
         --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.6);
-        --shadow-medium: 0 3px 6px rgba(0, 0, 0, 0.5), 0 3px 6px rgba(0, 0, 0, 0.6);
-        --shadow-heavy: 0 10px 20px rgba(0, 0, 0, 0.6), 0 6px 6px rgba(0, 0, 0, 0.6);
-        /* --shadow-focus-strong follows --primary-color; warning shadows stay. */
+        /* Warning shadows stay. */
 
         /* ===========================================================
            Calendar — flip OKLCH lightness, keep chroma/hue
            =========================================================== */
         --calendar-today-highlight: #2a2410;
-        --calendar-weekend-bg: var(--palette-night-700);
-        --calendar-header-gradient: linear-gradient(to right, #1a202b 0%, #222937 100%);
 
         --cal-line: oklch(32% 0.01 260);
         --cal-line-2: oklch(40% 0.012 260);
         --cal-ink: oklch(93% 0.01 260);
         --cal-ink-2: oklch(80% 0.012 260);
         --cal-ink-3: oklch(66% 0.008 260);
-        --cal-ink-4: oklch(52% 0.006 260);
         --cal-surface: var(--palette-night-800);
         --cal-surface-2: oklch(24% 0.008 260);
         --cal-zebra: oklch(27% 0.01 260);
@@ -258,17 +267,5 @@
         --cal-hol: oklch(66% 0.14 25);
         --cal-hol-soft: oklch(30% 0.06 25);
         --cal-purple-ink: #b3aef0;
-
-        /* ===========================================================
-           Appointment status pairs (bg / text) — inverted
-           =========================================================== */
-        --status-scheduled-bg: var(--palette-night-700);
-        --status-scheduled-text: var(--palette-night-200);
-        --status-present-bg: #13283f;
-        --status-present-text: #93c5fd;
-        --status-seated-bg: #3a2a17;
-        --status-seated-text: #fdba74;
-        --status-dismissed-bg: #14271c;
-        --status-dismissed-text: #86efac;
     }
 }

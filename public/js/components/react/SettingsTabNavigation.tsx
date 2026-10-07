@@ -73,7 +73,7 @@ const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, act
         if (data && data.hasChanges) {
             return (
                 <span className={styles.badge}>
-                    <i className="fas fa-circle"></i>
+                    <i className="fas fa-circle" aria-hidden="true"></i>
                 </span>
             );
         }
@@ -102,7 +102,7 @@ const SettingsTabNavigation: React.FC<SettingsTabNavigationProps> = ({ tabs, act
                         onKeyDown={handleKeyDown}
                         title={tab.description}
                     >
-                        <i className={tab.icon}></i>
+                        <i className={tab.icon} aria-hidden="true"></i>
                         <span className={styles.label}>{tab.label}</span>
                         {getTabBadge(tab.id)}
                     </button>

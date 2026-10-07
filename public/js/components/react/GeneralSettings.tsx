@@ -327,7 +327,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
         <div>
             <section className={styles.subsection}>
                 <h3 className={styles.pageTitle}>
-                    <i className="fas fa-desktop"></i>
+                    <i className="fas fa-desktop" aria-hidden="true"></i>
                     This PC
                 </h3>
                 <p className={styles.sectionDescription}>
@@ -361,7 +361,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                         onClick={saveChairId}
                         disabled={!chairIdDirty}
                     >
-                        <i className="fas fa-save"></i>
+                        <i className="fas fa-save" aria-hidden="true"></i>
                         Save Chair ID
                     </button>
                 </div>
@@ -476,7 +476,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
             {canManageSettings && (<>
                 <section className={styles.subsection}>
                     <h3 className={styles.pageTitle}>
-                        <i className="fas fa-image"></i>
+                        <i className="fas fa-image" aria-hidden="true"></i>
                         Clinic Branding
                     </h3>
                     <p className={styles.sectionDescription}>
@@ -497,7 +497,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                             </div>
                             <div className={styles.brandingLogoActions}>
                                 <label className="btn btn-secondary">
-                                    <i className="fas fa-upload"></i>
+                                    <i className="fas fa-upload" aria-hidden="true"></i>
                                     Choose image
                                     <input
                                         id="logo_input"
@@ -509,7 +509,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                                 </label>
                                 {shownLogo && (
                                     <button type="button" className="btn btn-secondary" onClick={clearLogo}>
-                                        <i className="fas fa-trash"></i>
+                                        <i className="fas fa-trash" aria-hidden="true"></i>
                                         Remove
                                     </button>
                                 )}
@@ -576,7 +576,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                             onClick={saveBranding}
                             disabled={!brandingDirty || savingBranding}
                         >
-                            <i className="fas fa-save"></i>
+                            <i className="fas fa-save" aria-hidden="true"></i>
                             {savingBranding ? 'Saving…' : 'Save Branding'}
                         </button>
                     </div>
@@ -584,7 +584,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
 
                 <section className={styles.subsection}>
                     <h3 className={styles.pageTitle}>
-                        <i className="fas fa-cog"></i>
+                        <i className="fas fa-cog" aria-hidden="true"></i>
                         System Options
                     </h3>
                     <p className={styles.sectionDescription}>
@@ -594,7 +594,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                     <div className={styles.form}>
                         {isLoading ? (
                             <div className={styles.loading}>
-                                <i className="fas fa-spinner fa-spin"></i>
+                                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                 <span>Loading settings...</span>
                             </div>
                         ) : (
@@ -639,7 +639,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                             onClick={saveAllChanges}
                             disabled={!hasChanges}
                         >
-                            <i className="fas fa-save"></i>
+                            <i className="fas fa-save" aria-hidden="true"></i>
                             {hasChanges
                                 ? `Save Changes (${Object.keys(pendingChanges).length})`
                                 : 'Save Changes'
@@ -649,7 +649,7 @@ const GeneralSettings = ({ onChangesUpdate }: GeneralSettingsProps) => {
                             className="btn btn-secondary"
                             onClick={refreshSettings}
                         >
-                            <i className="fas fa-sync-alt"></i>
+                            <i className="fas fa-sync-alt" aria-hidden="true"></i>
                             Refresh Settings
                         </button>
                     </div>

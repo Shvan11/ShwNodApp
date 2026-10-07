@@ -91,7 +91,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
             {(dismiss) => (<>
                 <ModalHeader
                     titleId="create-template-modal-title"
-                    icon={<i className="fas fa-plus" />}
+                    icon={<i className="fas fa-plus" aria-hidden="true" />}
                     title="Create New Template"
                     onClose={dismiss}
                 />
@@ -210,7 +210,7 @@ function CreateTemplateModal({ documentTypes, currentDocumentType, onClose, onCr
                             Cancel
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={isCreating}>
-                            <i className={`fas ${isCreating ? 'fa-spinner fa-spin' : 'fa-check'}`}></i>
+                            <i className={`fas ${isCreating ? 'fa-spinner fa-spin' : 'fa-check'}`} aria-hidden="true"></i>
                             {isCreating ? ' Creating…' : ' Create & Open Designer'}
                         </button>
                     </div>

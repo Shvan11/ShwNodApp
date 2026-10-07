@@ -126,25 +126,18 @@
     --color-black: #000000;
     --black: #000000;
     /* Alias for color-black */
-    --color-beige: #faebd7;
-    /* antiquewhite */
-    --color-blue-action: #1c87c9;
     --color-dark-blue: #1e3a8a;
-    --color-yellow: #FFBC00;
-    --color-yellow-border: #FFCB00;
-    --color-yellow-hover: #F0B200;
     --color-teal: #20c997;
-    --color-dark-slate: #2c3e50;
-    --color-light-slate: #495057;
-    --color-purple-light: #667eea;
+    /* The brand gradient's light end, under white text everywhere: #667eea was 3.7:1. */
+    --color-purple-light: #5a67d8;
     --color-purple-dark: #764ba2;
     --color-purple-medium: #6d67c6;
-    --selection-color: #ec4899;
+    --selection-color: #db2777;
     /* Rose-pink — semantic "selected" state (calendar day, time slot, future selectables) */
     --selection-color-rgb: 236, 72, 153;
     /* RGB tuple for rgba(var(--selection-color-rgb), <alpha>) usage */
-    --whatsapp-green: #25D366;
-    --whatsapp-dark: #128C7E;
+    /* The fill under white on the WhatsApp buttons (the brand green is 2:1 with white). */
+    --whatsapp-dark: #0f7f72;
 
     /* ===============================================================
        3. STRUCTURAL TOKENS  — spacing, radius, type, motion, layout
@@ -259,6 +252,12 @@
     --z-index-modal: 1040;
     --z-index-popover: 1050;
     --z-index-tooltip: 1060;
+    /* Above the scale, on purpose. A confirm prompt answers before anything else, so it
+       out-stacks every modal and drawer (1040). PhotoSwipe pins its lightbox root at
+       100000; a dialog opened from inside it must clear that, and toasts clear both. */
+    --z-index-confirm: 2050;
+    --z-index-over-lightbox: 100010;
+    --z-index-toast: 100020;
 
     /* Breakpoints for responsive design */
     --breakpoint-xs: 375px;

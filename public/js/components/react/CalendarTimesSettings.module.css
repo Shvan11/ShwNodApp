@@ -112,7 +112,7 @@
 }
 
 .addSlotSection h4 i {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .addSlotForm {
@@ -218,7 +218,7 @@
 }
 
 .earlyCategory .categoryHeader i {
-    color: var(--warning-500);
+    color: var(--warning-700);
 }
 
 .mainCategory .categoryHeader i {
@@ -226,7 +226,7 @@
 }
 
 .lateCategory .categoryHeader i {
-    color: var(--purple-500);
+    color: var(--indigo-600);
 }
 
 .categoryCount {
@@ -302,7 +302,7 @@
 
 .moveBtn:hover:not(:disabled) {
     background: var(--gray-200);
-    color: var(--primary-color);
+    color: var(--blue-700);
 }
 
 .moveBtn:disabled {
@@ -316,16 +316,17 @@
 
 .moveBtn.deleteBtn:hover:not(:disabled) {
     background: var(--error-100);
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 .moveBtn.confirmDelete {
     background: var(--error-100);
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 .moveBtn.confirmDelete:hover:not(:disabled) {
-    background: var(--error-200);
+    background: var(--error-fill);
+    color: var(--color-white);
 }
 
 /* Messages */
@@ -338,7 +339,7 @@
     border: 1px solid var(--error-200);
     border-left: 4px solid var(--error-400);
     border-radius: 8px;
-    color: var(--error-600);
+    color: var(--error-700);
     margin-bottom: 1.5rem;
 }
 
@@ -400,4 +401,6 @@
 
 .regenerateButton {
     margin-top: 0.5rem;
+    /* A long label on a narrow screen: wrap instead of pushing the page wide. */
+    white-space: normal;
 }

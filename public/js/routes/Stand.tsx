@@ -53,10 +53,10 @@ export default function Stand() {
         <h1>Stand / Mini Pharmacy</h1>
         <div className={styles.quickActions}>
           <button className="btn btn-primary" onClick={() => navigate('/stand/pos')}>
-            <i className="fas fa-cash-register"></i> New Sale
+            <i className="fas fa-cash-register" aria-hidden="true"></i> New Sale
           </button>
           <button className="btn btn-secondary" onClick={() => navigate('/stand/inventory')}>
-            <i className="fas fa-boxes"></i> Inventory
+            <i className="fas fa-boxes" aria-hidden="true"></i> Inventory
           </button>
         </div>
       </div>
@@ -78,28 +78,28 @@ export default function Stand() {
 
       <div className={styles.navCards}>
         <button className={styles.navCard} onClick={() => navigate('/stand/inventory')}>
-          <div className={styles.navCardIcon}><i className="fas fa-boxes"></i></div>
+          <div className={styles.navCardIcon}><i className="fas fa-boxes" aria-hidden="true"></i></div>
           <div className={styles.navCardText}>
             <h3>Inventory</h3>
             <p>Manage items, stock, categories</p>
           </div>
         </button>
         <button className={styles.navCard} onClick={() => navigate('/stand/pos')}>
-          <div className={styles.navCardIcon}><i className="fas fa-cash-register"></i></div>
+          <div className={styles.navCardIcon}><i className="fas fa-cash-register" aria-hidden="true"></i></div>
           <div className={styles.navCardText}>
             <h3>Point of Sale</h3>
             <p>Barcode scanning, multi-item checkout</p>
           </div>
         </button>
         <button className={styles.navCard} onClick={() => navigate('/stand/sales')}>
-          <div className={styles.navCardIcon}><i className="fas fa-receipt"></i></div>
+          <div className={styles.navCardIcon}><i className="fas fa-receipt" aria-hidden="true"></i></div>
           <div className={styles.navCardText}>
             <h3>Sales History</h3>
             <p>View and void past sales</p>
           </div>
         </button>
         <button className={styles.navCard} onClick={() => navigate('/stand/reports')}>
-          <div className={styles.navCardIcon}><i className="fas fa-chart-line"></i></div>
+          <div className={styles.navCardIcon}><i className="fas fa-chart-line" aria-hidden="true"></i></div>
           <div className={styles.navCardText}>
             <h3>Reports</h3>
             <p>Revenue, profit, top items</p>

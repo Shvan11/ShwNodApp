@@ -18,7 +18,9 @@
 }
 
 .stepDisabled {
-    opacity: 0.55;
+    /* Still instructions the user has to read ("2 · pick a photo type"), so
+       desaturated rather than faded: at 55% opacity the heading read 2.2:1. */
+    filter: grayscale(1);
 }
 
 .stepHeader {
@@ -47,7 +49,7 @@
 }
 
 .stepNumberComplete {
-    background: var(--success-color);
+    background: var(--success-fill);
     color: var(--color-white);
 }
 
@@ -123,12 +125,12 @@
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
     line-height: 1.7;
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 
 .orderBadgeAfter {
-    background: var(--success-color);
+    background: var(--success-fill);
 }
 
 /* --- photo-type chips --- */
@@ -177,8 +179,8 @@
 }
 
 .chipSelected {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
+    background: var(--primary-fill);
+    border-color: var(--primary-fill);
     color: var(--color-white);
 }
 
@@ -217,7 +219,7 @@
     padding: var(--spacing-sm);
     border-radius: var(--radius-md);
     background: var(--error-50);
-    color: var(--error-color);
+    color: var(--error-700);
     font-size: var(--font-size-sm);
 }
 

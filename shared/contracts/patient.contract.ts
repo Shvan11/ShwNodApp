@@ -43,6 +43,7 @@ import {
 import { withPendingOutcome } from './approvals.contract.js';
 import { XRAY_WORK_TYPE_IDS } from '../treatment-taxonomy.js';
 import { WORK_CURRENCIES } from '../work-currency.js';
+import { PATIENT_LOOKUP } from '../patient-lookup.js';
 
 /** A `<select>`-backed id on the CREATE body: '' (nothing chosen) → undefined (so
  *  the service's `toInt` yields NULL, not 0); a chosen value (form string / number)
@@ -132,13 +133,6 @@ const galleryView = z.object({
    *  busts the browser cache instead of showing the stale image at the same URL. */
   mtime: z.number(),
 }).nullable();
-
-/** Patient phone record (id + name + phone for autocomplete). phone is nullable. */
-const patientPhoneRow = z.looseObject({
-  id: z.number(),
-  name: z.string(),
-  phone: z.string().nullable(),
-});
 
 // Alerts back two surfaces (patient-context flags + header "Tasks"). These enums
 // mirror the DB CHECK constraints (migrations/pg/…_alerts-to-tasks.sql) and are
@@ -267,9 +261,38 @@ export const gallery = {
 export type GalleryResponse = z.infer<typeof gallery.response>;
 export type GalleryView = NonNullable<GalleryResponse[keyof GalleryResponse]>;
 
-// GET /api/patients/phones — bare array of patient phone records.
-export const patientPhones = { response: z.array(patientPhoneRow) } as const;
-export type PatientPhonesResponse = z.infer<typeof patientPhones.response>;
+// GET /api/patients/lookup — the patient typeahead: the few best matches for what
+// has been typed so far, never the patient list. (It replaced GET /patients/phones,
+// which sent every patient to the browser to be filtered there.)
+//   by=name     names starting with `q`, then names containing it (`group: 'name'`);
+//               `nameStartsWith=true` keeps the first half only.
+//   by=phoneId  IDs starting with `q` (`group: 'id'`), then phone numbers starting
+//               with or containing it (`group: 'phone'`, either phone column).
+// `q` shorter than the minimum (shared/patient-lookup.ts) answers []. `limit` is rows
+// per group. `phone` is the matched number on a `phone` row, otherwise the number the
+// patient is reached on. Closed objects: every field is modeled.
+const lookupFlag = z.enum(['true', 'false']).optional();
+export const patientLookup = {
+  query: z.object({
+    q: z.string().max(PATIENT_LOOKUP.maxQueryLength),
+    by: z.enum(['name', 'phoneId']),
+    nameStartsWith: lookupFlag,
+    requirePhone: lookupFlag,
+    exclude: optionalPositiveIntQuery,
+    limit: optionalPositiveIntQuery,
+  }),
+  response: z.array(
+    z.object({
+      id: z.number(),
+      name: z.string(),
+      phone: z.string().nullable(),
+      group: z.enum(['name', 'id', 'phone']),
+    })
+  ),
+} as const;
+export type PatientLookupQuery = z.infer<typeof patientLookup.query>;
+export type PatientLookupResponse = z.infer<typeof patientLookup.response>;
+export type PatientLookupMatch = PatientLookupResponse[number];
 
 // GET /api/patients/search — { patients, totalCount?, hasMore? }. TIGHTENED (N13):
 // the rows assert the stable ids the consumers key on.

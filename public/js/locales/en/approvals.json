@@ -16,6 +16,23 @@
     "failed": "Failed",
     "stale": "Stale"
   },
+  "summary": {
+    "workUpdate": "Edit work #{{id}}",
+    "discountApply": "Apply discount on work #{{id}}",
+    "discountRemove": "Remove discount on work #{{id}}",
+    "workDelete": "Delete work #{{id}}",
+    "invoiceDelete": "Delete invoice #{{id}}",
+    "expenseUpdate": "Edit expense #{{id}}",
+    "expenseDelete": "Delete expense #{{id}}",
+    "patientDelete": "Delete patient #{{id}}"
+  },
+  "note": {
+    "superseded": "Superseded by a newer request",
+    "unknownAction": "Unknown action_type",
+    "targetMissing": "Target no longer exists",
+    "targetChanged": "Target changed since request was submitted",
+    "applyError": "Apply error: {{reason}}"
+  },
   "patientFallback": "Patient #{{id}}",
   "openPatient": "Open {{name}} → Works",
   "bell": {

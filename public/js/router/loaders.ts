@@ -9,6 +9,7 @@
  */
 
 import type { LoaderFunctionArgs } from 'react-router-dom';
+import type { FetchQueryOptions, QueryKey } from '@tanstack/react-query';
 import { fetchJSON, type HttpError } from '@/core/http';
 import { toLocalDateString } from '@/utils/calendarDate';
 import { queryClient } from '../query/client';
@@ -20,7 +21,6 @@ import {
   patientInfoQuery,
   workDetailsQuery,
   timepointsQuery,
-  patientPhonesQuery,
   workTypesQuery,
   dailyAppointmentsQuery,
   workKeywordsQuery,
@@ -31,6 +31,26 @@ import {
   templateQuery,
   labCasesBoardQuery,
   labsQuery,
+  patientsFolderQuery,
+  worksQuery,
+  hasAppointmentQuery,
+  galleryQuery,
+  photoVisibilityQuery,
+  patientAlertsQuery,
+  alertTypesQuery,
+  costPresetsQuery,
+  patientAppointmentsQuery,
+  visitsByWorkQuery,
+  gendersQuery,
+  addressesQuery,
+  referralSourcesQuery,
+  workDoctorsQuery,
+  slideshowConfigsQuery,
+  wiresQuery,
+  operatorsQuery,
+  latestWiresQuery,
+  alignerSetsQuery,
+  alignerFeaturesQuery,
 } from '../query/queries';
 
 /**
@@ -109,6 +129,83 @@ export function withAuth<T>(
 }
 
 /**
+ * Start a read without waiting for it. The request goes out beside the loader's
+ * awaited reads and the chunk download, and the screen's `useQuery` (same
+ * `queryOptions` factory, so the same key) picks it up in flight or finished.
+ * Not awaited on purpose: a slow list must not hold the navigation on the old
+ * screen. `prefetchQuery` never rejects and skips a read that is still fresh.
+ */
+function warm<TQueryFnData, TError, TData, TQueryKey extends QueryKey>(
+  options: FetchQueryOptions<TQueryFnData, TError, TData, TQueryKey>
+): void {
+  void queryClient.prefetchQuery(options);
+}
+
+/**
+ * The reads each patient page makes the moment it mounts, started from the
+ * loader so they run beside the patient header and the page chunk, not after
+ * them. Before, a page asked for its own list only once it had mounted: Works
+ * was four sequential steps (header → sidebar → works list → work details)
+ * where it can be two (audit FE-F26-4).
+ *
+ * Each entry must call the SAME factory with the SAME arguments as the page.
+ * A mismatch is never wrong data, only a second request, and
+ * `scripts/e2e/nav-waterfall.mjs` reports any URL a navigation fetches twice.
+ * Left out on purpose: reads keyed on device or screen state (the Files
+ * listing's flat mode, the booking form's month, Compare's chosen sessions),
+ * role-gated reads (the portal card), and the two reads that always refetch on
+ * mount (`diagnosisQuery`, the edit form's `patientByIdQuery`).
+ */
+const PAGE_READS: Record<string, (personId: string, at: { workId: string | null; tp: string }) => void> = {
+  works: (id) => {
+    warm(worksQuery(id));
+    warm(hasAppointmentQuery(id));
+    warm(galleryQuery(id, 0));
+  },
+  photos: (id, { tp }) => {
+    warm(galleryQuery(id, tp));
+    warm(photoVisibilityQuery(id));
+  },
+  'patient-info': (id) => {
+    warm(patientAlertsQuery(id));
+    warm(alertTypesQuery());
+    warm(costPresetsQuery());
+  },
+  // Lookups only: the form reads the patient itself with `refetchOnMount: 'always'`
+  // (it must open on the stored row, FE-F6-8), so a prefetch of it is fetched twice.
+  'edit-patient': () => {
+    warm(gendersQuery());
+    warm(addressesQuery());
+    warm(referralSourcesQuery());
+    warm(patientTypesQuery());
+    warm(tagOptionsQuery());
+  },
+  appointments: (id) => warm(patientAppointmentsQuery(id)),
+  visits: (_id, { workId }) => {
+    if (workId) warm(visitsByWorkQuery(workId));
+  },
+  'new-visit': (_id, { workId }) => {
+    warm(wiresQuery());
+    warm(operatorsQuery());
+    if (workId) warm(latestWiresQuery(workId));
+  },
+  'new-work': () => {
+    warm(workTypesQuery());
+    warm(workKeywordsQuery());
+    warm(workDoctorsQuery());
+  },
+  diagnosis: (id) => warm(worksQuery(id)),
+  slideshow: (id) => warm(slideshowConfigsQuery(id)),
+};
+
+/** The Add Patient form's lookups (`/patient/new/add` has no patient to read). */
+function warmAddPatientForm(): void {
+  warm(referralSourcesQuery());
+  warm(addressesQuery());
+  warm(gendersQuery());
+}
+
+/**
  * Patient shell loader — a pure prefetcher.
  *
  * Warms the page chunk and fills the React Query cache so PatientShell paints
@@ -132,19 +229,22 @@ export async function patientShellLoader({
   const workIdFromQuery = url.searchParams.get('workId');
   const effectiveWorkId = workId || workIdFromQuery;
 
-  // Warm the lazy chunk for the tab we're about to render, in parallel with the
-  // data fetch below. ContentRenderer code-splits each patient sub-page, so
-  // without this the page chunk would only begin downloading after PatientShell
-  // mounts — a waterfall. Fire-and-forget (mirrors routes.config's withPreload).
-  //
   // The diagnosis deep-link has no `:page` segment (its route is
-  // ':personId/work/:workId/diagnosis'), so `params.page` is undefined there and
-  // this used to no-op on the largest patient sub-page in the tree. Mirror the
-  // derivation PatientShell already does for rendering.
-  preloadPatientPage(url.pathname.endsWith('/diagnosis') ? 'diagnosis' : page);
+  // ':personId/work/:workId/diagnosis'), so `params.page` is undefined there.
+  // Mirror the derivation PatientShell does for rendering.
+  const effectivePage = url.pathname.endsWith('/diagnosis') ? 'diagnosis' : page;
+
+  // The page's own chunk (ContentRenderer code-splits each patient sub-page),
+  // downloaded beside the data below and awaited with it, so the page mounts
+  // loaded. Started here and merely not awaited, it used to lose the race by one
+  // tick, show the content spinner, and pay React's 300 ms fallback throttle.
+  const pageChunk = preloadPatientPage(effectivePage);
 
   // Skip loading for "new" patient (add patient form)
   if (personId === 'new' || isNaN(parseInt(personId || '', 10))) {
+    if (effectivePage === 'add') warmAddPatientForm();
+    warm(patientsFolderQuery());
+    await pageChunk;
     return null;
   }
 
@@ -156,15 +256,24 @@ export async function patientShellLoader({
     ? loaderQuery(workDetailsQuery(effectiveWorkId))
     : Promise.resolve(null);
 
-  // Load time points for photos/comparison pages
-  const timepointsPromise =
-    page && (page.startsWith('photos') || page === 'compare' || page === 'xrays')
-      ? loaderQuery(timepointsQuery(personId!))
-      : Promise.resolve(null);
+  // Photo sessions: awaited on the pages built from them; on every other page
+  // only the sidebar reads them (its photo-session links), so there they are
+  // started and not waited for.
+  const needsTimepoints =
+    !!page && (page.startsWith('photos') || page === 'compare' || page === 'xrays');
+  const timepointsPromise = needsTimepoints
+    ? loaderQuery(timepointsQuery(personId!))
+    : Promise.resolve(null);
+  if (!needsTimepoints) warm(timepointsQuery(personId!));
+  warm(patientsFolderQuery()); // the sidebar's "open folder" link
 
-  // Wait for all promises in parallel — the results land in the RQ cache, which
-  // is the whole point; nothing here is returned.
-  await Promise.all([patientPromise, workPromise, timepointsPromise]);
+  // The page's own reads (see PAGE_READS).
+  const tp = (params['*'] || '').match(/^tp(\d+)$/)?.[1] ?? '0';
+  if (effectivePage) PAGE_READS[effectivePage]?.(personId!, { workId: effectiveWorkId ?? null, tp });
+
+  // Wait for the header data and the chunk together — the results land in the
+  // RQ cache, which is the whole point; nothing here is returned.
+  await Promise.all([patientPromise, workPromise, timepointsPromise, pageChunk]);
 
   return null;
 }
@@ -218,6 +327,12 @@ export async function alignerPatientWorkLoader({
   if (!workId || isNaN(parseInt(workId, 10))) {
     throw new Response('Invalid work ID', { status: 400 });
   }
+
+  // What PatientSets reads on mount, started beside the work read. They used to
+  // go out only after work → patient → mount, two round trips later (FE-F26-4).
+  warm(alignerSetsQuery(workId));
+  warm(alignerDoctorsQuery());
+  warm(alignerFeaturesQuery());
 
   const work = await loaderQuery(workDetailsQuery(workId));
 
@@ -281,12 +396,12 @@ export async function templateDesignerLoader({
 /**
  * PATIENT MANAGEMENT LOADER — a pure prefetcher.
  *
- * Warms the five filter lookups in the shared React Query cache so the screen's
+ * Warms the four filter lookups in the shared React Query cache so the screen's
  * dropdowns paint filled on first render, and enables native scroll restoration
  * via React Router.
  *
- * It returns `null`: the component reads the same five keys with `useQuery`.
- * This used to issue five raw `fetchJSON` calls that duplicated
+ * It returns `null`: the component reads the same four keys with `useQuery`.
+ * This used to issue raw `fetchJSON` calls that duplicated
  * the lookup factories verbatim and returned the rows as loader data, so the
  * results never entered the cache — and a work type or patient tag edited
  * through Settings → Lookups could not reach these dropdowns until a full route
@@ -294,10 +409,15 @@ export async function templateDesignerLoader({
  * `/api/patient-types` feed as the edit form; its own `/api/patients/type-options`
  * twin was retired in FE-F6-14.)
  *
+ * There was a fifth: the whole patient list, for the two search boxes' jump
+ * lists (419 kB at 6,859 patients, on every visit to this screen). The boxes now
+ * ask the server as the user types (`usePatientLookup`), so nothing about
+ * patients is fetched until something is typed.
+ *
  * `ensureQueryData` rather than `loaderQuery` on purpose: `loaderQuery` maps a
  * failure onto a `Response` for the route errorElement, and here each lookup is
  * individually tolerated (`emptyOnHttpError`) so one bad lookup does not blank
- * the other four or the screen.
+ * the other three or the screen.
  *
  * NOTE: the component still handles its own searching (sessionStorage restore +
  * `?search=` deep link) — that is the documented loader exception, and it is
@@ -308,7 +428,6 @@ export async function patientManagementLoader(): Promise<null> {
 
   try {
     await Promise.all([
-      emptyOnHttpError(queryClient.ensureQueryData(patientPhonesQuery())),
       emptyOnHttpError(queryClient.ensureQueryData(workTypesQuery())),
       emptyOnHttpError(queryClient.ensureQueryData(workKeywordsQuery())),
       emptyOnHttpError(queryClient.ensureQueryData(tagOptionsQuery())),

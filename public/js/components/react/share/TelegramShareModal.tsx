@@ -25,8 +25,8 @@ import { useToast } from '@/contexts/ToastContext';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
 import { GOOGLE_CONTACT_ACCOUNTS } from '@shared/google-contacts-accounts';
 import { lostTrackMessage, watchTelegramJob } from '@/services/share-watch';
+import { usePatientContacts, PATIENT_CONTACTS_PROMPT } from '@/hooks/usePatientContacts';
 import {
-  patientPhonesQuery,
   googleContactsQuery,
   employeesQuery,
   telegramStatusQuery,
@@ -75,6 +75,8 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
 
   const [source, setSource] = useState<Source>('pat');
   const [selected, setSelected] = useState<ContactOption | null>(null);
+  // What is typed in the contact picker: for patients, the search the server answers.
+  const [contactSearch, setContactSearch] = useState('');
   const [phone, setPhone] = useState('');
   const [starting, setStarting] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -106,27 +108,33 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
   const done = progress?.status === 'done';
   const lost = !!jobId && (progressResult.error as HttpError | null)?.status === 404;
 
-  // Contacts come from the patients' phone book (`pat`), the staff roster (`emp`),
-  // or a Google contact group (`shw`/`cli`); only the active source fetches while
-  // the modal is open.
-  const phonesResult = useQuery({ ...patientPhonesQuery(), enabled: open && source === 'pat' });
+  // Contacts come from the patients (`pat`), the staff roster (`emp`), or a Google
+  // contact group (`shw`/`cli`); only the active source fetches while the modal is
+  // open. Patients are searched on the server as the user types, and only those with
+  // a phone number are offered; the other sources are one list each.
+  const fromPatients = source === 'pat';
+  const patientResult = usePatientContacts(contactSearch, open && fromPatients);
   const employeesResult = useQuery({ ...employeesQuery(), enabled: open && source === 'emp' });
   const googleResult = useQuery({
     ...googleContactsQuery(source),
     enabled: open && source !== 'pat' && source !== 'emp',
   });
-  const activeResult =
-    source === 'pat' ? phonesResult : source === 'emp' ? employeesResult : googleResult;
+  const activeResult = fromPatients
+    ? { isError: patientResult.isError, error: patientResult.error }
+    : source === 'emp'
+      ? employeesResult
+      : googleResult;
   // Employees come back wrapped in `{ employees: [...] }` with `employee_name`;
   // the other sources are bare ContactData[] arrays — normalize to one shape.
-  const contacts: ContactData[] =
-    source === 'emp'
+  const contacts: ContactData[] = fromPatients
+    ? patientResult.contacts
+    : source === 'emp'
       ? (employeesResult.data?.employees ?? []).map((e) => ({
           id: e.id,
           name: e.employee_name,
           phone: e.phone ?? undefined,
         }))
-      : ((activeResult.data ?? []) as ContactData[]);
+      : ((googleResult.data ?? []) as ContactData[]);
   const options: ContactOption[] = contacts
     .filter((c) => c.phone)
     .map((c) => ({
@@ -144,6 +152,7 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
     if (open) {
       setSource('pat');
       setSelected(null);
+      setContactSearch('');
       setPhone('');
       setStarting(false);
       setJobId(null);
@@ -173,6 +182,7 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
   const handleSourceChange = (src: Source): void => {
     setSource(src);
     setSelected(null);
+    setContactSearch('');
     setPhone('');
   };
 
@@ -272,12 +282,20 @@ const TelegramShareModal = ({ open, sources, onClose }: Props) => {
               value={selected}
               onChange={handleSelect}
               options={options}
+              inputValue={contactSearch}
+              onInputChange={(text) => setContactSearch(text)}
+              // The server has already matched the patients; filtering them again by
+              // label would drop one found by their ID or second number.
+              filterOption={fromPatients ? null : undefined}
               isSearchable
               isClearable
+              isLoading={fromPatients && patientResult.isLoading}
               isDisabled={!enabled}
               placeholder="Search and select a contact…"
               aria-label="Contact"
-              noOptionsMessage={() => 'No contacts found'}
+              noOptionsMessage={() =>
+                fromPatients && patientResult.needsInput ? PATIENT_CONTACTS_PROMPT : 'No contacts found'
+              }
               classNamePrefix="react-select"
               styles={selectStyles}
             />

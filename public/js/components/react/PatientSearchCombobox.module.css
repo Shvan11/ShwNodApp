@@ -64,3 +64,10 @@
     color: var(--text-muted);
     font-size: var(--font-size-xs);
 }
+
+/* Shown in the dropdown's place when the suggestions could not be loaded. */
+.status {
+    padding: var(--spacing-sm) var(--spacing-md);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}

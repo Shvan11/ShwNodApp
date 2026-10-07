@@ -13,7 +13,7 @@
 
 .spinner {
   border: 4px solid var(--gray-100);
-  border-top: 4px solid var(--blue-300);
+  border-top: 4px solid var(--blue-600);
   border-radius: 50%;
   width: 50px;
   height: 50px;
@@ -57,7 +57,7 @@
 .breadcrumbLink {
   background: none;
   border: none;
-  color: var(--blue-300);
+  color: var(--blue-700);
   cursor: pointer;
   font-size: 0.95rem;
   display: flex;
@@ -101,7 +101,6 @@
 .patientSubtitle {
   font-size: 1rem;
   font-weight: var(--font-weight-normal);
-  opacity: 0.9;
   margin-left: 0.5rem;
 }
 

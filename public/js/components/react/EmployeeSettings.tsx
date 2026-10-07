@@ -11,6 +11,7 @@ import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { resolveDoctorColor, NEUTRAL_PICKER_HEX } from './doctorColors';
 import { isClinicDoctorName } from '@shared/clinic-doctor';
+import { useMenuFocus, handleMenuKeyDown } from '@/hooks/useFloatingMenu';
 import styles from './EmployeeSettings.module.css';
 
 // Row shapes are owned by the employee contract (the single source of truth for
@@ -100,6 +101,8 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             document.removeEventListener('keydown', handleEsc);
         };
     }, [contextMenu, closeContextMenu]);
+
+    useMenuFocus(menuRef, contextMenu !== null);
 
     const handleAdd = () => {
         setFormData({
@@ -280,7 +283,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         return (
             <div className={styles.container}>
                 <div className={styles.loadingContainer}>
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <p>Loading employees...</p>
                 </div>
             </div>
@@ -291,10 +294,10 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
         return (
             <div className={styles.container}>
                 <div className={styles.errorContainer}>
-                    <i className="fas fa-exclamation-triangle"></i>
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <p>Error: {error}</p>
                     <button onClick={() => refetchEmployees()} className={styles.btnRetry}>
-                        <i className="fas fa-redo"></i> Retry
+                        <i className="fas fa-redo" aria-hidden="true"></i> Retry
                     </button>
                 </div>
             </div>
@@ -306,7 +309,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             <div className={styles.sectionHeader}>
                 <div className={styles.headerContent}>
                     <h2>
-                        <i className="fas fa-users"></i>
+                        <i className="fas fa-users" aria-hidden="true"></i>
                         Employee Management
                     </h2>
                     <p className={styles.sectionDescription}>
@@ -318,7 +321,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                     onClick={handleAdd}
                     disabled={showAddForm}
                 >
-                    <i className="fas fa-plus"></i>
+                    <i className="fas fa-plus" aria-hidden="true"></i>
                     Add Employee
                 </button>
             </div>
@@ -333,7 +336,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                 {(dismiss) => (<>
                     <ModalHeader
                         titleId="employee-modal-title"
-                        icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} />}
+                        icon={<i className={editingId ? 'fas fa-edit' : 'fas fa-plus'} aria-hidden="true" />}
                         title={editingId ? 'Edit Employee' : 'Add New Employee'}
                         onClose={dismiss}
                     />
@@ -345,14 +348,14 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                             className={cn(styles.tabBtn, activeTab === 'basic' && styles.active)}
                                             onClick={() => setActiveTab('basic')}
                                         >
-                                            <i className="fas fa-id-card"></i> Basic Info
+                                            <i className="fas fa-id-card" aria-hidden="true"></i> Basic Info
                                         </button>
                                         <button
                                             type="button"
                                             className={cn(styles.tabBtn, activeTab === 'other' && styles.active)}
                                             onClick={() => setActiveTab('other')}
                                         >
-                                            <i className="fas fa-sliders-h"></i> Other Options
+                                            <i className="fas fa-sliders-h" aria-hidden="true"></i> Other Options
                                         </button>
                                     </div>
 
@@ -447,7 +450,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                                 disabled={editingClinicRow}
                                                             />
                                                             <span className={styles.checkboxLabel}>
-                                                                <i className="fas fa-user-check"></i>
+                                                                <i className="fas fa-user-check" aria-hidden="true"></i>
                                                                 Currently employed
                                                                 <span className={styles.fieldHelp}>
                                                                     (Uncheck if this employee has left / quit)
@@ -509,7 +512,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                                     className={styles.colorClear}
                                                                     onClick={handleClearColor}
                                                                 >
-                                                                    <i className="fas fa-times"></i> Clear
+                                                                    <i className="fas fa-times" aria-hidden="true"></i> Clear
                                                                 </button>
                                                             )}
                                                         </div>
@@ -519,7 +522,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
 
                                                 {!formData.is_active && (
                                                     <p className={styles.fieldHelp}>
-                                                        <i className="fas fa-info-circle"></i> This employee is marked as having quit, so email and appointment options are disabled. Commission settings are kept so past-period commission reports stay accurate.
+                                                        <i className="fas fa-info-circle" aria-hidden="true"></i> This employee is marked as having quit, so email and appointment options are disabled. Commission settings are kept so past-period commission reports stay accurate.
                                                     </p>
                                                 )}
                                                 <div className={styles.checkboxGroup}>
@@ -533,7 +536,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                                 disabled={!formData.is_active}
                                                             />
                                                             <span className={styles.checkboxLabel}>
-                                                                <i className="fas fa-envelope"></i>
+                                                                <i className="fas fa-envelope" aria-hidden="true"></i>
                                                                 Receive Email Notifications
                                                             </span>
                                                         </label>
@@ -549,7 +552,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                                 disabled={!formData.is_active}
                                                             />
                                                             <span className={styles.checkboxLabel}>
-                                                                <i className="fas fa-calendar-check"></i>
+                                                                <i className="fas fa-calendar-check" aria-hidden="true"></i>
                                                                 Include in Appointment Reports
                                                             </span>
                                                         </label>
@@ -564,7 +567,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                                                 onChange={handleInputChange}
                                                             />
                                                             <span className={styles.checkboxLabel}>
-                                                                <i className="fas fa-percent"></i>
+                                                                <i className="fas fa-percent" aria-hidden="true"></i>
                                                                 Percentage-Based Compensation
                                                             </span>
                                                         </label>
@@ -603,7 +606,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                 Cancel
                             </button>
                             <button type="submit" className={styles.btnSave} disabled={saving}>
-                                <i className={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'}></i>
+                                <i className={saving ? 'fas fa-spinner fa-spin' : 'fas fa-save'} aria-hidden="true"></i>
                                 {editingId ? 'Update Employee' : 'Add Employee'}
                             </button>
                         </div>
@@ -614,7 +617,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
             <div className={styles.list}>
                 {employees.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-users"></i>
+                        <i className="fas fa-users" aria-hidden="true"></i>
                         <p>No employees found</p>
                         <p className={styles.emptyStateHint}>Click "Add Employee" to create your first employee entry</p>
                     </div>
@@ -650,7 +653,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                             }}
                                             title="Right-click for actions"
                                         >
-                                            <i className="fas fa-user"></i>
+                                            <i className="fas fa-user" aria-hidden="true"></i>
                                             {employee.employee_name}
                                         </td>
                                         <td data-label="Position">
@@ -661,12 +664,12 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <td data-label="Status">
                                             {employee.is_active ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
-                                                    <i className="fas fa-user-check"></i>
+                                                    <i className="fas fa-user-check" aria-hidden="true"></i>
                                                     Active
                                                 </span>
                                             ) : (
                                                 <span className={`${styles.badge} ${styles.badgeQuit}`}>
-                                                    <i className="fas fa-user-slash"></i>
+                                                    <i className="fas fa-user-slash" aria-hidden="true"></i>
                                                     Quit
                                                 </span>
                                             )}
@@ -679,7 +682,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <td data-label="Phone">
                                             {employee.phone ? (
                                                 <span className={styles.emailValue}>
-                                                    <i className="fas fa-phone"></i>
+                                                    <i className="fas fa-phone" aria-hidden="true"></i>
                                                     {employee.phone}
                                                 </span>
                                             ) : (
@@ -689,7 +692,7 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <td data-label="Email">
                                             {employee.email ? (
                                                 <span className={styles.emailValue}>
-                                                    <i className="fas fa-envelope"></i>
+                                                    <i className="fas fa-envelope" aria-hidden="true"></i>
                                                     {employee.email}
                                                 </span>
                                             ) : (
@@ -699,12 +702,12 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <td data-label="Commission">
                                             {employee.percentage ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
-                                                    <i className="fas fa-percent"></i>
+                                                    <i className="fas fa-percent" aria-hidden="true"></i>
                                                     {employee.commission_percentage != null ? `${employee.commission_percentage}%` : 'Yes'}
                                                 </span>
                                             ) : (
                                                 <span className={`${styles.badge} ${styles.badgeMuted}`}>
-                                                    <i className="fas fa-minus"></i>
+                                                    <i className="fas fa-minus" aria-hidden="true"></i>
                                                     No
                                                 </span>
                                             )}
@@ -712,12 +715,12 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <td data-label="Email Notifications">
                                             {employee.receive_email ? (
                                                 <span className={`${styles.badge} ${styles.badgeSuccess}`}>
-                                                    <i className="fas fa-check-circle"></i>
+                                                    <i className="fas fa-check-circle" aria-hidden="true"></i>
                                                     Enabled
                                                 </span>
                                             ) : (
                                                 <span className={`${styles.badge} ${styles.badgeMuted}`}>
-                                                    <i className="fas fa-times-circle"></i>
+                                                    <i className="fas fa-times-circle" aria-hidden="true"></i>
                                                     Disabled
                                                 </span>
                                             )}
@@ -725,12 +728,12 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                                         <td data-label="Appointments">
                                             {employee.get_appointments ? (
                                                 <span className={`${styles.badge} ${styles.badgeInfo}`}>
-                                                    <i className="fas fa-check"></i>
+                                                    <i className="fas fa-check" aria-hidden="true"></i>
                                                     Yes
                                                 </span>
                                             ) : (
                                                 <span className={`${styles.badge} ${styles.badgeMuted}`}>
-                                                    <i className="fas fa-minus"></i>
+                                                    <i className="fas fa-minus" aria-hidden="true"></i>
                                                     No
                                                 </span>
                                             )}
@@ -772,6 +775,9 @@ const EmployeeSettings = ({ onChangesUpdate: _onChangesUpdate }: EmployeeSetting
                     className={styles.contextMenu}
                     style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
                     role="menu"
+                    tabIndex={-1}
+                    aria-label={`Actions for ${contextMenu.employee.employee_name}`}
+                    onKeyDown={(e) => handleMenuKeyDown(e, menuRef.current, closeContextMenu)}
                 >
                     <button
                         type="button"

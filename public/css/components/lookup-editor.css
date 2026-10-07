@@ -164,21 +164,21 @@
 }
 
 .btn-icon.btn-edit {
-    background: var(--info-color);
+    background: var(--info-fill);
     color: var(--color-white);
 }
 
 .btn-icon.btn-edit:hover {
-    background: var(--info-dark);
+    background: var(--info-fill-hover);
 }
 
 .btn-icon.btn-delete {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
 .btn-icon.btn-delete:hover {
-    background: var(--error-dark);
+    background: var(--error-fill-hover);
 }
 
 /* Empty state — scoped to the table so it outranks `.lookup-table td`
@@ -360,11 +360,6 @@
 .text-success {
     color: var(--success-color);
 }
-
-.text-warning {
-    color: var(--warning-color);
-}
-
 .text-muted {
     color: var(--text-secondary);
 }
@@ -376,13 +371,13 @@
 }
 
 .btn-danger {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
     border: none;
 }
 
 .btn-danger:hover {
-    background: var(--error-dark);
+    background: var(--error-fill-hover);
 }
 
 /* Responsive styles */

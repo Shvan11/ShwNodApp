@@ -256,8 +256,8 @@ router.get(
     try {
       const { personId } = req.params;
       // The patient's own tp codes scope the shared flat `working/` dir to files
-      // this patient can actually own (a `{personId}0…` prefix match would pull in
-      // any patient whose id starts with `{personId}0`).
+      // this patient can actually own (a `{personId}…` prefix match would pull in
+      // any patient whose id starts with `{personId}`).
       const tpCodes = await getTimePointCodes(personId);
       const entries = await listPatientWorkingFiles(personId, tpCodes);
       log.info('[Files] working-list', {

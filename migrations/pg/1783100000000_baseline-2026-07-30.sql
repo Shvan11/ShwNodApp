@@ -5145,10 +5145,15 @@ INSERT INTO public.cdc_sink_control (sink) VALUES
   ('dolphin'), ('failover')
   ON CONFLICT (sink) DO NOTHING;
 
--- WhatsApp group defaults (from the retired seed-whatsapp-group-options migration).
+-- WhatsApp group rows (from the retired seed-whatsapp-group-options migration). A new
+-- install starts with the group post OFF and no group named: these rows were seeded
+-- as 'true' / the original clinic's own group name until 2026-10-06, so a center that
+-- skipped setup was set to post its daily list (patient names) to a group called after
+-- another clinic. An existing deployment keeps its rows (ON CONFLICT DO NOTHING, and the
+-- baseline never re-runs); `npm run db:setup -- --whatsapp-group` or the /send page set them.
 INSERT INTO public.options (option_name, option_value) VALUES
-  ('whatsapp_send_to_group', 'true'),
-  ('whatsapp_group_name', 'Shwan Orthodontics')
+  ('whatsapp_send_to_group', 'false'),
+  ('whatsapp_group_name', '')
   ON CONFLICT (option_name) DO NOTHING;
 
 -- VITA Classic shade vocabulary.

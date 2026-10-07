@@ -68,7 +68,7 @@ const SaveConfigModal = ({ selected, sessions, onSave, onClose }: Props) => {
       <ModalHeader
         title="Save presentation"
         titleId="slideshow-save-title"
-        icon={<i className="fas fa-floppy-disk" />}
+        icon={<i className="fas fa-floppy-disk" aria-hidden="true" />}
         onClose={onClose}
       />
       <div className={styles.body}>

@@ -76,9 +76,9 @@
 .sev2 { background: var(--warning-100); color: var(--warning-700); border-color: var(--warning-200); }
 .sev3 { background: var(--error-100); color: var(--error-700); border-color: var(--error-200); }
 
-.sev1.severityActive { background: var(--success-500); color: var(--color-white); border-color: var(--success-600); }
-.sev2.severityActive { background: var(--warning-500); color: var(--color-white); border-color: var(--warning-600); }
-.sev3.severityActive { background: var(--error-500); color: var(--color-white); border-color: var(--error-600); }
+.sev1.severityActive { background: var(--success-fill); color: var(--color-white); border-color: var(--success-600); }
+.sev2.severityActive { background: var(--warning-fill); color: var(--color-white); border-color: var(--warning-600); }
+.sev3.severityActive { background: var(--error-fill); color: var(--color-white); border-color: var(--error-600); }
 
 /* Patient picker */
 .picker {
@@ -142,7 +142,7 @@
 }
 
 .chipRemove:hover {
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 /* Optional date fields side by side */

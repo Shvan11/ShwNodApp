@@ -9,6 +9,7 @@ import { useUnsavedRouteGuard } from '../../hooks/useUnsavedRouteGuard';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatNumber, parseFormattedNumber, formatLocaleDate } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
+import { buildWorkUpdatePayload, type WorkEditFields } from '../../utils/workUpdatePayload';
 import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { roleCaps, type UserRole } from '@shared/auth/roles';
 import { postJSON, putJSON, httpErrorMessage, type HttpError } from '@/core/http';
@@ -60,28 +61,8 @@ interface ExistingWorkData {
  */
 type WorkConflictExisting = ExistingWorkData & { type?: string; work_id?: number };
 
-interface WorkFormData {
+interface WorkFormData extends WorkEditFields {
     person_id: string;
-    total_required: number;
-    currency: string;
-    type_of_work: string;
-    notes: string;
-    status: number;
-    start_date: string;
-    debond_date: string;
-    f_photo_date: string;
-    i_photo_date: string;
-    estimated_duration: string;
-    dr_id: string;
-    notes_date: string;
-    keyword_id_1: string;
-    keyword_id_2: string;
-    keyword_id_3: string;
-    keyword_id_4: string;
-    keyword_id_5: string;
-    discount: number;
-    discount_date: string;
-    discount_reason: string;
     createAsFinished: boolean;
 }
 
@@ -333,19 +314,15 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             setLoading(true);
 
             if (workId) {
-                // Update existing work
-                // Send all fields - backend middleware handles authorization
-                // Backend will reject money field updates for old works if user is secretary
-                const discountNum = Number(formData.discount) || 0;
-                const updatePayload: Record<string, unknown> = {
-                    workId,
-                    ...formData,
-                    discount: discountNum > 0 ? discountNum : null,
-                    discount_date: discountNum > 0
-                        ? (formData.discount_date || formatISODate())
-                        : null,
-                    discount_reason: discountNum > 0 ? (formData.discount_reason || null) : null
-                };
+                // Update existing work: only what the user changed (see workUpdatePayload).
+                // The server decides who may change what; a money edit on an old work by
+                // the front desk comes back 'pending'.
+                const updatePayload = buildWorkUpdatePayload(workId, formData, baseline, formatISODate());
+                if (!updatePayload) {
+                    // Saved with nothing changed: there is nothing to write.
+                    finishSave();
+                    return;
+                }
                 // Non-admin discount changes are diverted server-side into the
                 // admin approval queue (outcome 'pending' below) — send them as-is.
                 const updateResult = await putJSON<{ outcome: string }>('/api/updatework', updatePayload, { schema: workContract.updateWork.response });
@@ -500,10 +477,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         return (
             <div className={styles.newWorkComponent}>
                 <div className={styles.newWorkError}>
-                    <i className="fas fa-lock"></i> Editing a work is done by the front desk or an admin.
+                    <i className="fas fa-lock" aria-hidden="true"></i> Editing a work is done by the front desk or an admin.
                     {onCancel && (
                         <button type="button" onClick={onCancel} className="btn btn-secondary">
-                            <i className="fas fa-arrow-left"></i> Back
+                            <i className="fas fa-arrow-left" aria-hidden="true"></i> Back
                         </button>
                     )}
                 </div>
@@ -514,7 +491,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     if (workLoading && workId) {
         return (
             <div className={styles.newWorkLoading}>
-                <i className="fas fa-spinner fa-spin"></i> Loading work data...
+                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading work data...
             </div>
         );
     }
@@ -524,10 +501,10 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
         return (
             <div className={styles.newWorkComponent}>
                 <div className={styles.newWorkError} role="alert">
-                    <i className="fas fa-exclamation-circle"></i> This work no longer exists — it may have been deleted or moved to another patient.
+                    <i className="fas fa-exclamation-circle" aria-hidden="true"></i> This work no longer exists — it may have been deleted or moved to another patient.
                     {onCancel && (
                         <button type="button" onClick={onCancel} className="btn btn-secondary">
-                            <i className="fas fa-arrow-left"></i> Back
+                            <i className="fas fa-arrow-left" aria-hidden="true"></i> Back
                         </button>
                     )}
                 </div>
@@ -540,14 +517,14 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
             {/* Header */}
             <div className={styles.newWorkHeader}>
                 <h3>
-                    <i className="fas fa-tooth"></i> {workId ? 'Edit Work' : 'Add New Work'}
+                    <i className="fas fa-tooth" aria-hidden="true"></i> {workId ? 'Edit Work' : 'Add New Work'}
                 </h3>
             </div>
 
             {/* Error Display */}
             {error && (
                 <div className={styles.newWorkError}>
-                    <i className="fas fa-exclamation-circle"></i> {error}
+                    <i className="fas fa-exclamation-circle" aria-hidden="true"></i> {error}
                     <button onClick={() => setError(null)} className={styles.errorClose}>×</button>
                 </div>
             )}
@@ -565,7 +542,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <ModalHeader
                             title="Active Work Already Exists"
                             titleId="duplicate-work-title"
-                            icon={<i className="fas fa-exclamation-triangle" />}
+                            icon={<i className="fas fa-exclamation-triangle" aria-hidden="true" />}
                             variant="warning"
                             onClose={loading ? undefined : handleCancelConfirmation}
                         />
@@ -600,7 +577,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     className="btn btn-primary"
                                     disabled={loading}
                                 >
-                                    <i className="fas fa-check"></i> Yes, Finish & Add New
+                                    <i className="fas fa-check" aria-hidden="true"></i> Yes, Finish & Add New
                                 </button>
                             )}
                             <button
@@ -608,7 +585,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 className="btn btn-secondary"
                                 disabled={loading}
                             >
-                                <i className="fas fa-times"></i> Cancel
+                                <i className="fas fa-times" aria-hidden="true"></i> Cancel
                             </button>
                         </div>
                 </Modal>
@@ -627,7 +604,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                         <ModalHeader
                             title="Confirm Completed Work Creation"
                             titleId="finished-work-title"
-                            icon={<i className="fas fa-check-circle" />}
+                            icon={<i className="fas fa-check-circle" aria-hidden="true" />}
                             variant="success"
                             onClose={loading ? undefined : handleCancelFinishedWork}
                         />
@@ -635,7 +612,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             <p>You are about to create:</p>
                             <div className={styles.existingWorkDetails}>
                                 <div className={styles.detailSection}>
-                                    <h4><i className="fas fa-tooth"></i> New Work (FINISHED)</h4>
+                                    <h4><i className="fas fa-tooth" aria-hidden="true"></i> New Work (FINISHED)</h4>
                                     <div className={styles.detailRow}>
                                         <strong>Type:</strong> {workTypes.find(t => String(t.id) === formData.type_of_work)?.work_type || 'N/A'}
                                     </div>
@@ -650,7 +627,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     </div>
                                 </div>
                                 <div className={styles.detailSection}>
-                                    <h4><i className="fas fa-file-invoice-dollar"></i> Full Payment Invoice</h4>
+                                    <h4><i className="fas fa-file-invoice-dollar" aria-hidden="true"></i> Full Payment Invoice</h4>
                                     <div className={styles.detailRow}>
                                         <strong>Amount:</strong> {formData.total_required} {formData.currency}
                                     </div>
@@ -669,14 +646,14 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 className="btn btn-primary"
                                 disabled={loading}
                             >
-                                <i className="fas fa-check"></i> Confirm & Create
+                                <i className="fas fa-check" aria-hidden="true"></i> Confirm & Create
                             </button>
                             <button
                                 onClick={handleCancelFinishedWork}
                                 className="btn btn-secondary"
                                 disabled={loading}
                             >
-                                <i className="fas fa-times"></i> Cancel
+                                <i className="fas fa-times" aria-hidden="true"></i> Cancel
                             </button>
                         </div>
                 </Modal>
@@ -687,11 +664,11 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 {/* Top Action Buttons */}
                 <div className={`${styles.formActions} ${styles.topActions}`}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
-                        <i className="fas fa-save"></i> {loading ? 'Saving...' : (workId ? 'Update' : 'Add Work')}
+                        <i className="fas fa-save" aria-hidden="true"></i> {loading ? 'Saving...' : (workId ? 'Update' : 'Add Work')}
                     </button>
                     {onCancel && (
                         <button type="button" onClick={onCancel} className="btn btn-secondary">
-                            <i className="fas fa-times"></i> Cancel
+                            <i className="fas fa-times" aria-hidden="true"></i> Cancel
                         </button>
                     )}
                 </div>
@@ -775,12 +752,12 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 </select>
                                 {formData.status === 2 && (
                                     <small className={`${styles.formHint} ${styles.textWarning}`}>
-                                        <i className="fas fa-exclamation-triangle"></i> Finishing a work marks the treatment as completed
+                                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> Finishing a work marks the treatment as completed
                                     </small>
                                 )}
                                 {formData.status === 3 && (
                                     <small className={`${styles.formHint} ${styles.textWarning}`}>
-                                        <i className="fas fa-exclamation-triangle"></i> Discontinuing a work indicates the patient abandoned treatment
+                                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> Discontinuing a work indicates the patient abandoned treatment
                                     </small>
                                 )}
                             </div>
@@ -832,7 +809,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                 </select>
                                 {!!workId && existingTotalPaid > 0 && (
                                     <small className={styles.formHint}>
-                                        <i className="fas fa-lock"></i> Locked — this work already has payments
+                                        <i className="fas fa-lock" aria-hidden="true"></i> Locked — this work already has payments
                                     </small>
                                 )}
                             </div>
@@ -850,7 +827,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         disabled={!formData.total_required || formData.total_required <= 0}
                                     />
                                     <span>
-                                        <i className="fas fa-check-circle"></i> Mark as fully paid and finished
+                                        <i className="fas fa-check-circle" aria-hidden="true"></i> Mark as fully paid and finished
                                     </span>
                                 </label>
                                 <small className={styles.formHint}>
@@ -868,7 +845,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                         Discount
                                         {!caps.adminWrites && (
                                             <small className={`${styles.formHint} ${styles.adminHint}`}>
-                                                <i className="fas fa-user-check"></i> Requires admin approval
+                                                <i className="fas fa-user-check" aria-hidden="true"></i> Requires admin approval
                                             </small>
                                         )}
                                     </label>
@@ -891,7 +868,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     />
                                     {formData.discount > 0 && formData.discount > (formData.total_required - existingTotalPaid) && (
                                         <small className={`${styles.formHint} ${styles.textWarning}`}>
-                                            <i className="fas fa-exclamation-triangle"></i> Discount cannot exceed Total Required minus Total Paid ({formatNumber(formData.total_required - existingTotalPaid)} {formData.currency})
+                                            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> Discount cannot exceed Total Required minus Total Paid ({formatNumber(formData.total_required - existingTotalPaid)} {formData.currency})
                                         </small>
                                     )}
                                 </div>
@@ -1026,7 +1003,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 >
                     <div className={styles.keywordsSection}>
                         <p className={styles.sectionHint}>
-                            <i className="fas fa-info-circle"></i> Select up to 5 keywords to categorize this work
+                            <i className="fas fa-info-circle" aria-hidden="true"></i> Select up to 5 keywords to categorize this work
                         </p>
                         <div className={styles.keywordsGrid}>
                             {([1, 2, 3, 4, 5] as const).map(num => {
@@ -1056,11 +1033,11 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                 {/* Bottom Form Actions */}
                 <div className={styles.formActions}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
-                        <i className="fas fa-save"></i> {loading ? 'Saving...' : (workId ? 'Update Work' : 'Add Work')}
+                        <i className="fas fa-save" aria-hidden="true"></i> {loading ? 'Saving...' : (workId ? 'Update Work' : 'Add Work')}
                     </button>
                     {onCancel && (
                         <button type="button" onClick={onCancel} className="btn btn-secondary">
-                            <i className="fas fa-times"></i> Cancel
+                            <i className="fas fa-times" aria-hidden="true"></i> Cancel
                         </button>
                     )}
                 </div>

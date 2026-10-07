@@ -27,7 +27,7 @@
 }
 
 .title i {
-  color: var(--error-500);
+  color: var(--error-700);
 }
 
 .count {
@@ -120,7 +120,7 @@
 }
 
 .expired {
-  background-color: var(--error-600);
+  background-color: var(--error-fill);
   color: var(--color-white);
 }
 

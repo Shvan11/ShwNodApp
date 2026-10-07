@@ -21,27 +21,29 @@
     --lpm-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
     --lpm-gradient-hover: linear-gradient(135deg, #4f46e5, #7c3aed);
 
-    /* Label Type Colors */
-    --lpm-upper-bg: #eff6ff;
-    --lpm-upper-border: #3b82f6;
-    --lpm-upper-text: #1e40af;
-    --lpm-lower-bg: #f0fdf4;
-    --lpm-lower-border: #22c55e;
-    --lpm-lower-text: #166534;
-    --lpm-combined-bg: #fffbeb;
+    /* Label Type Colors — tint/text pairs ride the themed ramps, so a chip and the
+       row gradient flip together in dark (a fixed light tint under themed text was
+       unreadable there). The light values are the ones this block used to hardcode. */
+    --lpm-upper-bg: var(--blue-50);
+    --lpm-upper-border: var(--blue-500);
+    --lpm-upper-text: var(--blue-800);
+    --lpm-lower-bg: var(--success-50);
+    --lpm-lower-border: var(--success-500);
+    --lpm-lower-text: var(--success-800);
+    --lpm-combined-bg: var(--amber-50);
     --lpm-combined-border: #f59e0b;
-    --lpm-combined-text: #92400e;
-    --lpm-custom-bg: #f5f3ff;
-    --lpm-custom-border: #8b5cf6;
-    --lpm-custom-text: #5b21b6;
+    --lpm-combined-text: var(--amber-800);
+    --lpm-custom-bg: var(--indigo-50);
+    --lpm-custom-border: var(--purple-500);
+    --lpm-custom-text: var(--indigo-700);
 
     /* Semantic Colors */
-    --lpm-danger: #dc2626;
-    --lpm-danger-bg: #fee2e2;
-    --lpm-danger-hover: #fecaca;
-    --lpm-reset-bg: #e0e7ff;
-    --lpm-reset-text: #4338ca;
-    --lpm-reset-hover: #c7d2fe;
+    --lpm-danger: var(--error-color);
+    --lpm-danger-bg: var(--error-100);
+    --lpm-danger-hover: var(--error-200);
+    --lpm-reset-bg: var(--indigo-100);
+    --lpm-reset-text: var(--indigo-700);
+    --lpm-reset-hover: var(--indigo-200);
 
     /* Typography */
     --lpm-font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -248,12 +250,12 @@ input.inputError {
 }
 
 .rangeBadgeUpper {
-    background: #dbeafe;
+    background: var(--blue-100);
     color: var(--lpm-upper-text);
 }
 
 .rangeBadgeLower {
-    background: #dcfce7;
+    background: var(--success-100);
     color: var(--lpm-lower-text);
 }
 
@@ -390,7 +392,7 @@ input.inputError {
 }
 
 .btnAddLabel:disabled {
-    background: #d1d5db;
+    background: var(--gray-300);
     cursor: not-allowed;
 }
 
@@ -416,7 +418,7 @@ input.inputError {
     align-items: center;
     gap: var(--lpm-space-sm);
     padding: var(--lpm-space-sm) var(--lpm-space-md);
-    background: var(--color-white);
+    background: var(--surface);
     border-radius: var(--lpm-radius-md);
     border: 1px solid transparent;
     border-left-width: 3px;
@@ -426,22 +428,22 @@ input.inputError {
 /* Label type variants */
 .labelItemUpper {
     border-left-color: var(--lpm-upper-border);
-    background: linear-gradient(90deg, var(--lpm-upper-bg) 0%, var(--color-white) 20%);
+    background: linear-gradient(90deg, var(--lpm-upper-bg) 0%, var(--surface) 20%);
 }
 
 .labelItemLower {
     border-left-color: var(--lpm-lower-border);
-    background: linear-gradient(90deg, var(--lpm-lower-bg) 0%, var(--color-white) 20%);
+    background: linear-gradient(90deg, var(--lpm-lower-bg) 0%, var(--surface) 20%);
 }
 
 .labelItemCombined {
     border-left-color: var(--lpm-combined-border);
-    background: linear-gradient(90deg, var(--lpm-combined-bg) 0%, var(--color-white) 20%);
+    background: linear-gradient(90deg, var(--lpm-combined-bg) 0%, var(--surface) 20%);
 }
 
 .labelItemCustom {
     border-left-color: var(--lpm-custom-border);
-    background: linear-gradient(90deg, var(--lpm-custom-bg) 0%, var(--color-white) 20%);
+    background: linear-gradient(90deg, var(--lpm-custom-bg) 0%, var(--surface) 20%);
 }
 
 .labelIndex {
@@ -834,7 +836,7 @@ input.inputError {
     align-items: center;
     gap: var(--lpm-space-sm);
     padding: 0.625rem 0.875rem;
-    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+    background: linear-gradient(135deg, var(--gray-100), var(--gray-200));
     border-bottom: 1px solid var(--border-color);
     border-radius: var(--lpm-radius-xl) var(--lpm-radius-xl) 0 0;
     font-weight: var(--font-weight-semibold);
@@ -1034,25 +1036,25 @@ input.inputError {
 /* Label chip type colors */
 .queueLabelChipUpper {
     background: var(--lpm-upper-bg);
-    border-color: #93c5fd;
+    border-color: var(--lpm-upper-border);
     color: var(--lpm-upper-text);
 }
 
 .queueLabelChipLower {
     background: var(--lpm-lower-bg);
-    border-color: #86efac;
+    border-color: var(--lpm-lower-border);
     color: var(--lpm-lower-text);
 }
 
 .queueLabelChipCombined {
     background: var(--lpm-combined-bg);
-    border-color: #fcd34d;
+    border-color: var(--lpm-combined-border);
     color: var(--lpm-combined-text);
 }
 
 .queueLabelChipCustom {
     background: var(--lpm-custom-bg);
-    border-color: #c4b5fd;
+    border-color: var(--lpm-custom-border);
     color: var(--lpm-custom-text);
 }
 
@@ -1148,14 +1150,14 @@ input.inputError {
 }
 
 .queueLabelsList::-webkit-scrollbar-track {
-    background: #f3f4f6;
+    background: var(--gray-100);
     border-radius: var(--lpm-radius-sm);
 }
 
 .queueLabelsList::-webkit-scrollbar-thumb {
     background: rgba(99, 102, 241, 0.4);
     border-radius: var(--lpm-radius-sm);
-    border: 2px solid #f3f4f6;
+    border: 2px solid var(--gray-100);
 }
 
 .queueLabelsList::-webkit-scrollbar-thumb:hover {

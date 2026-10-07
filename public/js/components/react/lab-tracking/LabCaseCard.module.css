@@ -51,7 +51,7 @@
 }
 
 .rushBadge {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
@@ -107,7 +107,7 @@
     padding: var(--spacing-sm);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    background: var(--surface-elevated, var(--background-light));
+    background: var(--surface-elevated);
 }
 
 .quickSelect {

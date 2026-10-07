@@ -22,9 +22,11 @@
   margin: var(--spacing-xs);
 }
 
-.btn:focus {
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--primary-alpha);
+/* An outline, not the old 25%-alpha halo (1.4:1 against the page), and only on
+   keyboard focus: a mouse click no longer leaves a ring behind. */
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .btn:disabled,
@@ -37,49 +39,49 @@
 /* Button Variants */
 .btn-primary {
   color: var(--color-white);
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
+  background-color: var(--primary-fill);
+  border-color: var(--primary-fill);
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-hover);
-  border-color: var(--primary-hover);
+  background-color: var(--primary-fill-hover);
+  border-color: var(--primary-fill-hover);
   transform: translateY(-1px);
 }
 
 .btn-secondary {
   color: var(--color-white);
-  background-color: var(--secondary-color);
-  border-color: var(--secondary-color);
+  background-color: var(--secondary-fill);
+  border-color: var(--secondary-fill);
 }
 
 .btn-secondary:hover {
-  background-color: var(--secondary-hover);
-  border-color: var(--secondary-hover);
+  background-color: var(--secondary-fill-hover);
+  border-color: var(--secondary-fill-hover);
   transform: translateY(-1px);
 }
 
 .btn-success {
   color: var(--color-white);
-  background-color: var(--success-color);
-  border-color: var(--success-color);
+  background-color: var(--success-fill);
+  border-color: var(--success-fill);
 }
 
 .btn-success:hover {
-  background-color: var(--success-dark);
-  border-color: var(--success-dark);
+  background-color: var(--success-fill-hover);
+  border-color: var(--success-fill-hover);
   transform: translateY(-1px);
 }
 
 .btn-danger {
   color: var(--color-white);
-  background-color: var(--error-color);
-  border-color: var(--error-color);
+  background-color: var(--error-fill);
+  border-color: var(--error-fill);
 }
 
 .btn-danger:hover {
-  background-color: var(--error-dark);
-  border-color: var(--error-dark);
+  background-color: var(--error-fill-hover);
+  border-color: var(--error-fill-hover);
   transform: translateY(-1px);
 }
 
@@ -99,13 +101,13 @@
 
 .btn-info {
   color: var(--color-white);
-  background-color: var(--info-color);
-  border-color: var(--info-color);
+  background-color: var(--info-fill);
+  border-color: var(--info-fill);
 }
 
 .btn-info:hover {
-  background-color: var(--info-dark);
-  border-color: var(--info-dark);
+  background-color: var(--info-fill-hover);
+  border-color: var(--info-fill-hover);
   transform: translateY(-1px);
 }
 
@@ -122,64 +124,21 @@
 
 /* Outline Variants - Soft colored backgrounds with borders */
 .btn-outline-primary {
-  color: var(--primary-color);
+  color: var(--blue-700);
   border-color: var(--primary-color);
   background-color: var(--blue-50);
 }
 
 .btn-outline-primary:hover {
   color: var(--color-white);
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
+  background-color: var(--primary-fill);
+  border-color: var(--primary-fill);
 }
-
-.btn-outline-success {
-  color: var(--success-color);
-  border-color: var(--success-color);
-  background-color: var(--success-50);
-}
-
-.btn-outline-success:hover {
-  color: var(--color-white);
-  background-color: var(--success-color);
-  border-color: var(--success-color);
-}
-
-.btn-outline-danger {
-  color: var(--error-color);
-  border-color: var(--error-color);
-  background-color: var(--error-50);
-}
-
-.btn-outline-danger:hover {
-  color: var(--color-white);
-  background-color: var(--error-color);
-  border-color: var(--error-color);
-}
-
-.btn-outline-warning {
-  color: var(--warning-dark);
-  border-color: var(--warning-color);
-  background-color: var(--warning-50);
-}
-
-.btn-outline-warning:hover {
-  color: var(--text-primary);
-  background-color: var(--warning-color);
-  border-color: var(--warning-color);
-}
-
 /* Button Sizes */
 .btn-sm {
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-sm);
   border-radius: var(--radius-sm);
-}
-
-/* Block Button */
-.btn-block {
-  display: flex;
-  width: 100%;
 }
 
 /* Icon Sizing in Buttons */
@@ -233,7 +192,7 @@
 }
 
 .btn-edit:hover {
-  background-color: var(--info-color);
+  background-color: var(--info-fill);
   color: var(--color-white);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
@@ -262,7 +221,7 @@
 }
 
 .btn-delete:hover {
-  background-color: var(--error-color);
+  background-color: var(--error-fill);
   color: var(--color-white);
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);

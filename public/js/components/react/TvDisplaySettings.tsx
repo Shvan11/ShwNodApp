@@ -414,7 +414,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             <div className={styles.header}>
                 <div>
                     <h3 className={styles.title}>
-                        <i className="fas fa-tv"></i>
+                        <i className="fas fa-tv" aria-hidden="true"></i>
                         TV Display
                     </h3>
                     <p className={styles.description}>
@@ -425,7 +425,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                 </div>
                 <div className={styles.headerActions}>
                     <a className={styles.linkBtn} href={slideshowUrl} target="_blank" rel="noreferrer">
-                        <i className="fas fa-external-link-alt"></i> Open the slideshow
+                        <i className="fas fa-external-link-alt" aria-hidden="true"></i> Open the slideshow
                     </a>
                 </div>
             </div>
@@ -433,7 +433,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Folder health (only when something's off) ---------------- */}
             {(orphanDurations.length > 0 || ignoredFiles.length > 0) && (
                 <section className={styles.warning} role="status">
-                    <i className={`fas fa-exclamation-triangle ${styles.warningIcon}`}></i>
+                    <i className={`fas fa-exclamation-triangle ${styles.warningIcon}`} aria-hidden="true"></i>
                     <div className={styles.warningBody}>
                         <h4 className={styles.warningTitle}>A couple of things in the media folder need a look</h4>
                         {orphanDurations.length > 0 && (
@@ -461,7 +461,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                     </div>
                     {orphanDurations.length > 0 && (
                         <button type="button" className={styles.secondaryBtn} onClick={clearOrphanDurations}>
-                            <i className="fas fa-broom"></i> Remove the {orphanDurations.length} stale time
+                            <i className="fas fa-broom" aria-hidden="true"></i> Remove the {orphanDurations.length} stale time
                             {orphanDurations.length > 1 ? 's' : ''}
                         </button>
                     )}
@@ -471,7 +471,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Live status + manual control ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-heartbeat"></i> Right now
+                    <i className="fas fa-heartbeat" aria-hidden="true"></i> Right now
                 </h4>
                 <div className={styles.statusGrid}>
                     <div className={styles.statusItem}>
@@ -511,7 +511,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                         onClick={() => handleCommand('on')}
                         disabled={!daemonAlive || sendCommand.isPending}
                     >
-                        <i className="fas fa-power-off"></i> Turn TV on now
+                        <i className="fas fa-power-off" aria-hidden="true"></i> Turn TV on now
                     </button>
                     <button
                         type="button"
@@ -519,7 +519,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                         onClick={() => handleCommand('off')}
                         disabled={!daemonAlive || sendCommand.isPending}
                     >
-                        <i className="fas fa-power-off"></i> Turn TV off now
+                        <i className="fas fa-power-off" aria-hidden="true"></i> Turn TV off now
                     </button>
                     <button
                         type="button"
@@ -527,11 +527,11 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                         onClick={() => handleCommand('reload')}
                         disabled={!daemonAlive || sendCommand.isPending}
                     >
-                        <i className="fas fa-sync"></i> Reload the slideshow
+                        <i className="fas fa-sync" aria-hidden="true"></i> Reload the slideshow
                     </button>
                     {!daemonAlive && (
                         <span className={styles.pending}>
-                            <i className="fas fa-exclamation-triangle"></i> Scheduler offline — check the
+                            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> Scheduler offline — check the
                             “LG TV Signage” task on the server
                         </span>
                     )}
@@ -554,7 +554,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Schedule ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-clock"></i> Schedule
+                    <i className="fas fa-clock" aria-hidden="true"></i> Schedule
                 </h4>
 
                 <label className={styles.switchRow}>
@@ -616,7 +616,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Appearance ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-sliders-h"></i> How the loop plays
+                    <i className="fas fa-sliders-h" aria-hidden="true"></i> How the loop plays
                 </h4>
                 <div className={styles.fieldGrid}>
                     <label className={styles.field}>
@@ -685,7 +685,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                     onClick={handleSave}
                     disabled={!dirty || saveSettings.isPending}
                 >
-                    <i className={`fas ${saveSettings.isPending ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+                    <i className={`fas ${saveSettings.isPending ? 'fa-spinner fa-spin' : 'fa-save'}`} aria-hidden="true"></i>
                     {saveSettings.isPending ? 'Saving…' : 'Save settings'}
                 </button>
                 <button
@@ -702,7 +702,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Media ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-photo-video"></i> Playlist — what plays, in order ({playlist.length})
+                    <i className="fas fa-photo-video" aria-hidden="true"></i> Playlist — what plays, in order ({playlist.length})
                 </h4>
 
                 <div className={styles.uploadRow}>
@@ -720,7 +720,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploading}
                     >
-                        <i className={`fas ${uploading ? 'fa-spinner fa-spin' : 'fa-upload'}`}></i>
+                        <i className={`fas ${uploading ? 'fa-spinner fa-spin' : 'fa-upload'}`} aria-hidden="true"></i>
                         {uploading ? 'Uploading…' : 'Add pictures / videos'}
                     </button>
                     {playlistDirty && (
@@ -731,7 +731,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                 onClick={handleSavePlaylist}
                                 disabled={savePlaylistMut.isPending}
                             >
-                                <i className={`fas ${savePlaylistMut.isPending ? 'fa-spinner fa-spin' : 'fa-list-ol'}`}></i>
+                                <i className={`fas ${savePlaylistMut.isPending ? 'fa-spinner fa-spin' : 'fa-list-ol'}`} aria-hidden="true"></i>
                                 {savePlaylistMut.isPending ? 'Saving…' : 'Save playlist'}
                             </button>
                             <button
@@ -754,7 +754,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                 {/* Files on disk that aren't in the playlist — the "add me?" prompt. */}
                 {available.length > 0 && (
                     <div className={styles.notice} role="status">
-                        <i className={`fas fa-inbox ${styles.noticeIcon}`}></i>
+                        <i className={`fas fa-inbox ${styles.noticeIcon}`} aria-hidden="true"></i>
                         <div className={styles.noticeBody}>
                             <h5 className={styles.noticeTitle}>
                                 {available.length} file{available.length > 1 ? 's are' : ' is'} in the folder but not in
@@ -775,7 +775,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                                     loading="lazy"
                                                 />
                                             ) : (
-                                                <i className="fas fa-film"></i>
+                                                <i className="fas fa-film" aria-hidden="true"></i>
                                             )}
                                         </div>
                                         <div className={styles.mediaMeta}>
@@ -791,7 +791,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                                 className={styles.secondaryBtn}
                                                 onClick={() => addToPlaylist(item.name)}
                                             >
-                                                <i className="fas fa-plus"></i> Add
+                                                <i className="fas fa-plus" aria-hidden="true"></i> Add
                                             </button>
                                             <button
                                                 type="button"
@@ -800,7 +800,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                                 onClick={() => void handleDelete(item.name)}
                                                 disabled={removeMedia.isPending}
                                             >
-                                                <i className="fas fa-trash"></i>
+                                                <i className="fas fa-trash" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                     </li>
@@ -812,7 +812,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                     className={styles.secondaryBtn}
                                     onClick={() => setPlaylistDraft([...playlist, ...available.map((a) => a.name)])}
                                 >
-                                    <i className="fas fa-plus"></i> Add all {available.length} to the playlist
+                                    <i className="fas fa-plus" aria-hidden="true"></i> Add all {available.length} to the playlist
                                 </button>
                             )}
                         </div>
@@ -841,7 +841,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                     <span className={styles.mediaIndex}>{index + 1}</span>
                                     <div className={styles.thumb}>
                                         {!item ? (
-                                            <i className="fas fa-exclamation-triangle"></i>
+                                            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                         ) : isImage ? (
                                             <img
                                                 src={`/tv-display/media/${encodeURIComponent(name)}`}
@@ -849,7 +849,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                                 loading="lazy"
                                             />
                                         ) : (
-                                            <i className="fas fa-film"></i>
+                                            <i className="fas fa-film" aria-hidden="true"></i>
                                         )}
                                     </div>
                                     <div className={styles.mediaMeta}>
@@ -895,7 +895,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                             onClick={() => move(index, -1)}
                                             disabled={index === 0}
                                         >
-                                            <i className="fas fa-arrow-up"></i>
+                                            <i className="fas fa-arrow-up" aria-hidden="true"></i>
                                         </button>
                                         <button
                                             type="button"
@@ -904,7 +904,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                             onClick={() => move(index, 1)}
                                             disabled={index === playlist.length - 1}
                                         >
-                                            <i className="fas fa-arrow-down"></i>
+                                            <i className="fas fa-arrow-down" aria-hidden="true"></i>
                                         </button>
                                         <button
                                             type="button"
@@ -913,7 +913,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                             onClick={() => duplicateAt(index)}
                                             disabled={!item}
                                         >
-                                            <i className="fas fa-clone"></i>
+                                            <i className="fas fa-clone" aria-hidden="true"></i>
                                         </button>
                                         <button
                                             type="button"
@@ -921,7 +921,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                             title="Remove this slot from the playlist (keeps the file)"
                                             onClick={() => removeAt(index)}
                                         >
-                                            <i className="fas fa-times"></i>
+                                            <i className="fas fa-times" aria-hidden="true"></i>
                                         </button>
                                         {item && (
                                             <button
@@ -931,7 +931,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                                                 onClick={() => void handleDelete(name)}
                                                 disabled={removeMedia.isPending}
                                             >
-                                                <i className="fas fa-trash"></i>
+                                                <i className="fas fa-trash" aria-hidden="true"></i>
                                             </button>
                                         )}
                                     </div>
@@ -942,9 +942,9 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                 )}
 
                 <p className={styles.hint}>
-                    Order is the list order. <i className="fas fa-clone"></i> repeats a clip — the way to
-                    put one logo between every video with no duplicate file. <i className="fas fa-times"></i>{' '}
-                    removes just that slot (the file stays); <i className="fas fa-trash"></i> deletes the
+                    Order is the list order. <i className="fas fa-clone" aria-hidden="true"></i> repeats a clip — the way to
+                    put one logo between every video with no duplicate file. <i className="fas fa-times" aria-hidden="true"></i>{' '}
+                    removes just that slot (the file stays); <i className="fas fa-trash" aria-hidden="true"></i> deletes the
                     file from the server. Playlist changes are saved with “Save playlist”.
                 </p>
                 <p className={styles.hint}>
@@ -957,7 +957,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Preview ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-desktop"></i> Preview
+                    <i className="fas fa-desktop" aria-hidden="true"></i> Preview
                 </h4>
                 {showPreview ? (
                     <>
@@ -982,7 +982,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
                         className={styles.secondaryBtn}
                         onClick={() => setShowPreview(true)}
                     >
-                        <i className="fas fa-play"></i> Show a preview here
+                        <i className="fas fa-play" aria-hidden="true"></i> Show a preview here
                     </button>
                 )}
                 <p className={styles.hint}>
@@ -994,7 +994,7 @@ const TvDisplaySettings = ({ onChangesUpdate }: TvDisplaySettingsProps) => {
             {/* ---------------- Where everything lives ---------------- */}
             <section className={styles.card}>
                 <h4 className={styles.cardTitle}>
-                    <i className="fas fa-folder-open"></i> Where everything lives
+                    <i className="fas fa-folder-open" aria-hidden="true"></i> Where everything lives
                 </h4>
                 <dl className={styles.pathList}>
                     <dt>Media folder (on this server)</dt>

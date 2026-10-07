@@ -38,7 +38,7 @@
 
 /* Warning text */
 .warningText {
-  color: var(--warning-600);
+  color: var(--warning-700);
   font-weight: var(--font-weight-medium);
   margin-bottom: 15px;
   padding: 12px;

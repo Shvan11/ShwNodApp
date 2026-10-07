@@ -17,7 +17,7 @@
 }
 
 .title {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     font-size: 1.8rem;
     margin: 0 0 0.5rem;
     display: flex;
@@ -57,15 +57,15 @@
     width: 100%;
     padding: 0.85rem 1rem;
     border-radius: var(--radius-md);
-    background: var(--warning-light, var(--gray-100));
-    border: 1px solid var(--warning-color, var(--gray-300));
+    background: var(--warning-light);
+    border: 1px solid var(--warning-color);
     color: var(--text-primary);
     font-size: 0.9rem;
     line-height: 1.45;
 }
 
 .warning i {
-    color: var(--warning-dark, var(--warning-color));
+    color: var(--warning-800);
     font-size: 1.1rem;
     margin-top: 0.1rem;
     flex-shrink: 0;
@@ -78,7 +78,7 @@
     padding: 0.7rem 1.4rem;
     border: none;
     border-radius: 8px;
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
     font-size: 0.95rem;
     font-weight: 600;
@@ -87,8 +87,7 @@
 }
 
 .downloadBtn:hover:not(:disabled) {
-    background: var(--color-purple-light, var(--primary-color));
-    opacity: 0.92;
+    background: var(--primary-fill-hover);
 }
 
 .downloadBtn:disabled {

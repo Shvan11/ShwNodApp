@@ -283,7 +283,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             complete: {
                 title: t('statusModal.complete.title'),
                 icon: 'fa-check-circle',
-                color: 'var(--success-color)',
+                tone: styles.confirmToneSuccess,
                 message: t('statusModal.complete.message'),
                 warning: t('statusModal.complete.warning'),
                 buttonText: t('statusModal.complete.button'),
@@ -292,7 +292,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             discontinue: {
                 title: t('statusModal.discontinue.title'),
                 icon: 'fa-times-circle',
-                color: 'var(--warning-color)',
+                tone: styles.confirmToneWarning,
                 message: t('statusModal.discontinue.message'),
                 warning: t('statusModal.discontinue.warning'),
                 buttonText: t('statusModal.discontinue.button'),
@@ -301,7 +301,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
             reactivate: {
                 title: t('statusModal.reactivate.title'),
                 icon: 'fa-redo',
-                color: 'var(--primary-color)',
+                tone: styles.confirmToneInfo,
                 message: t('statusModal.reactivate.message'),
                 warning: t('statusModal.reactivate.warning'),
                 buttonText: t('statusModal.reactivate.button'),
@@ -574,6 +574,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 value={filterStatus}
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value as FilterStatus)}
                                 className={styles.filterSelect}
+                                aria-label={t('filter.label')}
                             >
                                 {FILTER_OPTIONS.map(opt => (
                                     <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
@@ -585,7 +586,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 disabled={checkingIn || checkedIn}
                                 title={checkedIn ? t('checkin.titleDone') : t('checkin.title')}
                             >
-                                <i className="fas fa-user-check"></i>
+                                <i className="fas fa-user-check" aria-hidden="true"></i>
                                 {checkingIn ? t('checkin.checkingIn') : checkedIn ? t('checkin.checkedIn') : t('checkin.checkIn')}
                             </button>
                             <button
@@ -594,11 +595,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 disabled={loadingAppointment || !hasNextAppointment}
                                 title={!hasNextAppointment ? t('printAppointment.noAppt') : t('printAppointment.title')}
                             >
-                                <i className="fas fa-print"></i>
+                                <i className="fas fa-print" aria-hidden="true"></i>
                                 {loadingAppointment ? t('printAppointment.loading') : t('printAppointment.label')}
                             </button>
                             <button onClick={handleAddWork} className="btn btn-primary">
-                                <i className="fas fa-plus"></i>
+                                <i className="fas fa-plus" aria-hidden="true"></i>
                                 {t('controls.addWork')}
                             </button>
                         </div>
@@ -636,7 +637,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                 ))}
                 {filteredWorks.length === 0 && (
                     <div className={styles.noWorksMessage}>
-                        <i className={`fas fa-tooth ${styles.noWorksIcon}`}></i>
+                        <i className={`fas fa-tooth ${styles.noWorksIcon}`} aria-hidden="true"></i>
                         <p className={styles.noWorksText}>
                             {searchTerm || filterStatus !== 'all'
                                 ? t('empty.noMatch')
@@ -671,7 +672,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         <ModalHeader
                             title={t('paymentHistory.title', { name: historyWork.type_name || t('paymentHistory.workFallback', { id: historyWork.work_id }) })}
                             titleId="payment-history-title"
-                            icon={<i className="fas fa-receipt" />}
+                            icon={<i className="fas fa-receipt" aria-hidden="true" />}
                             onClose={() => setHistoryWorkId(null)}
                         />
                         <div className={styles.modalContentScroll}>
@@ -822,7 +823,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         <ModalHeader
                             title={t('deleteWork.title')}
                             titleId="delete-work-title"
-                            icon={<i className="fas fa-exclamation-triangle" />}
+                            icon={<i className="fas fa-exclamation-triangle" aria-hidden="true" />}
                             variant="danger"
                             onClose={cancelDeleteWork}
                         />
@@ -847,13 +848,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         </div>
                         <div className="whatsapp-actions">
                             <button onClick={cancelDeleteWork} className="whatsapp-btn-cancel">
-                                <i className="fas fa-times"></i> {t('common.cancel')}
+                                <i className="fas fa-times" aria-hidden="true"></i> {t('common.cancel')}
                             </button>
                             <button
                                 onClick={confirmDeleteWork}
                                 className={`whatsapp-btn-send ${styles.confirmActionButton}`}
                             >
-                                <i className="fas fa-trash"></i> {t('deleteWork.button')}
+                                <i className="fas fa-trash" aria-hidden="true"></i> {t('deleteWork.button')}
                             </button>
                         </div>
                 </Modal>
@@ -870,11 +871,11 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         contentClassName={`whatsapp-modal ${styles.confirmDialog}`}
                         ariaLabelledBy="confirm-action-title"
                     >
-                            <div style={{ '--confirm-accent': config.color } as React.CSSProperties}>
+                            <div className={config.tone}>
                                 <ModalHeader
                                     title={config.title}
                                     titleId="confirm-action-title"
-                                    icon={<i className={`fas ${config.icon}`} />}
+                                    icon={<i className={`fas ${config.icon}`} aria-hidden="true" />}
                                     variant={confirmationModal.type === 'complete' ? 'success' : confirmationModal.type === 'discontinue' ? 'warning' : 'info'}
                                     onClose={closeConfirmationModal}
                                 />
@@ -899,13 +900,13 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                                 </div>
                                 <div className="whatsapp-actions">
                                     <button onClick={closeConfirmationModal} className="whatsapp-btn-cancel">
-                                        <i className="fas fa-times"></i> {t('common.cancel')}
+                                        <i className="fas fa-times" aria-hidden="true"></i> {t('common.cancel')}
                                     </button>
                                     <button
                                         onClick={executeConfirmedAction}
                                         className={`whatsapp-btn-send ${styles.confirmActionButton}`}
                                     >
-                                        <i className={`fas ${config.buttonIcon}`}></i> {config.buttonText}
+                                        <i className={`fas ${config.buttonIcon}`} aria-hidden="true"></i> {config.buttonText}
                                     </button>
                                 </div>
                             </div>

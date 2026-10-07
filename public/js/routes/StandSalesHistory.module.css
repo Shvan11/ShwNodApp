@@ -67,7 +67,7 @@
 
 .errorBanner p {
   margin: 0;
-  color: var(--error-600);
+  color: var(--error-700);
 }
 
 @media (max-width: 768px) {

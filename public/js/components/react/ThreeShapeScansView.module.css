@@ -81,7 +81,7 @@
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-full);
   background: var(--background-secondary);
-  color: var(--success-color);
+  color: var(--success-700);
   font-weight: 600;
 }
 

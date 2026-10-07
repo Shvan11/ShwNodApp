@@ -56,7 +56,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
         <div className={styles.modernFilterCard}>
             <div className={styles.filterCardHeader}>
                 <div className={styles.filterHeaderContent}>
-                    <i className="fas fa-filter"></i>
+                    <i className="fas fa-filter" aria-hidden="true"></i>
                     <h3>{t('filters.title')}</h3>
                 </div>
                 <button
@@ -65,14 +65,14 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                     onClick={onReset}
                     title={t('filters.reset')}
                 >
-                    <i className="fas fa-redo"></i>
+                    <i className="fas fa-redo" aria-hidden="true"></i>
                 </button>
             </div>
 
             <div className={styles.modernFilterGrid}>
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-start-date">
-                        <i className="fas fa-calendar-alt"></i>
+                        <i className="fas fa-calendar-alt" aria-hidden="true"></i>
                         {t('filters.startDate')}
                     </label>
                     <input
@@ -86,7 +86,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
 
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-end-date">
-                        <i className="fas fa-calendar-alt"></i>
+                        <i className="fas fa-calendar-alt" aria-hidden="true"></i>
                         {t('filters.endDate')}
                     </label>
                     <input
@@ -100,7 +100,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
 
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-category">
-                        <i className="fas fa-folder"></i>
+                        <i className="fas fa-folder" aria-hidden="true"></i>
                         {t('filters.category')}
                     </label>
                     <div className={styles.selectWrapper}>
@@ -117,14 +117,14 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                                 </option>
                             ))}
                         </select>
-                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
                     </div>
                 </div>
 
                 {subLevel === 'employee' ? (
                     <div className={styles.modernFilterGroup}>
                         <label htmlFor="filter-employee">
-                            <i className="fas fa-user"></i>
+                            <i className="fas fa-user" aria-hidden="true"></i>
                             {t('filters.employee')}
                         </label>
                         <div className={styles.selectWrapper}>
@@ -141,13 +141,13 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                                     </option>
                                 ))}
                             </select>
-                            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                            <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
                         </div>
                     </div>
                 ) : subLevel === 'lab' ? (
                     <div className={styles.modernFilterGroup}>
                         <label htmlFor="filter-lab">
-                            <i className="fas fa-flask"></i>
+                            <i className="fas fa-flask" aria-hidden="true"></i>
                             {t('filters.lab')}
                         </label>
                         <div className={styles.selectWrapper}>
@@ -162,13 +162,13 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                                     <option key={lab.id} value={lab.id}>{lab.name}</option>
                                 ))}
                             </select>
-                            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                            <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
                         </div>
                     </div>
                 ) : (
                     <div className={styles.modernFilterGroup}>
                         <label htmlFor="filter-subcategory">
-                            <i className="fas fa-tag"></i>
+                            <i className="fas fa-tag" aria-hidden="true"></i>
                             {t('filters.subcategory')}
                         </label>
                         <div className={styles.selectWrapper}>
@@ -186,14 +186,14 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                                     </option>
                                 ))}
                             </select>
-                            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                            <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
                         </div>
                     </div>
                 )}
 
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-currency">
-                        <i className="fas fa-dollar-sign"></i>
+                        <i className="fas fa-dollar-sign" aria-hidden="true"></i>
                         {t('filters.currency')}
                     </label>
                     <div className={styles.selectWrapper}>
@@ -207,13 +207,13 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             <option value="IQD">IQD</option>
                             <option value="USD">USD</option>
                         </select>
-                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
                     </div>
                 </div>
 
                 <div className={styles.modernFilterGroup}>
                     <label htmlFor="filter-type">
-                        <i className="fas fa-tag"></i>
+                        <i className="fas fa-tag" aria-hidden="true"></i>
                         {t('filters.type')}
                     </label>
                     <div className={styles.selectWrapper}>
@@ -229,7 +229,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                             {/* eslint-disable-next-line i18next/no-literal-string */}
                             <option value="true">{t('filters.monthlyOnly')}</option>
                         </select>
-                        <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+                        <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
                     </div>
                 </div>
 
@@ -239,7 +239,7 @@ export default function ExpenseFilters({ filters, onFilterChange, onApply, onRes
                         className={`${styles.btnModern} ${styles.btnModernPrimary}`}
                         onClick={onApply}
                     >
-                        <i className="fas fa-check"></i>
+                        <i className="fas fa-check" aria-hidden="true"></i>
                         {t('filters.apply')}
                     </button>
                 </div>

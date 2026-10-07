@@ -96,12 +96,14 @@ router.post(
         return;
       }
 
-      // Use defaults for quick-add (alertTypeId=1 General). The contract has already
-      // coerced both to positive integers, so the old `x ? parseInt(String(x), 10) : d`
-      // dance both re-parsed a number and treated id 0 as "unset".
+      // No type given = an untyped alert, as POST /api/tasks stores it. This used to
+      // fall back to the literal id 1 as "General": `alert_types` is each clinic's own
+      // vocabulary (filled by db:setup, edited in Settings → Lookups), no migration
+      // seeds a row 1, and where one exists it is whatever was added first (here,
+      // "Financial"), so an untyped alert was filed under an unrelated category.
       await createAlert({
         person_id: personId,
-        alert_type_id: alertTypeId ?? 1,
+        alert_type_id: alertTypeId ?? null,
         alert_severity: alertSeverity,
         alert_details: alertDetails,
         surface_mode: surfaceMode,

@@ -58,8 +58,8 @@ export function getTimePoints(PID: string): Promise<TimePoint[]> {
 
 /**
  * The patient's own `tp_code` set — the disambiguator for the shared flat
- * `working/` dir. A rendered view is named `{personId}0{tpCode}.{view}`, and
- * decimal ids prefix each other, so a `{personId}0…` prefix match spans patients
+ * `working/` dir. A rendered view is named `{personId}{tpCode:02}.{view}`, and
+ * decimal ids prefix each other, so a `{personId}…` prefix match spans patients
  * (patient 5 also matches patient 50's `5001.i12`). Callers pair these codes with
  * `VIEW_CODES` to enumerate the EXACT names this patient can own — see
  * services/files/working-files.service.ts.
@@ -74,3 +74,11 @@ export function getTimePointCodes(PID: string): Promise<number[]> {
     .then((rows) => rows.map((r) => r.tp_code));
 }
 
+/**
+ * The clinic's common photo-session names (the `time_point_names` lookup, Settings →
+ * Lookups), in the order they were added — what the Name select of the New / Edit Photo
+ * Session dialogs offers. Suggestions only: `time_points.tp_description` is free text.
+ */
+export function getTimePointNames(): Promise<{ id: number; name: string }[]> {
+  return getKysely().selectFrom('time_point_names').select(['id', 'name']).orderBy('id').execute();
+}

@@ -94,7 +94,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: Stats
         <div className={styles.headerContainer}>
             <div className={styles.cardTotal}>
                 <div className={styles.icon}>
-                    <i className="fas fa-calendar-check"></i>
+                    <i className="fas fa-calendar-check" aria-hidden="true"></i>
                 </div>
                 <div className={styles.content}>
                     <div className={styles.label}>{t('stats.total')}</div>
@@ -104,7 +104,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: Stats
 
             <div className={styles.cardPresent}>
                 <div className={styles.icon}>
-                    <i className="fas fa-user-check"></i>
+                    <i className="fas fa-user-check" aria-hidden="true"></i>
                 </div>
                 <div className={styles.content}>
                     <div className={styles.label}>{t('stats.checkedIn')}</div>
@@ -114,7 +114,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: Stats
 
             <div className={styles.cardRemaining}>
                 <div className={styles.icon}>
-                    <i className="fas fa-user-clock"></i>
+                    <i className="fas fa-user-clock" aria-hidden="true"></i>
                 </div>
                 <div className={styles.content}>
                     <div className={styles.label}>{t('stats.remaining')}</div>
@@ -124,7 +124,7 @@ const StatsCards = ({ total = 0, checkedIn = 0, absent = 0, waiting = 0 }: Stats
 
             <div className={styles.cardWaiting}>
                 <div className={styles.icon}>
-                    <i className="fas fa-clock"></i>
+                    <i className="fas fa-clock" aria-hidden="true"></i>
                 </div>
                 <div className={styles.content}>
                     <div className={styles.label}>{t('stats.waiting')}</div>

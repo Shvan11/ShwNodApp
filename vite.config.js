@@ -21,15 +21,21 @@ export default defineConfig(({ mode }) => {
   const projectRoot = realpathSync.native(__dirname);
   const publicRoot = resolve(projectRoot, 'public');
 
-  // App-wide runtime that App.tsx / RootLayout mount on EVERY page (React, the
-  // router, the React Query provider, i18n) — rarely changes, so it belongs in
-  // one long-cached eager vendor chunk. Matches EXACT package directories on
-  // purpose: the old `id.includes('react')` was a substring test that also
-  // swept the route-only libs (react-select, react-easy-crop, react-imask/imask,
-  // @tanstack/react-virtual) into this eager bundle. Keep this list to deps that
-  // are genuinely needed for first paint of any route.
-  const VENDOR_CORE =
-    /[\\/]node_modules[\\/](?:react|react-dom|react-is|scheduler|react-router|react-router-dom|use-sync-external-store|@tanstack[\\/](?:react-query|query-core)|react-i18next|i18next)[\\/]/;
+  // App-wide runtime, in two long-cached eager chunks. Both match EXACT package
+  // directories on purpose: the old `id.includes('react')` was a substring test
+  // that also swept the route-only libs (react-select, react-easy-crop,
+  // react-imask/imask, @tanstack/react-virtual) into the eager bundle.
+  //
+  // VENDOR_REACT is React itself: what BOTH entry points run (the staff SPA and
+  // the Patient Portal). VENDOR_APP is the rest of the staff app's runtime (the
+  // router, React Query, i18n), which the portal never imports. They were one
+  // chunk, so a patient's phone downloaded 164 kB of router, query cache and
+  // i18n to show a sign-in form (audit FE-F26-6). Keep both lists to deps the
+  // first paint of any route needs.
+  const VENDOR_REACT =
+    /[\\/]node_modules[\\/](?:react|react-dom|react-is|scheduler|use-sync-external-store)[\\/]/;
+  const VENDOR_APP =
+    /[\\/]node_modules[\\/](?:react-router|react-router-dom|@tanstack[\\/](?:react-query|query-core)|react-i18next|i18next)[\\/]/;
 
   return {
   // Define environment variables to expose to the client
@@ -51,9 +57,8 @@ export default defineConfig(({ mode }) => {
     // compiler's output.
     babel({ presets: [reactCompilerPreset()] }),
     // Bundle treemap, opt-in via `npm run build:analyze` (sets ANALYZE=true).
-    // Writes dist/stats.html so we can see what actually ships — e.g. Chart.js
-    // is eagerly imported by the Stand chart components, so it loads even for
-    // users who never open Statistics. No cost on a normal `npm run build`.
+    // Writes dist/stats.html so we can see what actually ships (per-module sizes
+    // for every chunk). No cost on a normal `npm run build`.
     process.env.ANALYZE === 'true' &&
       visualizer({
         filename: resolve(projectRoot, 'dist/stats.html'),
@@ -81,37 +86,27 @@ export default defineConfig(({ mode }) => {
         portal: resolve(publicRoot, 'portal.html'),
       },
       output: {
-        // Optimal code splitting strategy for production
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-
-          // GrapesJS — DO NOT bundle; let it stay a dynamic import chunk so it
-          // loads only when the TemplateDesigner component mounts.
-          if (id.includes('grapesjs')) {
-            return; // undefined → Rollup keeps it as an on-demand chunk
-          }
-
-          // Chart library (chart.js) — used only by the lazy Statistics +
-          // Stand Reports routes, so this chunk loads on demand with them.
-          if (id.includes('chart.js')) {
-            return 'vendor-charts';
-          }
-
-          // App-wide runtime (React/router/query/i18n) — one long-cached eager
-          // chunk. EXACT package match (see VENDOR_CORE above): a bare
-          // includes('react') also pulled react-select, react-easy-crop,
-          // react-imask/imask and @tanstack/react-virtual — all imported ONLY
-          // by lazy route chunks — into this eagerly-loaded bundle (~100 kB raw
-          // parsed on every cold load that no route on first paint needs).
-          if (VENDOR_CORE.test(id)) {
-            return 'vendor-react';
-          }
-
-          // Everything else: let Rollup auto-chunk (prevents the circular-dep
-          // "Cannot access before initialization" errors a catch-all vendor
-          // chunk caused). Route-only deps now ride with the lazy route chunk
-          // that imports them, not the eager bundle.
-        }
+        // Chunk groups. Anything not named here is auto-chunked by Rolldown, so
+        // route-only deps ride with the lazy route that imports them (GrapesJS
+        // stays an on-demand chunk of the template designer), and there is no
+        // catch-all vendor chunk (one caused circular-dependency "Cannot access
+        // before initialization" errors).
+        //
+        // `priority` is load-bearing. A group also takes the dependencies of the
+        // modules it matches, so without it the router's group swallowed `react`
+        // itself (the router imports it) and the portal still downloaded the
+        // whole staff runtime. The higher priority claims its modules first.
+        // This is why the groups are `codeSplitting`, not a `manualChunks`
+        // function: that form has no priority.
+        codeSplitting: {
+          groups: [
+            { name: 'vendor-react', test: VENDOR_REACT, priority: 30 },
+            { name: 'vendor-app', test: VENDOR_APP, priority: 20 },
+            // Chart.js: only the lazy Statistics route imports it, so this
+            // chunk loads on demand with that route.
+            { name: 'vendor-charts', test: /[\\/]node_modules[\\/]chart\.js[\\/]/, priority: 10 },
+          ],
+        },
       }
     }
   },

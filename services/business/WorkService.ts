@@ -621,6 +621,10 @@ export async function validateAndUpdateWork(
   if (Object.prototype.hasOwnProperty.call(workData, 'currency') && workData.currency === undefined) {
     delete workData.currency;
   }
+  // Same for the doctor (`works.dr_id` is NOT NULL): present-but-undefined is "unchanged".
+  if (Object.prototype.hasOwnProperty.call(workData, 'dr_id') && workData.dr_id === undefined) {
+    delete workData.dr_id;
+  }
 
   // Fetch current work once if a validation below needs it.
   const status = workData.status as WorkStatusType | undefined;

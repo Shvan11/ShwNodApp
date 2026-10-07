@@ -31,7 +31,7 @@
 
 .currencyTab:hover {
     background: var(--background-secondary);
-    color: var(--primary-color);
+    color: var(--blue-700);
 }
 
 .currencyTab.active,
@@ -171,7 +171,7 @@
 }
 
 .btnEdit:hover {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 
@@ -181,7 +181,7 @@
 }
 
 .btnDelete:hover {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 

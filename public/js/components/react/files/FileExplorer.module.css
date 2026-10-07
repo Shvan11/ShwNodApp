@@ -34,6 +34,7 @@
 .crumb:hover {
   text-decoration: underline;
   background: var(--hover-bg);
+  color: var(--blue-700);
 }
 .crumbCurrent {
   color: var(--text-primary);
@@ -86,14 +87,14 @@
   padding: 8px 16px;
   border: none;
   border-radius: var(--radius-md);
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
   font-size: var(--font-size-sm);
   cursor: pointer;
   text-decoration: none;
 }
 .primaryButton:hover {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
 }
 .primaryButton:disabled {
   opacity: 0.5;
@@ -235,7 +236,7 @@
 }
 .iconButton:hover {
   background: var(--hover-bg);
-  color: var(--primary-color);
+  color: var(--blue-700);
 }
 .iconButton.danger:hover {
   color: var(--danger-color);
@@ -345,8 +346,8 @@
   color: var(--danger-color);
 }
 .dangerButton:hover:not(:disabled) {
-  background: var(--danger-color);
-  border-color: var(--danger-color);
+  background: var(--error-fill);
+  border-color: var(--error-fill);
   color: var(--color-white);
 }
 
@@ -365,8 +366,8 @@
   font-size: 0.7rem;
 }
 .selectCheckOn {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--primary-fill);
+  border-color: var(--primary-fill);
 }
 /* Grid: float the checkbox into the tile's top-left corner. */
 .tile .selectCheck {

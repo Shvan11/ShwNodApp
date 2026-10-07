@@ -160,7 +160,7 @@ export default function Dashboard() {
 
   return (
     <div id="app">
-      <main className={styles.mainContent}>
+      <div className={styles.mainContent}>
         <div className={styles.container}>
           {/* Subtle Customization Control */}
           <div className={styles.dashboardHeader}>
@@ -253,13 +253,13 @@ export default function Dashboard() {
 
                   <div className={styles.dashboardCard}>
                     <div className={styles.cardIcon}>
-                      <i className={card.icon}></i>
+                      <i className={card.icon} aria-hidden="true"></i>
                     </div>
                     <h3>{t(`cards.${card.key}.title`)}</h3>
                     <p>{t(`cards.${card.key}.description`)}</p>
                     <div className={styles.cardFooter}>
                       <span>{t(`cards.${card.key}.linkText`)}</span>
-                      <i className="fas fa-arrow-right"></i>
+                      <i className="fas fa-arrow-right" aria-hidden="true"></i>
                     </div>
                   </div>
                 </a>
@@ -267,7 +267,7 @@ export default function Dashboard() {
             })}
           </div>
         </div>
-      </main>
+      </div>
 
       <footer className={styles.footer}>
         <div className={styles.container}>

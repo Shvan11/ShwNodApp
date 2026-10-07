@@ -11,15 +11,15 @@
 }
 
 .btn-card-action.btn-new-visit i {
-    color: var(--color-purple-medium);
+    color: var(--indigo-600);
 }
 
 .btn-card-action.btn-visits i {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .btn-card-action.btn-payments i {
-    color: var(--info-600);
+    color: var(--info-700);
 }
 
 .btn-card-action.btn-diagnosis i {
@@ -28,12 +28,18 @@
 
 /* --- Secondary action button modifiers --- */
 
+/* The ink for the three fills below. The base rule went missing in the 2025-11-26
+   stylesheet split, and the labels have been the browser's black since. */
+.btn-card-secondary {
+    color: var(--color-white);
+}
+
 .btn-card-secondary.btn-add-payment {
-    background: var(--success-500);
+    background: var(--success-fill);
 }
 
 .btn-card-secondary.btn-add-payment:hover:not(.disabled) {
-    background: var(--success-600);
+    background: var(--success-fill-hover);
 }
 
 .btn-card-secondary.btn-add-payment.disabled {
@@ -43,11 +49,11 @@
 }
 
 .btn-card-secondary.btn-print-receipt {
-    background: var(--primary-color);
+    background: var(--primary-fill);
 }
 
 .btn-card-secondary.btn-print-receipt:hover {
-    background: var(--primary-hover);
+    background: var(--primary-fill-hover);
 }
 
 .btn-card-secondary.btn-add-set {
@@ -55,7 +61,7 @@
 }
 
 .btn-card-secondary.btn-add-set:hover {
-    background: var(--indigo-500);
+    background: var(--palette-indigo-600);
 }
 
 /* --- Responsive --- */

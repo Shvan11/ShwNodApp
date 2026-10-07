@@ -156,7 +156,7 @@ const PatientsList: React.FC = () => {
             {/* Patients Grid */}
             {filteredPatients.length === 0 ? (
                 <div className={styles.emptyPatients}>
-                    <i className="fas fa-users"></i>
+                    <i className="fas fa-users" aria-hidden="true"></i>
                     <h3>{patientFilter ? 'No matching patients found' : 'No patients with aligner sets'}</h3>
                     {patientFilter && (
                         <button
@@ -226,11 +226,11 @@ const PatientsList: React.FC = () => {
                             </div>
                             <div className={styles.patientCardStats}>
                                 <div className={styles.stat}>
-                                    <i className="fas fa-box"></i>
+                                    <i className="fas fa-box" aria-hidden="true"></i>
                                     <span>{patient.TotalSets || 0} Sets</span>
                                 </div>
                                 <div className={`${styles.stat} ${styles.active}`}>
-                                    <i className="fas fa-check-circle"></i>
+                                    <i className="fas fa-check-circle" aria-hidden="true"></i>
                                     <span>{patient.ActiveSets || 0} Active</span>
                                 </div>
                             </div>

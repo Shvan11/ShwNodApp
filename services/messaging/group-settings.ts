@@ -3,11 +3,11 @@
  *
  * Persisted in the key/value `options` table (two rows), so they're editable at
  * runtime from the /send page without a redeploy and survive restarts. The DB is
- * the single source of truth — the default values (send=on, group="Shwan
- * Orthodontics") are SEEDED in the DB by migration
- * `*_seed-whatsapp-group-options.sql`, NOT hardcoded here. If a row is somehow
- * absent (DB not migrated), we fail safe: disabled + empty name (the send path
- * then skips), rather than inventing a default.
+ * the single source of truth — the two rows are SEEDED by the baseline migration
+ * (off, with no group named; a center turns it on and names its own group on the
+ * /send page or in `npm run db:setup`), NOT hardcoded here. If a row is somehow
+ * absent (DB not migrated), we fail safe the same way: disabled + empty name (the
+ * send path then skips), rather than inventing a default.
  *
  * Consumed by both the WhatsApp service (decides whether/where to post the PDF on
  * each notification batch) and the `/api/wa/group-settings` GET/PUT route.

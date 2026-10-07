@@ -102,7 +102,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                             variant="warning"
                             title="Existing Appointments Found"
                             titleId="appt-warning-modal-title"
-                            icon={<i className="fas fa-exclamation-triangle" />}
+                            icon={<i className="fas fa-exclamation-triangle" aria-hidden="true" />}
                             onClose={() => settleWarning(false)}
                         />
                         <div className="modal-body">
@@ -118,7 +118,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                                 {warning.appointments.slice(0, 10).map((apt, idx) => (
                                     <div key={idx} className="appointment-item">
                                         <span className="patient-name">
-                                            <i className="fas fa-user"></i>
+                                            <i className="fas fa-user" aria-hidden="true"></i>
                                             {apt.patient_name}
                                         </span>
                                         <span className="appointment-detail">{apt.app_detail}</span>
@@ -147,7 +147,7 @@ const HolidayEditor = ({ tableKey, tableName, columns, idColumn }: HolidayEditor
                                 className="btn btn-warning"
                                 onClick={() => settleWarning(true)}
                             >
-                                <i className="fas fa-calendar-times"></i>
+                                <i className="fas fa-calendar-times" aria-hidden="true"></i>
                                 Save Holiday Anyway
                             </button>
                         </div>

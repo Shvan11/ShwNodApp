@@ -19,19 +19,19 @@ const PatientTypesReadOnly: React.FC = () => {
     return (
         <div className="lookup-editor">
             <p className="section-description">
-                <i className="fas fa-circle-info"></i>{' '}
+                <i className="fas fa-circle-info" aria-hidden="true"></i>{' '}
                 Patient type is set automatically from each patient&apos;s treatments — it can&apos;t be
                 edited here. This list is shown for reference only.
             </p>
 
             {isLoading ? (
                 <div className="lookup-loading">
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <span>Loading patient types...</span>
                 </div>
             ) : isError ? (
                 <div className="lookup-loading">
-                    <i className="fas fa-triangle-exclamation"></i>
+                    <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
                     <span>Failed to load patient types.</span>
                 </div>
             ) : (
@@ -47,7 +47,7 @@ const PatientTypesReadOnly: React.FC = () => {
                             {rows.length === 0 ? (
                                 <tr>
                                     <td colSpan={2} className="empty-row">
-                                        <i className="fas fa-inbox"></i> No patient types found.
+                                        <i className="fas fa-inbox" aria-hidden="true"></i> No patient types found.
                                     </td>
                                 </tr>
                             ) : (

@@ -97,7 +97,7 @@ const AppointmentCard = ({
                     }}
                     title={t('actions.clickToCheckIn')}
                 >
-                    <i className="fas fa-user-check"></i>
+                    <i className="fas fa-user-check" aria-hidden="true"></i>
                 </button>
             );
         } else {
@@ -130,7 +130,7 @@ const AppointmentCard = ({
                         title={canUndoPresent ? t('actions.checkedInUndo', { time: presentTime }) : (isSeated ? t('actions.cannotUndoSeated') : t('actions.cannotUndoCompleted'))}
                         disabled={!canUndoPresent}
                     >
-                        <i className="fas fa-user-check"></i>
+                        <i className="fas fa-user-check" aria-hidden="true"></i>
                         {presentTime && <span className={styles.statusTime}>{presentTime}</span>}
                     </button>
 
@@ -174,7 +174,7 @@ const AppointmentCard = ({
                         title={isDismissed ? t('actions.completedUndo', { time: dismissedTime }) : (isSeated ? t('actions.clickToComplete') : t('actions.notSeatedYet'))}
                         disabled={!isSeated && !isDismissed}
                     >
-                        <i className="fas fa-check-circle"></i>
+                        <i className="fas fa-check-circle" aria-hidden="true"></i>
                         {dismissedTime && <span className={styles.statusTime}>{dismissedTime}</span>}
                     </button>
                 </div>
@@ -213,7 +213,7 @@ const AppointmentCard = ({
                             Aligner Lab, Active Non-Ortho, …). */}
                         {appointment.patient_type && appointment.patient_type_id !== PATIENT_TYPE_IDS.ACTIVE_ORTHO && (
                             <span className={styles.patientTypeBadge}>
-                                <i className="fas fa-tag"></i>
+                                <i className="fas fa-tag" aria-hidden="true"></i>
                                 {localizedName(appointment.patient_type, appointment.patient_type_name_ar)}
                             </span>
                         )}
@@ -232,6 +232,7 @@ const AppointmentCard = ({
                                 color: doctorColor.edge
                             } : undefined}
                             title={t('card.doctor', { name: doctorName })}
+                            role="img"
                             aria-label={t('card.doctor', { name: doctorName })}
                         >
                             <i className="fas fa-user-md" aria-hidden="true"></i>
@@ -245,7 +246,7 @@ const AppointmentCard = ({
                             className={appointment.has_visit ? styles.visitNotesRegistered : styles.visitNotesMissing}
                             title={appointment.has_visit ? t('card.visitNotesRegistered') : t('card.noVisitNotes')}
                         >
-                            <i className={`fas fa-${appointment.has_visit ? 'clipboard-check' : 'clipboard'}`}></i>
+                            <i className={`fas fa-${appointment.has_visit ? 'clipboard-check' : 'clipboard'}`} aria-hidden="true"></i>
                         </span>
                     </div>
                 )}

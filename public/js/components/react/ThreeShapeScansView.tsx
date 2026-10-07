@@ -79,7 +79,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
   if (!personId) {
     return (
       <div className="no-data-message">
-        <i className="fas fa-cube" />
+        <i className="fas fa-cube" aria-hidden="true" />
         <h3>3D Scans</h3>
         <p>Save the patient first to view 3Shape scans.</p>
       </div>
@@ -89,7 +89,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
   if (casesQ.isLoading || mediaQ.isLoading) {
     return (
       <div className="loading-spinner">
-        <i className="fas fa-spinner fa-spin" />
+        <i className="fas fa-spinner fa-spin" aria-hidden="true" />
         <span>Loading 3Shape scans…</span>
       </div>
     );
@@ -100,7 +100,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
   if (error) {
     return (
       <div className="error-message">
-        <i className="fas fa-exclamation-triangle" />
+        <i className="fas fa-exclamation-triangle" aria-hidden="true" />
         <span>{httpErrorMessage(error, 'Could not load 3Shape scans')}</span>
         {canConnect ? (
           <p>
@@ -119,7 +119,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
   if (cases.length === 0 && media.length === 0) {
     return (
       <div className="no-data-message">
-        <i className="fas fa-cube" />
+        <i className="fas fa-cube" aria-hidden="true" />
         <h3>No 3Shape Scans</h3>
         <p>No scans or cases found for this patient yet.</p>
       </div>
@@ -131,7 +131,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
       {cases.length > 0 && (
         <section className={styles.section}>
           <h2 className={styles.heading}>
-            <i className="fas fa-folder-open" /> Cases ({cases.length})
+            <i className="fas fa-folder-open" aria-hidden="true" /> Cases ({cases.length})
           </h2>
           <div className={styles.grid}>
             {cases.map((c) => {
@@ -165,7 +165,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
       {media.length > 0 && (
         <section className={styles.section}>
           <h2 className={styles.heading}>
-            <i className="fas fa-file-download" /> Files ({media.length})
+            <i className="fas fa-file-download" aria-hidden="true" /> Files ({media.length})
           </h2>
           <div className={styles.grid}>
             {media.map((m) => {
@@ -187,12 +187,12 @@ const ThreeShapeScansView = ({ personId }: Props) => {
                           href={downloadHref(m.id, f.id)}
                           download
                         >
-                          <i className="fas fa-download" /> {m.files.length > 1 ? (f.name ?? 'Download') : 'Download'}
+                          <i className="fas fa-download" aria-hidden="true" /> {m.files.length > 1 ? (f.name ?? 'Download') : 'Download'}
                         </a>
                       ))
                     ) : (
                       <a className={`btn btn-primary btn-sm ${styles.download}`} href={downloadHref(m.id, null)} download>
-                        <i className="fas fa-download" /> Download
+                        <i className="fas fa-download" aria-hidden="true" /> Download
                       </a>
                     )}
                     {m.uniteCloudLink && (
@@ -202,7 +202,7 @@ const ThreeShapeScansView = ({ personId }: Props) => {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <i className="fas fa-cloud" /> View in 3D
+                        <i className="fas fa-cloud" aria-hidden="true" /> View in 3D
                       </a>
                     )}
                   </div>

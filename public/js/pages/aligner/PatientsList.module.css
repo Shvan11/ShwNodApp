@@ -15,7 +15,7 @@
 .breadcrumbLink {
     background: none;
     border: none;
-    color: var(--blue-300);
+    color: var(--blue-700);
     cursor: pointer;
     font-size: 0.95rem;
     display: flex;
@@ -79,7 +79,7 @@
 
 .patientFilterBox input:focus {
     outline: none;
-    border-color: var(--blue-300);
+    border-color: var(--blue-600);
     box-shadow: var(--shadow-focus);
 }
 
@@ -113,7 +113,7 @@
 /* Patients Grid */
 .patientsGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 1.5rem;
     margin-top: 1.5rem;
 }
@@ -129,7 +129,7 @@
 }
 
 .patientCard:hover {
-    border-color: var(--blue-300);
+    border-color: var(--blue-600);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
@@ -219,7 +219,7 @@
 }
 
 .patientCardMeta i {
-    color: var(--blue-300);
+    color: var(--blue-700);
     width: 16px;
 }
 
@@ -239,7 +239,7 @@
 }
 
 .stat i {
-    color: var(--blue-300);
+    color: var(--blue-700);
 }
 
 .stat.active i {
@@ -248,7 +248,7 @@
 
 /* Activity Banner */
 .activityBanner {
-    background: linear-gradient(135deg, var(--warning-orange) 0%, var(--warning-600) 100%);
+    background: linear-gradient(135deg, var(--warning-fill) 0%, var(--warning-fill) 100%);
     color: var(--color-white);
     padding: 0.75rem 1rem;
     border-radius: var(--radius-lg);
@@ -337,7 +337,7 @@
 
 .spinner {
     border: 4px solid var(--gray-100);
-    border-top: 4px solid var(--blue-300);
+    border-top: 4px solid var(--blue-600);
     border-radius: 50%;
     width: 50px;
     height: 50px;

@@ -84,10 +84,10 @@ export default function WhatsAppAuth() {
         </p>
       </header>
 
-      <main className={styles.authContent}>
+      <div className={styles.authContent}>
         {renderContent()}
         <ControlButtons authState={authState} actions={actions} canPair={canPair} />
-      </main>
+      </div>
 
       <ConnectionStatusFooter authState={authState} streamDown={streamDown} />
 

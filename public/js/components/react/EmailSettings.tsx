@@ -144,11 +144,11 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
 
                 {isConfigLoading ? (
                     <div className="loading-indicator">
-                        <i className="fas fa-spinner fa-spin"></i> Loading email configuration...
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading email configuration...
                     </div>
                 ) : isError ? (
                     <div className="alert alert-warning">
-                        <i className="fas fa-exclamation-triangle"></i>{' '}
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>{' '}
                         {httpErrorMessage(error, 'Failed to load the email settings.')}
                     </div>
                 ) : (
@@ -273,7 +273,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                         <div className="form-group">
                             <span>Email Recipients</span>
                             <div className="info-box">
-                                <i className="fas fa-info-circle"></i>
+                                <i className="fas fa-info-circle" aria-hidden="true"></i>
                                 <span>
                                     Email notifications are sent to employees with &quot;Receive Email&quot; enabled.
                                     Manage recipients in <Link to="/settings/employees">Settings → Employees</Link>.
@@ -288,14 +288,14 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                     onClick={saveChanges}
                                     disabled={!hasChanges || isSaving}
                                 >
-                                    <i className="fas fa-save"></i> {isSaving ? 'Saving…' : 'Save Changes'}
+                                    <i className="fas fa-save" aria-hidden="true"></i> {isSaving ? 'Saving…' : 'Save Changes'}
                                 </button>
                                 <button
                                     className="btn btn-secondary"
                                     onClick={() => setEdits({})}
                                     disabled={!hasChanges || isSaving}
                                 >
-                                    <i className="fas fa-undo"></i> Discard
+                                    <i className="fas fa-undo" aria-hidden="true"></i> Discard
                                 </button>
                             </div>
                             <div className="button-group-right">
@@ -306,9 +306,9 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                     title={hasChanges ? 'Save first — the test uses the saved settings' : undefined}
                                 >
                                     {isTesting ? (
-                                        <><i className="fas fa-spinner fa-spin"></i> Testing...</>
+                                        <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Testing...</>
                                     ) : (
-                                        <><i className="fas fa-plug"></i> Test Connection</>
+                                        <><i className="fas fa-plug" aria-hidden="true"></i> Test Connection</>
                                     )}
                                 </button>
                                 <button
@@ -318,9 +318,9 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
                                     title={hasChanges ? 'Save first — the test uses the saved settings' : undefined}
                                 >
                                     {isSending ? (
-                                        <><i className="fas fa-spinner fa-spin"></i> Sending...</>
+                                        <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Sending...</>
                                     ) : (
-                                        <><i className="fas fa-envelope"></i> Send Test Email</>
+                                        <><i className="fas fa-envelope" aria-hidden="true"></i> Send Test Email</>
                                     )}
                                 </button>
                             </div>
@@ -328,7 +328,7 @@ const EmailSettings = ({ onChangesUpdate }: EmailSettingsProps) => {
 
                         {hasChanges && (
                             <div className="alert alert-warning">
-                                <i className="fas fa-exclamation-triangle"></i>
+                                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                 You have unsaved changes. Save them before testing — the tests use the saved settings.
                             </div>
                         )}

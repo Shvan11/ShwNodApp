@@ -192,13 +192,13 @@ export default function AdminUserManagement() {
 
       <div className={styles.header}>
         <h2>
-          <i className="fas fa-users"></i> User Management
+          <i className="fas fa-users" aria-hidden="true"></i> User Management
         </h2>
         <button
           className={`${styles.btn} ${styles.btnPrimary}`}
           onClick={() => setShowCreateForm(!showCreateForm)}
         >
-          <i className={`fas fa-${showCreateForm ? 'times' : 'plus'}`}></i>
+          <i className={`fas fa-${showCreateForm ? 'times' : 'plus'}`} aria-hidden="true"></i>
           {showCreateForm ? 'Cancel' : 'Create User'}
         </button>
       </div>
@@ -264,7 +264,7 @@ export default function AdminUserManagement() {
             </div>
 
             <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={creating}>
-              <i className="fas fa-save"></i> {creating ? 'Creating…' : 'Create User'}
+              <i className="fas fa-save" aria-hidden="true"></i> {creating ? 'Creating…' : 'Create User'}
             </button>
           </form>
         </div>
@@ -330,7 +330,7 @@ export default function AdminUserManagement() {
                           title="Reset Password"
                           aria-label={`Reset password for ${user.username}`}
                         >
-                          <i className="fas fa-key"></i>
+                          <i className="fas fa-key" aria-hidden="true"></i>
                         </button>
                         {/* The server refuses both on your own account; don't offer them. */}
                         {!self && (
@@ -342,7 +342,7 @@ export default function AdminUserManagement() {
                               title={user.isActive ? 'Deactivate' : 'Activate'}
                               aria-label={`${user.isActive ? 'Deactivate' : 'Activate'} ${user.username}`}
                             >
-                              <i className={`fas fa-${user.isActive ? 'ban' : 'check'}`}></i>
+                              <i className={`fas fa-${user.isActive ? 'ban' : 'check'}`} aria-hidden="true"></i>
                             </button>
                             <button
                               className={`${styles.btn} ${styles.btnDanger} ${styles.btnSmall}`}
@@ -351,7 +351,7 @@ export default function AdminUserManagement() {
                               title="Delete User"
                               aria-label={`Delete ${user.username}`}
                             >
-                              <i className="fas fa-trash"></i>
+                              <i className="fas fa-trash" aria-hidden="true"></i>
                             </button>
                           </>
                         )}
@@ -401,7 +401,7 @@ export default function AdminUserManagement() {
                 Cancel
               </button>
               <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={resetting}>
-                <i className="fas fa-key"></i> {resetting ? 'Resetting…' : 'Reset Password'}
+                <i className="fas fa-key" aria-hidden="true"></i> {resetting ? 'Resetting…' : 'Reset Password'}
               </button>
             </div>
           </form>

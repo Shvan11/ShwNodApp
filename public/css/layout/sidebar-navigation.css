@@ -78,7 +78,7 @@
 }
 
 .sidebar-nav-item.active {
-    background: linear-gradient(135deg, var(--indigo-500) 0%, var(--color-purple-medium) 100%);
+    background: linear-gradient(135deg, var(--palette-indigo-600) 0%, var(--color-purple-medium) 100%);
     color: var(--color-white);
     box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
 }
@@ -97,16 +97,18 @@
 
 /* Highlighted items (like Edit Patient) */
 .sidebar-nav-item.highlighted {
-    background: linear-gradient(135deg, var(--success-300) 0%, var(--success-500) 100%);
+    background: linear-gradient(135deg, var(--success-fill) 0%, var(--success-fill) 100%);
     color: var(--color-white);
 }
 
 .sidebar-nav-item.highlighted:hover {
-    background: linear-gradient(135deg, var(--success-500) 0%, var(--success-700) 100%);
+    background: linear-gradient(135deg, var(--success-fill) 0%, var(--palette-green-700) 100%);
 }
 
+/* Deeper than the resting highlight, not paler: the label is white, and the old
+   --success-300 → 500 run put it on a tint. */
 .sidebar-nav-item.highlighted.active {
-    background: linear-gradient(135deg, var(--success-300) 0%, var(--success-500) 100%);
+    background: linear-gradient(135deg, var(--success-fill) 0%, var(--palette-green-800) 100%);
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
 }
 
@@ -266,7 +268,7 @@
 }
 
 .more-actions-btn.active {
-    background: linear-gradient(135deg, var(--indigo-500) 0%, var(--color-purple-medium) 100%);
+    background: linear-gradient(135deg, var(--palette-indigo-600) 0%, var(--color-purple-medium) 100%);
     color: var(--color-white);
 }
 
@@ -320,7 +322,7 @@
 }
 
 .flyout-action-item.active {
-    background: linear-gradient(135deg, var(--indigo-500) 0%, var(--color-purple-medium) 100%);
+    background: linear-gradient(135deg, var(--palette-indigo-600) 0%, var(--color-purple-medium) 100%);
     color: var(--color-white);
     border-color: var(--indigo-600);
     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);

@@ -208,10 +208,10 @@ const AnnotationCanvas = ({ getPhotoRect, observe }: Props) => {
         ))}
         <span className={styles.divider} />
         <button type="button" className={styles.toolBtn} onClick={undo} disabled={count === 0} aria-label="Undo" title="Undo">
-          <i className="fas fa-rotate-left" />
+          <i className="fas fa-rotate-left" aria-hidden="true" />
         </button>
         <button type="button" className={styles.toolBtn} onClick={clear} disabled={count === 0} aria-label="Clear" title="Clear">
-          <i className="fas fa-trash" />
+          <i className="fas fa-trash" aria-hidden="true" />
         </button>
       </div>
     </div>

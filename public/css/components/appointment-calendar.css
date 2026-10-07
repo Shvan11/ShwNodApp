@@ -104,7 +104,8 @@ body:has(.appointment-calendar) {
 }
 
 .cal-today:hover:not(:disabled) {
-    background: var(--cal-purple-ink);
+    /* Fixed: --cal-purple-ink is an INK, pale in dark, and white on it vanished. */
+    background: var(--color-purple-dark);
 }
 
 .cal-nav-btn:disabled,
@@ -130,7 +131,8 @@ body:has(.appointment-calendar) {
 .cal-util-pct {
     font-size: 0.9375rem;
     font-weight: var(--font-weight-bold);
-    color: var(--color-teal);
+    /* As text: the teal itself is 2.1:1 on white. */
+    color: var(--info-700);
     font-variant-numeric: tabular-nums;
     line-height: 1;
 }
@@ -394,10 +396,10 @@ body:has(.appointment-calendar) {
 }
 
 .cal-time-head span {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
     letter-spacing: 0.1em;
     font-weight: var(--font-weight-bold);
-    color: var(--cal-ink-4);
+    color: var(--cal-ink-3);
 }
 
 .cal-day-head {
@@ -452,7 +454,7 @@ body:has(.appointment-calendar) {
 
 .cal-day-head.today .cal-day-num,
 .cal-day-head.today .cal-day-name {
-    color: var(--color-purple-medium);
+    color: var(--indigo-600);
 }
 
 .cal-day-head.holiday {
@@ -737,7 +739,7 @@ body:has(.appointment-calendar) {
 .cal-more-cell.open {
     background: var(--cal-surface-2);
     border-color: var(--color-purple-medium);
-    color: var(--color-purple-medium);
+    color: var(--cal-purple-ink);
 }
 
 .cal-more-cell.open {
@@ -1060,6 +1062,7 @@ body:has(.appointment-calendar) {
     }
 
     .cal-bar {
+        /* stylelint-disable-next-line declaration-property-value-disallowed-list -- print is intentionally light */
         background: white;
         border-bottom: 2px solid black;
     }
@@ -1160,7 +1163,7 @@ body:has(.appointment-calendar) {
 
 .context-menu-item:hover {
     background-color: var(--hover-bg);
-    color: var(--primary-color);
+    color: var(--blue-700);
 }
 
 .context-menu-item i {
@@ -1257,11 +1260,11 @@ body:has(.appointment-calendar) {
 }
 
 .btn-delete {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
 .btn-delete:hover {
-    background: var(--error-red-dark);
+    background: var(--error-fill-hover);
     box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
 }

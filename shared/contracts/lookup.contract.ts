@@ -86,3 +86,11 @@ export const shades = {
   }),
 } as const;
 export type ShadesResponse = z.infer<typeof shades.response>;
+
+// GET /api/timepoint-names — the clinic's common photo-session names, in list order
+// (timepoint-queries.ts#getTimePointNames), for the New / Edit Photo Session Name select.
+// CLOSED `z.object`: both columns are NOT NULL and there is nothing else on the row.
+export const timepointNames = {
+  response: z.array(z.object({ id: z.number(), name: z.string() })),
+} as const;
+export type TimepointNamesResponse = z.infer<typeof timepointNames.response>;

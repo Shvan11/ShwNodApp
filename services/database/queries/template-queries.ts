@@ -9,7 +9,8 @@
  * maintained by the `trg_set_updated_at` DB trigger.
  */
 import type { UpdateObject } from 'kysely';
-import { getKysely, type Database } from '../kysely.js';
+import { getKysely, withPgTransaction, type Database } from '../kysely.js';
+import { templateDeleteBlock } from '../../templates/template-files.js';
 
 // type definitions
 // Nullability mirrors template.contract.ts#documentTypeRow, which is itself derived
@@ -362,22 +363,40 @@ export class SystemTemplateError extends Error {
 }
 
 /**
- * Delete a template
+ * Delete a template.
+ *
+ * @returns the deleted row's `template_file_path` when that file is now referenced by
+ *   NO template (so the caller may remove it from disk), otherwise `null`: no row was
+ *   deleted, it had no file, or another template still points at the same file (rows
+ *   saved before FE-F20-2 could share one).
  */
-export async function deleteTemplate(templateId: number): Promise<boolean> {
-  // Check if it's a system template
+export async function deleteTemplate(templateId: number): Promise<string | null> {
+  // A template the product prints from is never deleted: the system flag, a name the
+  // receipt service looks up, or the current default receipt (see templateDeleteBlock).
   const template = await getTemplateById(templateId);
-  if (template && template.is_system) {
-    throw new SystemTemplateError();
+  const blocked = template ? templateDeleteBlock(template) : null;
+  if (blocked) {
+    throw new SystemTemplateError(blocked);
   }
 
-  const db = getKysely();
-  await db
-    .deleteFrom('document_templates')
-    .where('template_id', '=', templateId)
-    .where('is_system', '=', false)
-    .execute();
+  return withPgTransaction(async (trx) => {
+    const deleted = await trx
+      .deleteFrom('document_templates')
+      .where('template_id', '=', templateId)
+      .where('is_system', '=', false)
+      .returning('template_file_path')
+      .executeTakeFirst();
 
-  return true;
+    const filePath = deleted?.template_file_path;
+    if (!filePath) return null;
+
+    const stillUsed = await trx
+      .selectFrom('document_templates')
+      .select('template_id')
+      .where('template_file_path', '=', filePath)
+      .limit(1)
+      .executeTakeFirst();
+    return stillUsed ? null : filePath;
+  });
 }
 

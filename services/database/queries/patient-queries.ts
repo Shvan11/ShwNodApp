@@ -63,12 +63,6 @@ export type ActiveAlert = {
   alertSeverity: number;
 };
 
-type PatientPhone = {
-  id: number;
-  name: string;
-  phone: string | null;
-};
-
 export interface PatientData {
   patientName: string;
   phone?: string;
@@ -296,16 +290,6 @@ export async function getInfos(PID: number): Promise<(PatientInfo & PatientAsset
   };
 
   return { ...patientInfo, ...assets };
-}
-
-/**
- * Retrieves patient names and phone numbers.
- */
-export function getPatientsPhones(): Promise<PatientPhone[]> {
-  return getKysely()
-    .selectFrom('patients')
-    .select(['person_id as id', 'patient_name as name', 'phone as phone'])
-    .execute();
 }
 
 /**

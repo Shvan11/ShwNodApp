@@ -57,6 +57,22 @@ function TemplateDesigner() {
     const isLoading = !!templateId && queryLoading;
     const error = isError ? 'Failed to load template: ' + httpErrorMessage(queryError, 'Unknown error') : null;
 
+    // The designer is laid over the whole viewport, app header included, on purpose
+    // (it has its own Back). The header it covers stayed in the tab order, so Tab
+    // walked nine controls nobody could see. `inert` takes them out for exactly as
+    // long as the full-screen layout is up — not during the loading and error
+    // cards, which leave the header visible and in use.
+    const coversHeader = !isLoading && !error;
+    useEffect(() => {
+        if (!coversHeader) return;
+        const header = document.getElementById('universal-header-root');
+        if (!header) return;
+        header.inert = true;
+        return () => {
+            header.inert = false;
+        };
+    }, [coversHeader]);
+
     // Surface a load failure as a toast (kept out of the render body).
     useEffect(() => {
         if (isError) {
@@ -206,7 +222,7 @@ function TemplateDesigner() {
     if (isLoading) {
         return (
             <div className={styles.designerLoading}>
-                <i className="fas fa-spinner fa-spin"></i>
+                <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                 <p>Loading template designer...</p>
             </div>
         );
@@ -215,7 +231,7 @@ function TemplateDesigner() {
     if (error) {
         return (
             <div className={styles.designerError}>
-                <i className="fas fa-exclamation-circle"></i>
+                <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                 <p>{error}</p>
                 <button className="btn btn-primary" onClick={handleBack}>
                     Go Back
@@ -245,7 +261,7 @@ function TemplateDesigner() {
             {isSaving && (
                 <div className={`${styles.loadingOverlay} ${styles.loadingOverlayActive}`}>
                     <div className={styles.loadingContent}>
-                        <i className={`fas fa-spinner ${styles.loadingSpinner}`}></i>
+                        <i className={`fas fa-spinner ${styles.loadingSpinner}`} aria-hidden="true"></i>
                         <p className={styles.loadingMessage}>Saving template...</p>
                     </div>
                 </div>

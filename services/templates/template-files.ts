@@ -14,6 +14,7 @@
  * read and write goes through `resolveTemplateFile`.
  */
 import path from 'path';
+import { promises as fs } from 'fs';
 
 /**
  * The receipt's document type. `generateReceiptHTML` prints the default template of
@@ -21,6 +22,47 @@ import path from 'path';
  * refuses to delete it (audit FE-F21-12).
  */
 export const RECEIPT_DOCUMENT_TYPE_ID = 1;
+
+/**
+ * The two receipt layouts `receipt-service` finds BY NAME: the discount variant and the
+ * no-work receipt. A row with one of these names is one the product prints from, so it
+ * is a system template (migration `1791316000000` marks it; `templateDeleteBlock` holds
+ * the line even where the flag is not set).
+ */
+export const DISCOUNT_RECEIPT_TEMPLATE_NAME = 'Shwan Orthodontics Default Receipt (With Discount)';
+export const NO_WORK_RECEIPT_TEMPLATE_NAME = 'No-Work Appointment Receipt';
+export const CODE_NAMED_TEMPLATE_NAMES: readonly string[] = [
+  DISCOUNT_RECEIPT_TEMPLATE_NAME,
+  NO_WORK_RECEIPT_TEMPLATE_NAME,
+];
+
+/**
+ * Why this template may not be deleted, or `null` when it may.
+ *
+ * `is_system` alone was the rule, and it is only a flag on the row: the original
+ * clinic's discount receipt was loaded without it, so it carried a Delete button and
+ * deleting it sent discounted receipts back to the shipped layout. Worse, *Set Default*
+ * can make any template the default receipt, and that row is the one receipt-service
+ * has no fallback for: deleting it failed every "print receipt". So the templates the
+ * code resolves are refused by what they ARE, whatever the flag says.
+ */
+export function templateDeleteBlock(template: {
+  template_name: string;
+  document_type_id: number | null;
+  is_default: boolean | null;
+  is_system: boolean | null;
+}): string | null {
+  if (template.is_system) return 'Cannot delete system templates';
+  // `template_name` is citext: the lookup that finds it ignores case, so this does too.
+  const name = template.template_name.trim().toLowerCase();
+  if (CODE_NAMED_TEMPLATE_NAMES.some((n) => n.toLowerCase() === name)) {
+    return 'Cannot delete this template: receipts are printed from it';
+  }
+  if (template.document_type_id === RECEIPT_DOCUMENT_TYPE_ID && template.is_default) {
+    return 'Cannot delete the default receipt template. Set another template as the default first';
+  }
+  return null;
+}
 
 /** Absolute path of the templates directory. */
 export function templatesDir(): string {
@@ -64,4 +106,32 @@ export function templateFilePathFor(templateId: number, templateName: string): s
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
   return `data/templates/${slug ? `${slug}-` : 'template-'}${templateId}.html`;
+}
+
+/**
+ * The file to remove with template `templateId`, or `null` when it must stay.
+ *
+ * Deleting a template removed its row and left its design on disk for good. Only the
+ * file the server itself assigned to THIS template is removed (`…-<id>.html`, see
+ * `templateFilePathFor`): the files the product ships and falls back to
+ * (`receipt-service#FALLBACK_TEMPLATE_PATHS`) and designs saved under the older
+ * name-only scheme carry no id, and a wrong guess there deletes a receipt layout.
+ */
+export function ownedTemplateFile(templateId: number, storedPath: string | null | undefined): string | null {
+  if (!storedPath) return null;
+  let full: string;
+  try {
+    full = resolveTemplateFile(storedPath);
+  } catch {
+    return null; // outside the templates directory: never touched
+  }
+  return path.basename(full).endsWith(`-${templateId}.html`) ? full : null;
+}
+
+/** Remove a deleted template's own file (see `ownedTemplateFile`). Returns whether one was removed. */
+export async function removeTemplateFile(templateId: number, storedPath: string | null | undefined): Promise<boolean> {
+  const file = ownedTemplateFile(templateId, storedPath);
+  if (!file) return false;
+  await fs.rm(file, { force: true });
+  return true;
 }

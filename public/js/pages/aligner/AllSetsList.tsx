@@ -1,5 +1,7 @@
 // AllSetsList.tsx - Simple list view of all aligner sets from v_allsets
 import React, { useEffect, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useToday } from '@/hooks/useClock';
+import { toLocalDateString } from '@/utils/calendarDate';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
@@ -43,6 +45,7 @@ const getNextBatchState = (set: AlignerSetView): NextBatchState => {
 
 const AllSetsList: React.FC = () => {
     const navigate = useNavigate();
+    const today = useToday();
     const toast = useToast();
 
     // Filters + sort live in the URL so they survive navigating to a patient and
@@ -98,16 +101,13 @@ const AllSetsList: React.FC = () => {
             return <span className={styles.notesEmpty}>—</span>;
         }
         const appt = new Date(set.NextAppointment);
-        const now = new Date();
-        const isToday =
-            appt.getFullYear() === now.getFullYear() &&
-            appt.getMonth() === now.getMonth() &&
-            appt.getDate() === now.getDate();
+        // `today` from useClock, not `new Date()`: this runs in render (FE-F26-8).
+        const isToday = toLocalDateString(appt) === today;
         if (isToday) {
             const time = appt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             return (
                 <span className={`${styles.badge} ${styles.badgeApptToday}`}>
-                    <i className="fas fa-calendar-day"></i> Today {time}
+                    <i className="fas fa-calendar-day" aria-hidden="true"></i> Today {time}
                 </span>
             );
         }
@@ -131,7 +131,7 @@ const AllSetsList: React.FC = () => {
             case 'ready':
                 return (
                     <span className={`${styles.badge} ${styles.badgeNextReady}`}>
-                        <i className="fas fa-check-circle"></i> Ready (In Lab)
+                        <i className="fas fa-check-circle" aria-hidden="true"></i> Ready (In Lab)
                     </span>
                 );
             case 'pending':
@@ -143,7 +143,7 @@ const AllSetsList: React.FC = () => {
             case 'not_created':
                 return (
                     <span className={`${styles.badge} ${styles.badgeNextWarning}`}>
-                        <i className="fas fa-exclamation-triangle"></i> Not Created
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> Not Created
                     </span>
                 );
         }
@@ -248,12 +248,12 @@ const AllSetsList: React.FC = () => {
             <span className={styles.sortIcon}>
                 {sortColumn === column ? (
                     sortDirection === 'asc' ? (
-                        <i className="fas fa-sort-up"></i>
+                        <i className="fas fa-sort-up" aria-hidden="true"></i>
                     ) : (
-                        <i className="fas fa-sort-down"></i>
+                        <i className="fas fa-sort-down" aria-hidden="true"></i>
                     )
                 ) : (
-                    <i className="fas fa-sort"></i>
+                    <i className="fas fa-sort" aria-hidden="true"></i>
                 )}
             </span>
         </th>
@@ -272,7 +272,7 @@ const AllSetsList: React.FC = () => {
     if (error && !data) {
         return (
             <div className={styles.emptyPatients}>
-                <i className="fas fa-exclamation-triangle"></i>
+                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 <h3>Failed to load aligner sets</h3>
                 <p>{httpErrorMessage(error, 'Please check your connection and try again.')}</p>
                 <button className={styles.btnClearFilters} onClick={() => void refetch()}>
@@ -328,7 +328,7 @@ const AllSetsList: React.FC = () => {
             {/* Filter Controls */}
             <div className={styles.filterContainer}>
                 <div className={styles.patientFilterBox}>
-                    <i className={`fas fa-filter ${styles.filterIcon}`}></i>
+                    <i className={`fas fa-filter ${styles.filterIcon}`} aria-hidden="true"></i>
                     <input
                         type="text"
                         aria-label="Filter by patient or doctor"
@@ -342,7 +342,7 @@ const AllSetsList: React.FC = () => {
                             aria-label="Clear filter"
                             onClick={() => updateParams({ q: null })}
                         >
-                            <i className="fas fa-times"></i>
+                            <i className="fas fa-times" aria-hidden="true"></i>
                         </button>
                     )}
                 </div>
@@ -375,7 +375,7 @@ const AllSetsList: React.FC = () => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
                                 updateParams({ finished: e.target.checked ? '1' : null })}
                         />
-                        <i className="fas fa-check-circle"></i>
+                        <i className="fas fa-check-circle" aria-hidden="true"></i>
                         <span>Finished ({finishedCount})</span>
                     </label>
 
@@ -387,7 +387,7 @@ const AllSetsList: React.FC = () => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
                                 updateParams({ noNext: e.target.checked ? '1' : null })}
                         />
-                        <i className="fas fa-exclamation-triangle"></i>
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                         <span>No Next ({noNextBatchCount})</span>
                     </label>
 
@@ -399,7 +399,7 @@ const AllSetsList: React.FC = () => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
                                 updateParams(e.target.checked ? { lab: '1', mfg: null } : { lab: null })}
                         />
-                        <i className="fas fa-box"></i>
+                        <i className="fas fa-box" aria-hidden="true"></i>
                         <span>In Lab ({pendingDeliveryCount})</span>
                     </label>
 
@@ -411,7 +411,7 @@ const AllSetsList: React.FC = () => {
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
                                 updateParams(e.target.checked ? { mfg: '1', lab: null } : { mfg: null })}
                         />
-                        <i className="fas fa-cog"></i>
+                        <i className="fas fa-cog" aria-hidden="true"></i>
                         <span>Needs Mfg ({pendingManufactureCount})</span>
                     </label>
                 </div>
@@ -459,7 +459,7 @@ const AllSetsList: React.FC = () => {
             {/* Table View */}
             {filteredSets.length === 0 ? (
                 <div className={styles.emptyPatients}>
-                    <i className="fas fa-inbox"></i>
+                    <i className="fas fa-inbox" aria-hidden="true"></i>
                     <h3>{filter || showOnlyNoNextBatch || showOnlyInLab || showOnlyNeedsMfg || selectedDoctor !== 'all' ? 'No matching sets found' : 'No aligner sets'}</h3>
                     {(filter || showOnlyNoNextBatch || showOnlyInLab || showOnlyNeedsMfg || selectedDoctor !== 'all') && (
                         <button
@@ -515,7 +515,7 @@ const AllSetsList: React.FC = () => {
                                             </span>
                                             {isFinal && (
                                                 <span className={`${styles.badge} ${styles.badgeFinal}`}>
-                                                    <i className="fas fa-flag-checkered"></i>
+                                                    <i className="fas fa-flag-checkered" aria-hidden="true"></i>
                                                 </span>
                                             )}
                                         </>

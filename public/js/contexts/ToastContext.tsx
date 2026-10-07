@@ -5,6 +5,7 @@
  */
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * Toast type variants
@@ -103,7 +104,11 @@ interface ToastContainerProps {
  * Manages all active toast notifications
  */
 function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
-  return (
+  // Portaled to <body>, OUTSIDE the app root. `<Modal>` marks the app root
+  // `aria-hidden` while a dialog is open, and a live region inside a hidden
+  // subtree announces nothing — which silenced exactly the toasts that matter
+  // most, a save failing inside a dialog (audit FE-F25-8).
+  return createPortal(
     // Live region: toasts replaced alert() app-wide, and alert() was announced by
     // construction. Without this the entire async-status channel — every save
     // confirmation and every failure — is invisible to a screen reader.
@@ -120,7 +125,8 @@ function ToastContainer({ toasts, removeToast }: ToastContainerProps) {
           onClose={removeToast}
         />
       ))}
-    </div>
+    </div>,
+    document.body
   );
 }
 

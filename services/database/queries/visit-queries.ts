@@ -96,9 +96,14 @@ interface PhotoFlags {
   appliance_removed: boolean;
 }
 
-/** SQL `REPLACE(x, CHAR(13)+CHAR(10), '<BR> ')` — newline → HTML break. */
+/**
+ * Newline → HTML break. The proc this replaced did `REPLACE(x, CHAR(13)+CHAR(10), '<BR> ')`,
+ * and its port matched CR+LF only. A browser's textarea hands back a bare LF, so every note
+ * typed in this app (and 460 of the stored ones) ran its lines together in the summary the
+ * chair display and the latest-visit panel print.
+ */
 function nl2br(s: string): string {
-  return s.replace(/\r\n/g, '<BR> ');
+  return s.replace(/\r\n|\r|\n/g, '<BR> ');
 }
 
 /**

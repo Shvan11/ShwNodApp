@@ -51,7 +51,7 @@
 
 .error {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     border: 1px solid var(--error-200);
 }
 
@@ -220,12 +220,12 @@
 }
 
 .btnPrimary {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 
 .btnPrimary:hover {
-    background: var(--blue-700);
+    background: var(--palette-blue-700);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -243,12 +243,12 @@
 
 .btnDanger {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     border: 1px solid var(--error-200);
 }
 
 .btnDanger:hover {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 

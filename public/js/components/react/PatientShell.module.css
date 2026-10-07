@@ -60,7 +60,7 @@
 }
 
 .breadcrumbItemActive {
-    color: var(--indigo-500);
+    color: var(--indigo-600);
     font-weight: 600;
 }
 
@@ -73,7 +73,7 @@
 }
 
 .breadcrumbLink:hover {
-    color: var(--indigo-500);
+    color: var(--indigo-700);
     background-color: var(--surface-hover);
     text-decoration: none;
 }

@@ -113,7 +113,7 @@
 .alertError {
     background: var(--error-50);
     border: 1px solid var(--error-300);
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 .formField {
@@ -132,7 +132,7 @@
 }
 
 .formField label i {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     font-size: 14px;
 }
 
@@ -184,7 +184,7 @@
 }
 
 .fieldError {
-    color: var(--error-500);
+    color: var(--error-700);
     font-size: 12px;
     font-weight: var(--font-weight-medium);
 }

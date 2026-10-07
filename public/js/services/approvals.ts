@@ -15,6 +15,8 @@ import type {
   ApproveAllResult,
   AcknowledgeAllResult,
 } from '@shared/contracts/approvals.contract';
+import { approvalSummaryKind, parseApprovalNote } from '@shared/approval-text';
+import type { TFunction } from 'i18next';
 
 export type { ApprovalRow };
 
@@ -28,6 +30,32 @@ export const ACTION_LABEL_KEY = {
   'expense.delete': 'expenseDelete',
   'patient.delete': 'patientDelete',
 } as const satisfies Record<ApprovalActionType, string>;
+
+/**
+ * A request's one-line summary in the reader's language. The row stores it in
+ * English ("Edit work #12"), which is what an Arabic bell used to print; an action
+ * this build does not know falls back to the stored text.
+ */
+export function approvalSummaryText(
+  row: Pick<ApprovalRow, 'action_type' | 'target_id' | 'summary'>,
+  t: TFunction<'approvals'>
+): string {
+  const kind = approvalSummaryKind(row.action_type, row.summary);
+  return kind ? t(`summary.${kind}`, { id: row.target_id }) : row.summary;
+}
+
+/**
+ * A `review_note` in the reader's language: the queue's own notes are translated,
+ * an admin's typed reason is shown as written.
+ */
+export function approvalNoteText(note: string | null | undefined, t: TFunction<'approvals'>): string {
+  if (!note) return '';
+  const parsed = parseApprovalNote(note);
+  if (!parsed) return note;
+  return parsed.kind === 'applyError'
+    ? t('note.applyError', { reason: parsed.reason })
+    : t(`note.${parsed.kind}`);
+}
 
 /**
  * Refresh every approval read: the admin bell, the requester badge and the history.
@@ -60,7 +88,7 @@ export function invalidateApprovalTarget(
       case 'expense.delete':
         return [qk.expenses.all()];
       case 'patient.delete':
-        return [...patient, qk.lookups.patientPhones()];
+        return [...patient, qk.lookups.patientLookupAll()];
     }
   })();
   return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey }))).then(

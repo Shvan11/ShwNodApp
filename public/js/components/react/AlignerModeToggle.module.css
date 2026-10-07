@@ -39,14 +39,14 @@
 }
 
 .modeBtn:hover {
-    border-color: var(--blue-300);
-    color: var(--blue-300);
+    border-color: var(--blue-600);
+    color: var(--blue-700);
 }
 
 .modeBtn.active {
-    background: var(--blue-300);
+    background: var(--palette-blue-600);
     color: var(--color-white);
-    border-color: var(--blue-300);
+    border-color: var(--palette-blue-600);
 }
 
 .modeBtn i {

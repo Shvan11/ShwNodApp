@@ -205,19 +205,6 @@
   transition: opacity var(--transition-base), visibility 0s linear 250ms;
 }
 
-/* Text for screen readers only (the slide announcement). */
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .topBar {
   position: absolute;
   top: 0;
@@ -266,15 +253,15 @@
 }
 
 .iconBtnActive {
-  background: var(--primary-color);
+  background: var(--primary-fill);
 }
 
 .iconBtnActive:hover {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
 }
 
 .exitBtn:hover {
-  background: var(--error-color);
+  background: var(--error-fill);
 }
 
 /* --- Progress dots --- */
@@ -300,6 +287,7 @@
 /* The stage is an always-dark gradient (theme-independent), so the active dot
    must stay bright — --surface would go dark in dark mode and vanish here. */
 .dotActive {
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- active dot on the always-dark stage (see the note above) */
   background: var(--color-white);
   transform: scale(1.4);
 }

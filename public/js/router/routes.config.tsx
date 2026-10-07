@@ -10,8 +10,10 @@ import React from 'react';
 import { Navigate, type RouteObject, type LoaderFunction } from 'react-router-dom';
 
 // Layouts
-import RootLayout from '../layouts/RootLayout';
+import RootLayout, { LoadingFallback } from '../layouts/RootLayout';
 import AlignerLayout from '../layouts/AlignerLayout';
+
+import { lazyWithPreload } from './lazyWithPreload';
 
 // Error boundaries
 import { RouteErrorBoundary } from '../components/error-boundaries/RouteErrorBoundary';
@@ -36,56 +38,86 @@ import {
 // See CLAUDE.md "CSS Import Strategy" for details
 
 /**
- * Like `React.lazy`, but the returned component also exposes `.preload()` —
- * calling it kicks off the dynamic import (chunk download) ahead of render.
- * Mirrors React's own `lazy` typing so `<Component />` type-checks unchanged.
+ * Every route screen is its own chunk, and every route loader awaits that chunk
+ * (see `withPreload`), so a screen mounts already loaded: no Suspense fallback,
+ * and so none of React's 300 ms fallback throttle. `lazyWithPreload` has the why.
  */
-function lazyRoute<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T }>
-): React.LazyExoticComponent<T> & { preload: () => void } {
-  const Component = React.lazy(factory) as React.LazyExoticComponent<T> & {
-    preload: () => void;
+const lazyRoute = lazyWithPreload;
+
+/**
+ * Wrap a route loader so the route's chunk downloads *in parallel* with the
+ * loader's data and the navigation commits once both are in. The chunk is
+ * awaited, not just started: a screen that mounts before its chunk has settled
+ * suspends, and the fallback it shows then costs 300 ms (audit FE-F26-3). Adds no
+ * request: the chunk loads anyway. `preload()` never rejects, so a chunk that
+ * cannot load still fails on the render path, where the self-heal lives.
+ */
+function withPreload(
+  component: { preload: () => Promise<void> },
+  loader: LoaderFunction
+): LoaderFunction {
+  return async (args) => {
+    const chunk = component.preload();
+    const data: unknown = await loader(args);
+    await chunk;
+    return data;
   };
-  // Fire-and-forget: warm the browser's module cache. React.lazy reuses the
-  // same in-flight module promise when it renders, so there's no double fetch.
-  // Swallow rejections here — this is a speculative warm-up; a genuinely
-  // unloadable chunk still surfaces on the render path (React.lazy → Suspense →
-  // error boundary), where the chunk self-heal (core/chunk-reload.ts) reloads
-  // once and reports persistent failures.
-  // Without this, a failed preload would log spurious [client-error] noise.
-  Component.preload = () => {
-    void factory().catch(() => {});
-  };
-  return Component;
 }
 
 /**
- * Wrap a route loader so the route's lazy component chunk starts downloading
- * *in parallel* with the loader's data fetch — collapsing the
- * loader→lazy-chunk waterfall (fetch data, THEN fetch chunk) into one
- * concurrent wait. Adds no requests: the chunk loads anyway, just sooner.
+ * The route fields for a screen with no data loader of its own: wait for the
+ * chunk on the way in, and never again. `shouldRevalidate: false` matters. A
+ * route with a loader navigates asynchronously, and these screens change their
+ * own `?query` as the user types and filters; without it every such change would
+ * re-run the loader and turn a synchronous URL update into an asynchronous one.
  */
-function withPreload(
-  component: { preload: () => void },
-  loader: LoaderFunction
-): LoaderFunction {
-  return (args) => {
-    component.preload();
-    return loader(args);
+function chunkLoader(component: { preload: () => Promise<void> }): Pick<
+  RouteObject,
+  'loader' | 'shouldRevalidate'
+> {
+  return {
+    loader: async () => {
+      await component.preload();
+      return null;
+    },
+    shouldRevalidate: () => false,
   };
 }
 
+/**
+ * What a route shows while its first loader runs on a cold load (React Router's
+ * `hydrateFallbackElement`): the same spinner the Suspense fallback draws, inside
+ * the layout, so the header paints at once and the page swaps in when its chunk
+ * and data arrive. Added to every route that has a loader.
+ */
+function withHydrateFallback(routes: RouteObject[]): RouteObject[] {
+  return routes.map((route): RouteObject => {
+    const fallback =
+      route.loader && route.hydrateFallbackElement === undefined
+        ? { hydrateFallbackElement: <LoadingFallback /> }
+        : {};
+    // An index route has no children (and the two shapes are a union, so each
+    // branch is rebuilt as its own type).
+    if (route.index) return { ...route, ...fallback };
+    return {
+      ...route,
+      ...fallback,
+      ...(route.children ? { children: withHydrateFallback(route.children) } : {}),
+    };
+  });
+}
+
 // Lazy-loaded route components - Core routes
-const Dashboard = React.lazy(() => import('../routes/Dashboard'));
-const Statistics = React.lazy(() => import('../routes/Statistics'));
-const Expenses = React.lazy(() => import('../routes/Expenses'));
-const Videos = React.lazy(() => import('../routes/Videos'));
+const Dashboard = lazyRoute(() => import('../routes/Dashboard'));
+const Statistics = lazyRoute(() => import('../routes/Statistics'));
+const Expenses = lazyRoute(() => import('../routes/Expenses'));
+const Videos = lazyRoute(() => import('../routes/Videos'));
 const PatientManagement = lazyRoute(() => import('../routes/PatientManagement'));
-const TasksHistory = React.lazy(() => import('../routes/TasksHistory'));
-const ApprovalsHistory = React.lazy(() => import('../routes/ApprovalsHistory'));
+const TasksHistory = lazyRoute(() => import('../routes/TasksHistory'));
+const ApprovalsHistory = lazyRoute(() => import('../routes/ApprovalsHistory'));
 
 // Lazy-loaded route components - Settings & Templates
-const SettingsComponent = React.lazy(() => import('../components/react/SettingsComponent'));
+const SettingsComponent = lazyRoute(() => import('../components/react/SettingsComponent'));
 const TemplateManagement = lazyRoute(
   () => import('../components/templates/TemplateManagement')
 );
@@ -96,38 +128,38 @@ const LabTracking = lazyRoute(() => import('../routes/LabTracking'));
 
 // Lazy-loaded route components - Aligner
 const DoctorsList = lazyRoute(() => import('../pages/aligner/DoctorsList'));
-const PatientsList = React.lazy(() => import('../pages/aligner/PatientsList'));
+const PatientsList = lazyRoute(() => import('../pages/aligner/PatientsList'));
 const PatientSets = lazyRoute(() => import('../pages/aligner/PatientSets'));
-const SearchPatient = React.lazy(() => import('../pages/aligner/SearchPatient'));
-const AllSetsList = React.lazy(() => import('../pages/aligner/AllSetsList'));
-const ArchformMatcher = React.lazy(() => import('../pages/aligner/ArchformMatcher'));
-const Announcements = React.lazy(() => import('../pages/aligner/Announcements'));
+const SearchPatient = lazyRoute(() => import('../pages/aligner/SearchPatient'));
+const AllSetsList = lazyRoute(() => import('../pages/aligner/AllSetsList'));
+const ArchformMatcher = lazyRoute(() => import('../pages/aligner/ArchformMatcher'));
+const Announcements = lazyRoute(() => import('../pages/aligner/Announcements'));
 
 // Lazy-loaded route components - Patient
 const PatientShell = lazyRoute(() => import('../components/react/PatientShell'));
 
 // Lazy-loaded route components - Chair-side public display (open access, no auth)
-const ChairDisplay = React.lazy(() => import('../routes/ChairDisplay'));
+const ChairDisplay = lazyRoute(() => import('../routes/ChairDisplay'));
 
 // Lazy-loaded route components - Stand / Mini Pharmacy
-const Stand = React.lazy(() => import('../routes/Stand'));
-const StandInventory = React.lazy(() => import('../routes/StandInventory'));
-const StandPOS = React.lazy(() => import('../routes/StandPOS'));
-const StandSalesHistory = React.lazy(() => import('../routes/StandSalesHistory'));
-const StandReports = React.lazy(() => import('../routes/StandReports'));
+const Stand = lazyRoute(() => import('../routes/Stand'));
+const StandInventory = lazyRoute(() => import('../routes/StandInventory'));
+const StandPOS = lazyRoute(() => import('../routes/StandPOS'));
+const StandSalesHistory = lazyRoute(() => import('../routes/StandSalesHistory'));
+const StandReports = lazyRoute(() => import('../routes/StandReports'));
 
 // Lazy-loaded route components - Appointments & WhatsApp
 const DailyAppointments = lazyRoute(() => import('../routes/DailyAppointments'));
-const Calendar = React.lazy(() => import('../routes/Calendar'));
-const WhatsAppSend = React.lazy(() => import('../routes/WhatsAppSend'));
-const SendMessage = React.lazy(() => import('../components/react/SendMessage'));
-const WhatsAppAuth = React.lazy(() => import('../routes/WhatsAppAuth'));
+const Calendar = lazyRoute(() => import('../routes/Calendar'));
+const WhatsAppSend = lazyRoute(() => import('../routes/WhatsAppSend'));
+const SendMessage = lazyRoute(() => import('../components/react/SendMessage'));
+const WhatsAppAuth = lazyRoute(() => import('../routes/WhatsAppAuth'));
 
 /**
  * Route configuration array for createBrowserRouter
  * Each route object includes: path, element, loader (optional), errorElement
  */
-export const routesConfig: RouteObject[] = [
+const routes: RouteObject[] = [
   // Chair-side public display — top-level route OUTSIDE RootLayout so it has no
   // header, no auth, no global providers. The kiosk browser bookmarks
   // `/chair-display?chair=N` and runs in fullscreen kiosk mode.
@@ -138,6 +170,9 @@ export const routesConfig: RouteObject[] = [
         <ChairDisplay />
       </React.Suspense>
     ),
+    ...chunkLoader(ChairDisplay),
+    // No layout above the kiosk to draw a spinner in: stay blank, as before.
+    hydrateFallbackElement: <div />,
     errorElement: <RouteError />,
   },
   {
@@ -157,6 +192,7 @@ export const routesConfig: RouteObject[] = [
             <Dashboard />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Dashboard),
       },
 
       // Dashboard (explicit path)
@@ -167,6 +203,7 @@ export const routesConfig: RouteObject[] = [
             <Dashboard />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Dashboard),
       },
 
       // Statistics
@@ -177,6 +214,7 @@ export const routesConfig: RouteObject[] = [
             <Statistics />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Statistics),
       },
 
       // Expenses
@@ -187,6 +225,7 @@ export const routesConfig: RouteObject[] = [
             <Expenses />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Expenses),
       },
 
       // Videos (educational content)
@@ -197,6 +236,7 @@ export const routesConfig: RouteObject[] = [
             <Videos />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Videos),
       },
 
       // Lab case tracker board (Crown/Bridge + Veneers stage tracking)
@@ -229,6 +269,7 @@ export const routesConfig: RouteObject[] = [
             <TasksHistory />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(TasksHistory),
       },
 
       // Decided approvals + notices (admin; linked from the Approvals bell)
@@ -239,6 +280,7 @@ export const routesConfig: RouteObject[] = [
             <ApprovalsHistory />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(ApprovalsHistory),
       },
 
       // ============================================================
@@ -260,6 +302,7 @@ export const routesConfig: RouteObject[] = [
                 <SettingsComponent />
               </RouteErrorBoundary>
             ),
+            ...chunkLoader(SettingsComponent),
             // No loader needed - SettingsComponent fetches user role independently
           },
           {
@@ -332,6 +375,7 @@ export const routesConfig: RouteObject[] = [
                 <AllSetsList />
               </RouteErrorBoundary>
             ),
+            ...chunkLoader(AllSetsList),
             // No loader - loads data in component (complex filtering)
           },
           {
@@ -341,6 +385,7 @@ export const routesConfig: RouteObject[] = [
                 <PatientsList />
               </RouteErrorBoundary>
             ),
+            ...chunkLoader(PatientsList),
             // No loader - PatientsList fetches doctor and patients independently
           },
           {
@@ -359,6 +404,7 @@ export const routesConfig: RouteObject[] = [
                 <SearchPatient />
               </RouteErrorBoundary>
             ),
+            ...chunkLoader(SearchPatient),
             // No loader - search is user-driven
           },
           {
@@ -377,6 +423,7 @@ export const routesConfig: RouteObject[] = [
                 <ArchformMatcher />
               </RouteErrorBoundary>
             ),
+            ...chunkLoader(ArchformMatcher),
             // No loader - loads data in component
           },
           {
@@ -386,6 +433,7 @@ export const routesConfig: RouteObject[] = [
                 <Announcements />
               </RouteErrorBoundary>
             ),
+            ...chunkLoader(Announcements),
             // No loader - list + doctors load in component (includeExpired toggle)
           },
           {
@@ -453,6 +501,7 @@ export const routesConfig: RouteObject[] = [
             <Stand />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Stand),
       },
       {
         path: '/stand/inventory',
@@ -461,6 +510,7 @@ export const routesConfig: RouteObject[] = [
             <StandInventory />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(StandInventory),
       },
       {
         path: '/stand/pos',
@@ -469,6 +519,7 @@ export const routesConfig: RouteObject[] = [
             <StandPOS />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(StandPOS),
       },
       {
         path: '/stand/sales',
@@ -477,6 +528,7 @@ export const routesConfig: RouteObject[] = [
             <StandSalesHistory />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(StandSalesHistory),
       },
       {
         path: '/stand/reports',
@@ -485,6 +537,7 @@ export const routesConfig: RouteObject[] = [
             <StandReports />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(StandReports),
       },
 
       // ============================================================
@@ -516,6 +569,7 @@ export const routesConfig: RouteObject[] = [
             <Calendar />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(Calendar),
         // No loader — the screen fetches through React Query on mount
         // (calendarRangeQuery/calendarMonthQuery). It subscribes
         // to NO SSE and has no refetchInterval, so every appointment write — from
@@ -532,6 +586,7 @@ export const routesConfig: RouteObject[] = [
             <WhatsAppSend />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(WhatsAppSend),
         // No loader - 100% SSE-driven real-time data
       },
 
@@ -543,6 +598,7 @@ export const routesConfig: RouteObject[] = [
             <SendMessage />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(SendMessage),
         // No loader - 100% SSE-driven real-time data
       },
 
@@ -554,6 +610,7 @@ export const routesConfig: RouteObject[] = [
             <WhatsAppAuth />
           </RouteErrorBoundary>
         ),
+        ...chunkLoader(WhatsAppAuth),
         // No loader - 100% SSE-driven real-time data
       },
 
@@ -569,5 +626,7 @@ export const routesConfig: RouteObject[] = [
     ],
   },
 ];
+
+export const routesConfig: RouteObject[] = withHydrateFallback(routes);
 
 export default routesConfig;

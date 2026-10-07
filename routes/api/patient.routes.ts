@@ -1,7 +1,7 @@
 /**
  * Patient Management API Routes
  *
- * Patient information, search, phone lookup, the reference dropdowns
+ * Patient information, search, the typeahead, the reference dropdowns
  * (tags / patient types), full CRUD and the estimated-cost + has-appointment
  * reads.
  *
@@ -15,7 +15,6 @@ import { Router, type Request, type Response } from 'express';
 import { log } from '../../utils/logger.js';
 import { isUniqueViolation } from '../../utils/pg-errors.js';
 import {
-  getPatientsPhones,
   getPatientById,
   updatePatient,
   hasNextAppointment,
@@ -23,6 +22,7 @@ import {
   updateEstimatedCost
 } from '../../services/database/queries/patient-queries.js';
 import { searchPatients } from '../../services/database/queries/patient-search-queries.js';
+import { lookupPatients } from '../../services/database/queries/patient-lookup-queries.js';
 import { getAlertsByPersonId } from '../../services/database/queries/alert-queries.js';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import { CLINICAL_ROLES, FINANCE_ROLES } from '../../shared/auth/roles.js';
@@ -128,24 +128,37 @@ router.get(
 
 
 // ============================================================================
-// PATIENT PHONE NUMBERS
+// PATIENT TYPEAHEAD
 // ============================================================================
 
 /**
- * Get all patient phone numbers
- * GET /patients/phones
+ * The suggestions under a patient search box: the few best matches for the text
+ * typed so far, by name or by phone/ID. See patient-lookup-queries.ts.
+ * GET /patients/lookup — query params are the contract's `patientLookup.query`.
+ * NOTE: Must be defined BEFORE /patients/:personId to avoid route conflicts
  */
 router.get(
-  '/patients/phones',
-  async (_req: Request, res: Response): Promise<void> => {
+  '/patients/lookup',
+  validate({ query: patientContract.patientLookup.query }),
+  async (
+    req: Request<unknown, unknown, unknown, patientContract.PatientLookupQuery>,
+    res: Response
+  ): Promise<void> => {
     try {
-      const phonesList = await getPatientsPhones();
-      sendData(res, patientContract.patientPhones.response, phonesList);
+      const matches = await lookupPatients({
+        q: req.query.q,
+        by: req.query.by,
+        nameStartsWith: req.query.nameStartsWith === 'true',
+        requirePhone: req.query.requirePhone === 'true',
+        exclude: req.query.exclude,
+        limit: req.query.limit,
+      });
+      sendData(res, patientContract.patientLookup.response, matches);
     } catch (error) {
-      log.error('Error fetching patients phones:', error);
+      log.error('Error looking up patients:', error);
       ErrorResponses.internalError(
         res,
-        'Failed to fetch patients phones',
+        'Failed to look up patients',
         error as Error
       );
     }

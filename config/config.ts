@@ -7,13 +7,16 @@ import { z } from 'zod';
 import type { AppConfig } from '../types/config.types.js';
 import { log } from '../utils/logger.js';
 import { resolvePgConnection } from './pg-connection.js';
+import { DEV_ENV_FILE, ENV_FILE } from './early-env.js';
 
-// Load base .env file first (shared configuration) - silent mode for production
-dotenv.config({ path: '.env', debug: false });
+// Load base .env file first (shared configuration) - silent mode for production.
+// The file names and this order are shared with `early-env.ts`, which answers for
+// the one module evaluated before this line runs (the logger): keep the two in step.
+dotenv.config({ path: ENV_FILE, debug: false });
 
 // Then load environment-specific overrides
 if (process.env.NODE_ENV === 'development') {
-  dotenv.config({ path: '.env.development', override: true, debug: false });
+  dotenv.config({ path: DEV_ENV_FILE, override: true, debug: false });
 }
 
 // ---------------------------------------------------------------------------
@@ -163,9 +166,13 @@ const config: AppConfig = {
     scopes:
       process.env.THREESHAPE_SCOPES ||
       'openid api profile api.workflow.init api.media.read api.media.download api.cases.read license.read offline_access',
+    // Same shape as the Google defaults above. It was the original clinic's LAN
+    // domain, so an install without THREESHAPE_REDIRECT_URI sent 3Shape's sign-in
+    // back to another clinic's address. It must match a URI registered with 3Shape
+    // (docs/3shape-integration.md), so a real deployment sets it explicitly.
     redirectUri:
       process.env.THREESHAPE_REDIRECT_URI ||
-      'https://local.shwan-orthodontics.com/api/auth/3shape/callback',
+      `http://localhost:${process.env.PORT || 3000}/api/auth/3shape/callback`,
     webServiceBase: process.env.THREESHAPE_WEBSERVICE_BASE,
     webhookSecret: process.env.THREESHAPE_WEBHOOK_SECRET,
     webhookUrl: process.env.THREESHAPE_WEBHOOK_URL,

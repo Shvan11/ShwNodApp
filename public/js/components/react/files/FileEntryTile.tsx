@@ -107,7 +107,7 @@ const FileEntryTile = ({
           className={`${styles.selectCheck} ${selected ? styles.selectCheckOn : ''}`}
           aria-hidden="true"
         >
-          {selected && <i className="fas fa-check" />}
+          {selected && <i className="fas fa-check" aria-hidden="true" />}
         </span>
       )}
 

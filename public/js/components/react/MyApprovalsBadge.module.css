@@ -9,7 +9,7 @@
     height: 18px;
     padding: 0 5px;
     border-radius: var(--radius-full);
-    background: var(--warning-500);
+    background: var(--warning-fill);
     color: var(--color-white);
     font-size: 11px;
     font-weight: var(--font-weight-bold);
@@ -32,8 +32,8 @@
     margin-inline-start: var(--spacing-xs);
     padding: 0 var(--spacing-sm);
     border-radius: var(--radius-full);
-    background: var(--warning-100, #fef9c3);
-    color: var(--warning-700, #a16207);
+    background: var(--warning-100);
+    color: var(--warning-700);
     font-size: var(--font-size-sm);
 }
 
@@ -62,9 +62,10 @@
     border-bottom: none;
 }
 
-/* Grayed-out look for rows that are already decided */
+/* Grayed-out look for rows that are already decided. Desaturated, not faded:
+   at 70% opacity the row's secondary text fell under 4.5:1. */
 .decided {
-    opacity: 0.7;
+    filter: grayscale(1);
 }
 
 .itemBody {
@@ -100,8 +101,8 @@
     align-items: center;
     gap: 4px;
     max-width: 160px;
-    background: var(--primary-50, #eff6ff);
-    color: var(--primary-700, #1d4ed8);
+    background: var(--primary-50);
+    color: var(--primary-700);
     border-radius: var(--radius-sm);
     padding: 1px var(--spacing-xs);
     font-size: var(--font-size-xs);
@@ -118,12 +119,12 @@
     font-weight: var(--font-weight-medium);
 }
 
-.statusPending     { background: var(--warning-50, #fffbeb);  color: var(--warning-700, #a16207); }
-.statusApproved    { background: var(--success-50, #f0fdf4);  color: var(--success-700, #15803d); }
-.statusRejected    { background: var(--error-50, #fef2f2);    color: var(--error-700, #b91c1c); }
-.statusAcknowledged { background: var(--surface-muted);       color: var(--text-muted); }
-.statusFailed      { background: var(--error-50, #fef2f2);    color: var(--error-700, #b91c1c); }
-.statusStale       { background: var(--surface-muted);        color: var(--text-muted); }
+.statusPending     { background: var(--warning-50);  color: var(--warning-700); }
+.statusApproved    { background: var(--success-50);  color: var(--success-700); }
+.statusRejected    { background: var(--error-50);    color: var(--error-700); }
+.statusAcknowledged { background: var(--surface-muted);       color: var(--text-secondary); }
+.statusFailed      { background: var(--error-50);    color: var(--error-700); }
+.statusStale       { background: var(--surface-muted);        color: var(--text-secondary); }
 
 .note {
     font-size: var(--font-size-xs);

@@ -148,7 +148,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
   border-radius: 50%;
 }
@@ -199,7 +199,7 @@
 .relatedRecords li i {
   width: 16px;
   text-align: center;
-  color: var(--blue-500);
+  color: var(--blue-700);
 }
 
 /* Warning box */
@@ -214,7 +214,7 @@
 }
 
 .warningBox i {
-  color: var(--amber-600);
+  color: var(--warning-700);
   font-size: 18px;
   flex-shrink: 0;
   margin-top: 2px;
@@ -264,14 +264,14 @@
 }
 
 .btnPrimary {
-  background: var(--primary-color);
-  border: 1px solid var(--primary-color);
+  background: var(--primary-fill);
+  border: 1px solid var(--primary-fill);
   color: var(--color-white);
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: var(--primary-color-dark);
-  border-color: var(--primary-color-dark);
+  background: var(--primary-fill-hover);
+  border-color: var(--primary-fill-hover);
 }
 
 .btnPrimary:disabled {

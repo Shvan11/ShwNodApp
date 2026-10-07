@@ -72,7 +72,7 @@ const DatabaseBackupSettings = ({ onChangesUpdate }: DatabaseBackupSettingsProps
             <div className={styles.header}>
                 <div>
                     <h3 className={styles.title}>
-                        <i className="fas fa-database"></i>
+                        <i className="fas fa-database" aria-hidden="true"></i>
                         Database Backup
                     </h3>
                     <p className={styles.description}>
@@ -85,7 +85,7 @@ const DatabaseBackupSettings = ({ onChangesUpdate }: DatabaseBackupSettingsProps
 
             <div className={styles.card}>
                 <div className={styles.warning}>
-                    <i className="fas fa-exclamation-triangle"></i>
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <span>
                         The backup file is <strong>not encrypted</strong> and contains all patient
                         information. Store it securely and do not share it.
@@ -98,7 +98,7 @@ const DatabaseBackupSettings = ({ onChangesUpdate }: DatabaseBackupSettingsProps
                     onClick={handleDownload}
                     disabled={isBackingUp}
                 >
-                    <i className={`fas ${isBackingUp ? 'fa-spinner fa-spin' : 'fa-download'}`}></i>
+                    <i className={`fas ${isBackingUp ? 'fa-spinner fa-spin' : 'fa-download'}`} aria-hidden="true"></i>
                     {isBackingUp ? 'Preparing backup…' : 'Download backup'}
                 </button>
 

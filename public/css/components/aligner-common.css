@@ -37,26 +37,6 @@
     overflow: hidden;
     animation: slideInRight 0.3s ease;
 }
-
-.close-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: var(--color-white);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
-    transition: all 0.2s;
-}
-
-.close-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
 .drawer-body {
     flex: 1 1 0;
     overflow-y: auto;
@@ -147,7 +127,7 @@
 .form-field select:focus,
 .form-field textarea:focus {
     outline: none;
-    border-color: var(--blue-300);
+    border-color: var(--blue-600);
     box-shadow: 0 0 0 3px rgba(0, 115, 230, 0.1);
 }
 
@@ -199,7 +179,7 @@
     display: block;
     font-size: 0.75rem;
     font-weight: var(--font-weight-normal);
-    color: var(--gray-400);
+    color: var(--text-muted);
     margin-top: 0.15rem;
 }
 
@@ -248,6 +228,7 @@
 
 .btn-outline.btn-danger:hover:not(:disabled) {
     background: var(--error-50);
+    color: var(--error-700);
 }
 
 /* Date input with Today checkbox */
@@ -288,12 +269,12 @@
    =========================================== */
 
 .drawer-container .btn-primary {
-    background: var(--blue-300);
+    background: var(--palette-blue-600);
     color: var(--color-white);
 }
 
 .drawer-container .btn-primary:hover {
-    background: var(--blue-800);
+    background: var(--palette-blue-800);
 }
 
 .drawer-container .btn-primary:disabled {
@@ -311,12 +292,12 @@
 }
 
 .drawer-container .btn-danger {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
 .drawer-container .btn-danger:hover {
-    background: var(--error-500);
+    background: var(--error-fill);
 }
 
 /* ===========================================
@@ -351,13 +332,13 @@
 
 .form-tab:hover {
     background: rgba(0, 115, 230, 0.05);
-    color: var(--blue-300);
+    color: var(--blue-700);
 }
 
 .form-tab.active {
     background: var(--surface);
-    color: var(--blue-300);
-    border-bottom-color: var(--blue-300);
+    color: var(--blue-700);
+    border-bottom-color: var(--blue-600);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -514,7 +495,7 @@
 }
 
 .aligner-payment-form .required {
-    color: var(--error-400);
+    color: var(--error-700);
 }
 
 .aligner-payment-form .input-group {
@@ -546,7 +527,7 @@
 
 .aligner-payment-form .currency-badge {
     background: var(--gray-100);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     padding: 0.75rem 1.25rem;
     border-radius: 8px;
     font-weight: var(--font-weight-bold);
@@ -577,7 +558,7 @@
 
 .aligner-payment-form .error-message {
     display: block;
-    color: var(--error-400);
+    color: var(--error-700);
     font-size: 0.75rem;
     margin-top: 0.4rem;
     font-weight: var(--font-weight-medium);
@@ -604,15 +585,15 @@
 .balance-preview .preview-value {
     font-size: 1.25rem;
     font-weight: var(--font-weight-bold);
-    color: var(--success-600);
+    color: var(--success-700);
 }
 
 .balance-preview .preview-value.paid-full {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .balance-preview .badge-success {
-    background: var(--success-500);
+    background: var(--success-fill);
     color: var(--color-white);
     padding: 0.35rem 0.875rem;
     border-radius: 12px;
@@ -627,7 +608,7 @@
     border: 1px solid var(--error-100);
     border-radius: 8px;
     padding: 1rem;
-    color: var(--error-600);
+    color: var(--error-700);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -640,7 +621,7 @@
 
 .aligner-payment-drawer .drawer-footer .btn-cancel {
     background: var(--surface);
-    color: var(--gray-500);
+    color: var(--text-secondary);
     border: 2px solid var(--gray-200);
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
@@ -656,7 +637,7 @@
 }
 
 .aligner-payment-drawer .drawer-footer .btn-submit {
-    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    background: linear-gradient(135deg, var(--success-fill), var(--success-fill));
     color: var(--color-white);
     border: none;
     padding: 0.75rem 2rem;
@@ -672,7 +653,7 @@
 }
 
 .aligner-payment-drawer .drawer-footer .btn-submit:hover {
-    background: linear-gradient(135deg, var(--success-600), var(--success-700));
+    background: linear-gradient(135deg, var(--success-fill), var(--success-fill-hover));
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(22, 163, 74, 0.4);
 }
@@ -752,7 +733,7 @@
 
 .empty-communication i {
     font-size: 3rem;
-    color: var(--gray-300);
+    color: var(--text-muted);
     margin-bottom: 1rem;
 }
 
@@ -762,7 +743,7 @@
 
 .empty-communication .hint {
     font-size: 0.85rem;
-    color: var(--gray-400);
+    color: var(--text-muted);
 }
 
 /* Notes Timeline */
@@ -810,7 +791,7 @@
 }
 
 .note-author.lab {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
 }
 
 .note-author.doctor {
@@ -863,7 +844,7 @@
    =========================================== */
 
 .edit-set-btn {
-    background: linear-gradient(135deg, var(--blue-300), var(--blue-800));
+    background: linear-gradient(135deg, var(--palette-blue-600), var(--palette-blue-800));
     color: var(--color-white);
     border: none;
     padding: 0.6rem 1.2rem;
@@ -880,7 +861,7 @@
 }
 
 .edit-set-btn:hover {
-    background: linear-gradient(135deg, var(--blue-800), var(--blue-800));
+    background: var(--palette-blue-800);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 115, 230, 0.4);
 }
@@ -979,7 +960,7 @@
 }
 
 .breadcrumb > i {
-    color: var(--gray-300);
+    color: var(--text-muted);
     font-size: 0.8rem;
 }
 
@@ -987,6 +968,8 @@
 
 .section-header {
     display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
@@ -1020,7 +1003,8 @@
 }
 
 .aligner-set-card.inactive {
-    opacity: 0.7;
+    /* Desaturated, not faded: at 70% opacity an inactive set's text read 3.1:1. */
+    filter: grayscale(0.85);
     border-color: var(--gray-300);
 }
 
@@ -1038,7 +1022,7 @@
 
 /* Activity Banner at top of card */
 .activity-banner {
-    background: linear-gradient(135deg, var(--warning-orange) 0%, var(--warning-600) 100%);
+    background: linear-gradient(135deg, var(--warning-fill) 0%, var(--warning-fill) 100%);
     color: var(--color-white);
     padding: 0.75rem 1rem;
     border-radius: 8px;
@@ -1109,7 +1093,7 @@
 }
 
 .folder-btn {
-    background: var(--warning-orange);
+    background: var(--warning-fill);
     color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
@@ -1124,7 +1108,7 @@
 }
 
 .folder-btn:hover {
-    background: var(--warning-600);
+    background: var(--warning-fill);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
 }
@@ -1134,7 +1118,7 @@
 }
 
 .pdf-btn {
-    background: var(--error-pink);
+    background: var(--error-fill);
     color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
@@ -1149,7 +1133,7 @@
 }
 
 .pdf-btn:hover {
-    background: var(--error-500);
+    background: var(--error-fill);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
 }
@@ -1182,17 +1166,17 @@ a.archform-btn {
 }
 
 .set-badge.active {
-    background: var(--success-color);
+    background: var(--success-fill);
     color: var(--color-white);
 }
 
 .set-badge.inactive {
-    background: var(--gray-400);
+    background: var(--palette-gray-500);
     color: var(--color-white);
 }
 
 .set-type {
-    background: var(--blue-300);
+    background: var(--palette-blue-600);
     color: var(--color-white);
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
@@ -1214,7 +1198,7 @@ a.archform-btn {
 }
 
 .set-info-item i {
-    color: var(--blue-300);
+    color: var(--blue-700);
     width: 20px;
 }
 
@@ -1249,7 +1233,7 @@ a.archform-btn {
 }
 
 .toggle-batches-btn {
-    background: var(--blue-300);
+    background: var(--palette-blue-600);
     color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
@@ -1263,7 +1247,7 @@ a.archform-btn {
 }
 
 .toggle-batches-btn:hover {
-    background: var(--blue-800);
+    background: var(--palette-blue-800);
 }
 
 .toggle-batches-btn i {
@@ -1279,7 +1263,7 @@ a.archform-btn {
    =========================================== */
 
 .action-icon-btn.queue-labels {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, var(--palette-indigo-600), var(--purple-fill));
     color: var(--color-white);
 }
 
@@ -1313,15 +1297,6 @@ a.archform-btn {
     overflow: hidden;
 }
 
-.patient-details h2 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.8rem;
-    color: var(--color-white);
-    font-weight: var(--font-weight-bold);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-
 /* ===========================================
    ACTION ICON BUTTONS (Base + Variants)
    =========================================== */
@@ -1340,7 +1315,7 @@ a.archform-btn {
 }
 
 .action-icon-btn.edit {
-    color: var(--blue-300);
+    color: var(--blue-700);
 }
 
 .action-icon-btn.edit:hover {
@@ -1380,7 +1355,7 @@ a.archform-btn {
 }
 
 .action-icon-btn.print-labels {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
 }
 
 .action-icon-btn.print-labels:hover {
@@ -1388,7 +1363,7 @@ a.archform-btn {
 }
 
 .action-icon-btn.bg-purple {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
 }
 
 .action-icon-btn.bg-purple:hover {
@@ -1496,22 +1471,22 @@ a.archform-btn {
 }
 
 .batch-status.delivered {
-    background: var(--success-color);
+    background: var(--success-fill);
     color: var(--color-white);
 }
 
 .batch-status.pending {
-    background: var(--warning-orange);
+    background: var(--warning-fill);
     color: var(--color-white);
 }
 
 .batch-status.pending-manufacture {
-    background: #00acc1;  /* Cyan 600 */
+    background: var(--info-fill);
     color: var(--color-white);
 }
 
 .batch-status.pending-delivery {
-    background: var(--warning-orange);
+    background: var(--warning-fill);
     color: var(--color-white);
 }
 
@@ -1530,7 +1505,7 @@ a.archform-btn {
 }
 
 .batch-detail i {
-    color: var(--blue-300);
+    color: var(--blue-700);
     width: 16px;
 }
 
@@ -1546,7 +1521,7 @@ a.archform-btn {
 
 .spinner {
     border: 4px solid var(--gray-100);
-    border-top: 4px solid var(--blue-300);
+    border-top: 4px solid var(--blue-600);
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -1554,20 +1529,15 @@ a.archform-btn {
     margin: 0 auto 1rem;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
 .empty-state {
     text-align: center;
     padding: 4rem 2rem;
-    color: var(--gray-400);
+    color: var(--text-muted);
 }
 
 .empty-state i {
     font-size: 4rem;
-    color: var(--gray-300);
+    color: var(--text-muted);
     margin-bottom: 1rem;
 }
 
@@ -1581,7 +1551,7 @@ a.archform-btn {
    =========================================== */
 
 .url-link {
-    color: var(--blue-300);
+    color: var(--blue-700);
     text-decoration: none;
     word-break: break-all;
     max-width: 400px;
@@ -1596,7 +1566,7 @@ a.archform-btn {
 }
 
 .url-not-set {
-    color: var(--gray-400);
+    color: var(--text-muted);
     font-style: italic;
 }
 
@@ -1611,7 +1581,7 @@ a.archform-btn {
 
 .url-input-inline:focus {
     outline: none;
-    border-color: var(--blue-300);
+    border-color: var(--blue-600);
     box-shadow: 0 0 0 2px rgba(0, 115, 230, 0.1);
 }
 
@@ -1666,7 +1636,7 @@ a.archform-btn {
    =========================================== */
 
 .video-btn {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
@@ -1681,7 +1651,7 @@ a.archform-btn {
 }
 
 .video-btn:hover {
-    background: var(--error-dark);
+    background: var(--error-fill-hover);
     transform: translateY(-2px);
     box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
 }
@@ -1691,7 +1661,7 @@ a.archform-btn {
 }
 
 .archform-btn {
-    background: #00897b;
+    background: var(--info-fill);
     color: var(--color-white);
     border: none;
     padding: 0.5rem 1rem;
@@ -1803,22 +1773,22 @@ a.archform-btn {
     margin-left: 1rem;
     font-size: 0.9rem;
     font-weight: var(--font-weight-normal);
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 .remaining-count strong.positive {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .remaining-count strong.negative {
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 /* Optional field helper text */
 .field-optional-text {
     font-size: 0.85rem;
     font-weight: var(--font-weight-normal);
-    color: var(--gray-500);
+    color: var(--text-secondary);
 }
 
 /* Loading spinner container */
@@ -1836,7 +1806,7 @@ a.archform-btn {
    =================================== */
 
 .pdf-upload-info {
-    color: var(--gray-500);
+    color: var(--text-secondary);
     font-size: 0.875rem;
     margin-top: 0.25rem;
     display: block;
@@ -1857,7 +1827,7 @@ a.archform-btn {
 }
 
 .pdf-status-header i {
-    color: var(--info-600);
+    color: var(--info-700);
 }
 
 .pdf-status-header span {
@@ -1982,14 +1952,6 @@ a.archform-btn {
         width: 100%;
         max-width: 100%;
     }
-
-    .close-btn {
-        width: 44px;
-        height: 44px;
-        font-size: 1.25rem;
-        -webkit-tap-highlight-color: rgba(255, 255, 255, 0.2);
-    }
-
     .drawer-body .form-section {
         padding: 0 1rem;
     }
@@ -2063,11 +2025,6 @@ a.archform-btn {
 
 /* Small mobile devices */
 @media (max-width: 640px) {
-    .close-btn {
-        width: 48px;
-        height: 48px;
-    }
-
     .drawer-body .form-section {
         padding: 0 0.875rem;
     }
@@ -2146,16 +2103,6 @@ a.archform-btn {
 
 /* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
-    .close-btn {
-        min-width: 44px;
-        min-height: 44px;
-    }
-
-    .close-btn:active {
-        transform: scale(0.95);
-        background: rgba(255, 255, 255, 0.4);
-    }
-
     .form-field input,
     .form-field select,
     .form-field textarea {
@@ -2212,7 +2159,7 @@ a.archform-btn {
 
 .note-textarea:focus {
     outline: none;
-    border-color: var(--blue-300);
+    border-color: var(--blue-600);
     box-shadow: var(--shadow-focus);
 }
 
@@ -2227,7 +2174,7 @@ a.archform-btn {
 }
 
 .days-save-btn {
-    background: var(--blue-300);
+    background: var(--palette-blue-600);
     color: var(--color-white);
     border: none;
     padding: 0.4rem 0.9rem;
@@ -2238,7 +2185,7 @@ a.archform-btn {
 }
 
 .days-save-btn:hover {
-    background: var(--blue-800);
+    background: var(--palette-blue-800);
 }
 
 .days-save-btn:disabled {
@@ -2287,7 +2234,7 @@ a.archform-btn {
 
 /* Error-filled button helper (Grant Access; .video-btn already paints itself) */
 .bg-error {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
@@ -2495,9 +2442,9 @@ a.archform-btn {
 
 .aligner-photos-container {
     margin-top: 1.5rem;
-    background: var(--gray-50, #f8f9fa);
-    border: 1px solid var(--gray-200, #e9ecef);
-    border-radius: var(--radius-lg, 8px);
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
     padding: 1.25rem;
 }
 
@@ -2506,14 +2453,14 @@ a.archform-btn {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
-    border-bottom: 1px solid var(--gray-200, #e9ecef);
+    border-bottom: 1px solid var(--gray-200);
     padding-bottom: 0.5rem;
 }
 
 .aligner-photos-header h5 {
     margin: 0;
     font-size: 1.05rem;
-    color: var(--blue-800, #1e3a8a);
+    color: var(--blue-800);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -2529,11 +2476,11 @@ a.archform-btn {
 .aligner-photo-card {
     position: relative;
     aspect-ratio: 1 / 1;
-    border-radius: var(--radius-md, 6px);
+    border-radius: var(--radius-md);
     overflow: hidden;
-    border: 1px solid var(--gray-200, #e9ecef);
+    border: 1px solid var(--gray-200);
     cursor: pointer;
-    background: var(--color-white, #fff);
+    background: var(--surface);
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -2554,22 +2501,22 @@ a.archform-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--gray-100, #f8f9fa);
-    color: var(--gray-700, #495057);
+    background: var(--gray-100);
+    color: var(--gray-700);
     font-size: 2.5rem;
     transition: background-color 0.2s, color 0.2s;
 }
 
 .aligner-photo-card:hover .aligner-file-icon-placeholder {
-    background: var(--gray-200, #e9ecef);
-    color: var(--primary-color, #00897B);
+    background: var(--gray-200);
+    color: var(--blue-700);
 }
 
 .aligner-photo-delete-btn {
     position: absolute;
     top: 5px;
     right: 5px;
-    background: rgba(220, 38, 38, 0.9);
+    background: var(--error-fill-hover);
     color: white;
     border: none;
     border-radius: 50%;

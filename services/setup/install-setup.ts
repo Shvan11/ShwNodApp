@@ -49,7 +49,7 @@ import {
 /** One line of the setup report. `applied` = rows written; `skipped` = left as found. */
 export type SetupStep = { step: string; outcome: 'applied' | 'skipped'; detail: string };
 
-/** The header display name (Settings → General; UniversalHeader falls back to the original clinic's). */
+/** The header display name (Settings → General; unset, the header shows a generic product label). */
 export const CLINIC_NAME_OPTION = 'CLINIC_NAME';
 export const DEFAULT_WORK_CURRENCY_OPTION = 'DEFAULT_WORK_CURRENCY';
 
@@ -270,12 +270,12 @@ export async function readIdentity(): Promise<Record<string, string>> {
 
 /**
  * Human-readable warnings for identity settings a new center must not leave as they are: still
- * blank (the header then shows the built-in fallback) or still the original clinic's wording.
+ * blank (the header then shows a generic label) or still the original clinic's wording.
  */
 export function identityWarnings(current: Record<string, string>): string[] {
   const warnings: string[] = [];
   if (!current[CLINIC_NAME_OPTION]) {
-    warnings.push('The clinic name is not set, so the header shows the built-in default.');
+    warnings.push('The clinic name is not set, so the header shows a generic label.');
   }
   for (const [option, original] of Object.entries(ORIGINAL_CLINIC_VALUES)) {
     if (current[option] === original) {

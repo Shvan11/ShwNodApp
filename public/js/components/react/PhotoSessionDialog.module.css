@@ -93,8 +93,8 @@
 }
 
 .dateItem:hover {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
+    background: var(--primary-fill);
+    border-color: var(--primary-fill);
     color: var(--color-white);
 }
 
@@ -142,9 +142,9 @@
     line-height: 1.4;
 }
 
-.badgeGranted { background: var(--success-light); color: var(--success-dark); }
-.badgePrompt  { background: var(--warning-light); color: var(--warning-dark); }
-.badgeDenied  { background: var(--error-light); color: var(--error-dark); }
+.badgeGranted { background: var(--success-light); color: var(--success-800); }
+.badgePrompt  { background: var(--warning-light); color: var(--warning-800); }
+.badgeDenied  { background: var(--error-light); color: var(--error-700); }
 .badgeUnset   { background: var(--gray-100); color: var(--text-secondary); }
 
 .iniHint {
@@ -196,11 +196,6 @@
 }
 
 /* Animations */
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -226,7 +221,7 @@
 .conflictIcon {
     flex-shrink: 0;
     font-size: 1.5rem;
-    color: var(--warning-dark);
+    color: var(--warning-800);
 }
 
 .conflictContent {
@@ -235,14 +230,14 @@
 
 .conflictContent strong {
     display: block;
-    color: var(--warning-dark);
+    color: var(--warning-800);
     margin-bottom: 0.5rem;
     font-size: 1rem;
 }
 
 .conflictContent p {
     margin: 0 0 0.5rem 0;
-    color: var(--warning-dark);
+    color: var(--warning-800);
     font-size: 0.9rem;
     line-height: 1.4;
 }

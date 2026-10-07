@@ -64,7 +64,7 @@
 }
 
 .exchangeRateCompact i {
-    color: var(--info-500);
+    color: var(--info-700);
 }
 
 .rateDate {
@@ -85,7 +85,7 @@
 }
 
 .exchangeRateErrorCompact i {
-    color: var(--warning-500);
+    color: var(--warning-700);
 }
 
 .rateInputInline {
@@ -106,7 +106,7 @@
 .btnLink {
     background: none;
     border: none;
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     font-weight: var(--font-weight-semibold);
     cursor: pointer;
     text-decoration: underline;
@@ -253,17 +253,17 @@
 
 .locked:hover {
     background: var(--warning-100);
-    color: var(--warning-600);
+    color: var(--warning-700);
 }
 
 .unlocked {
     background: var(--warning-100);
-    color: var(--warning-600);
+    color: var(--warning-700);
 }
 
 .unlocked:hover {
     background: var(--warning-200);
-    color: var(--warning-700);
+    color: var(--warning-800);
 }
 
 .fieldHint {
@@ -274,7 +274,7 @@
 }
 
 .overrideHint {
-    color: var(--warning-600);
+    color: var(--warning-700);
 }
 
 .fieldHintSuccess {
@@ -438,7 +438,7 @@
 }
 
 .summaryWarningText i {
-    color: var(--warning-500);
+    color: var(--warning-700);
 }
 
 /* Compact Actions */

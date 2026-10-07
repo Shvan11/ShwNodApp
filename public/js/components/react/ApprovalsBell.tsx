@@ -15,6 +15,8 @@ import {
     invalidateApprovals,
     invalidateApprovalTarget,
     ACTION_LABEL_KEY,
+    approvalNoteText,
+    approvalSummaryText,
     type ApprovalRow,
 } from '@/services/approvals';
 import HeaderPopover, { RelativeAge } from './HeaderPopover';
@@ -72,7 +74,7 @@ const ApprovalsBell = () => {
             } else if (result.status === 'stale') {
                 toast.warning(t('bell.stale'));
             } else {
-                toast.error(result.review_note ? t('bell.failed', { reason: result.review_note }) : t('bell.failedUnknown'));
+                toast.error(result.review_note ? t('bell.failed', { reason: approvalNoteText(result.review_note, t) }) : t('bell.failedUnknown'));
             }
         }, t('bell.approveFailed'));
 
@@ -198,7 +200,7 @@ const ApprovalsBell = () => {
                                     <div key={row.request_id} className={styles.item}>
                                         <span className={`${styles.kindBar} ${styles.kindHold}`} />
                                         <div className={styles.itemBody}>
-                                            <div className={styles.itemText}>{row.summary}</div>
+                                            <div className={styles.itemText}>{approvalSummaryText(row, t)}</div>
                                             {meta(row)}
 
                                             {rejectingId === row.request_id && (
@@ -285,7 +287,7 @@ const ApprovalsBell = () => {
                                     <div key={row.request_id} className={styles.item}>
                                         <span className={`${styles.kindBar} ${styles.kindNotice}`} />
                                         <div className={styles.itemBody}>
-                                            <div className={styles.itemText}>{row.summary}</div>
+                                            <div className={styles.itemText}>{approvalSummaryText(row, t)}</div>
                                             {meta(row)}
                                         </div>
 

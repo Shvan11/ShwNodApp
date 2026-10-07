@@ -79,7 +79,7 @@ export default function DateSelector({
   return (
     <section className={styles.controlsArea}>
       <fieldset className={styles.dateSelectionPanel}>
-        <legend className={styles.srOnly}>Date and Message Controls</legend>
+        <legend className="sr-only">Date and Message Controls</legend>
         <div className={styles.dateControls}>
           <label htmlFor="dateSelector">Select Date:</label>
           <select

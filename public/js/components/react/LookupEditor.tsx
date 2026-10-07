@@ -206,13 +206,13 @@ const LookupEditor: React.FC<LookupEditorProps> = ({
                     )}
                 </div>
                 <button type="button" className="btn btn-primary btn-sm" onClick={handleAdd}>
-                    <i className="fas fa-plus"></i> {labels.add ?? 'Add New'}
+                    <i className="fas fa-plus" aria-hidden="true"></i> {labels.add ?? 'Add New'}
                 </button>
             </div>
 
             {loading ? (
                 <div className="lookup-loading">
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <span>Loading...</span>
                 </div>
             ) : (
@@ -233,12 +233,12 @@ const LookupEditor: React.FC<LookupEditorProps> = ({
                                     <td colSpan={columns.length + 2} className="empty-row">
                                         {searchTerm ? (
                                             <>
-                                                <i className="fas fa-search"></i>
+                                                <i className="fas fa-search" aria-hidden="true"></i>
                                                 <span>No items match your search</span>
                                             </>
                                         ) : (
                                             <>
-                                                <i className="fas fa-inbox"></i>
+                                                <i className="fas fa-inbox" aria-hidden="true"></i>
                                                 <span>{labels.empty ?? 'No items found'}</span>
                                             </>
                                         )}

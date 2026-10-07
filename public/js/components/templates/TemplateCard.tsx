@@ -32,35 +32,35 @@ function TemplateCard({ template, onEdit, onSetDefault, onDelete, styles }: Temp
                 <div className={styles.templateBadges}>
                     {template.is_default && (
                         <span className={`${styles.badge} ${styles.badgeDefault}`}>
-                            <i className="fas fa-star"></i> Default
+                            <i className="fas fa-star" aria-hidden="true"></i> Default
                         </span>
                     )}
                     {template.is_active ? (
                         <span className={`${styles.badge} ${styles.badgeActive}`}>
-                            <i className="fas fa-check"></i> Active
+                            <i className="fas fa-check" aria-hidden="true"></i> Active
                         </span>
                     ) : (
                         <span className={`${styles.badge} ${styles.badgeInactive}`}>
-                            <i className="fas fa-times"></i> Inactive
+                            <i className="fas fa-times" aria-hidden="true"></i> Inactive
                         </span>
                     )}
                     {template.is_system && (
                         <span className={`${styles.badge} ${styles.badgeSystem}`}>
-                            <i className="fas fa-shield-alt"></i> System
+                            <i className="fas fa-shield-alt" aria-hidden="true"></i> System
                         </span>
                     )}
                 </div>
                 <div className={styles.templateMeta}>
                     <div className={styles.metaItem}>
-                        <i className="fas fa-file"></i>
+                        <i className="fas fa-file" aria-hidden="true"></i>
                         <span>{template.template_file_path || 'No file'}</span>
                     </div>
                     <div className={styles.metaItem}>
-                        <i className="fas fa-clock"></i>
+                        <i className="fas fa-clock" aria-hidden="true"></i>
                         <span>Last used: {lastUsed}</span>
                     </div>
                     <div className={styles.metaItem}>
-                        <i className="fas fa-user"></i>
+                        <i className="fas fa-user" aria-hidden="true"></i>
                         <span>Created by: {template.created_by || 'Unknown'}</span>
                     </div>
                 </div>
@@ -74,14 +74,14 @@ function TemplateCard({ template, onEdit, onSetDefault, onDelete, styles }: Temp
                         className="btn btn-sm btn-primary"
                         onClick={() => onEdit(template.template_id)}
                     >
-                        <i className="fas fa-edit"></i> Edit Design
+                        <i className="fas fa-edit" aria-hidden="true"></i> Edit Design
                     </button>
                     {!template.is_default && (
                         <button
                             className="btn btn-sm btn-success"
                             onClick={() => onSetDefault(template.template_id)}
                         >
-                            <i className="fas fa-star"></i> Set Default
+                            <i className="fas fa-star" aria-hidden="true"></i> Set Default
                         </button>
                     )}
                     {!template.is_system && (
@@ -89,7 +89,7 @@ function TemplateCard({ template, onEdit, onSetDefault, onDelete, styles }: Temp
                             className="btn btn-sm btn-danger"
                             onClick={() => onDelete(template.template_id, template.template_name)}
                         >
-                            <i className="fas fa-trash"></i> Delete
+                            <i className="fas fa-trash" aria-hidden="true"></i> Delete
                         </button>
                     )}
                 </div>

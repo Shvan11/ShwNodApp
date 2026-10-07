@@ -15,6 +15,7 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { z } from 'zod';
 import { fetchJSON } from '@/core/http';
 import * as patientContract from '@shared/contracts/patient.contract';
+import type { PatientLookupBy } from '@shared/patient-lookup';
 import * as workContract from '@shared/contracts/work.contract';
 import * as templateContract from '@shared/contracts/template.contract';
 import * as alignerContract from '@shared/contracts/aligner.contract';
@@ -294,16 +295,51 @@ export const alignerPatientsByDoctorQuery = (doctorId: Id) =>
 // Lookups — patient-management filter data
 // ---------------------------------------------------------------------------
 
-/** GET /api/patients/phones — patient phone/name list (patient-management). */
-export const patientPhonesQuery = () =>
-  queryOptions({
-    queryKey: qk.lookups.patientPhones(),
+/** What one patient-typeahead request asks for (`patientContract.patientLookup.query`, typed). */
+export type PatientLookupParams = {
+  /** The text, trimmed. */
+  q: string;
+  by: PatientLookupBy;
+  nameStartsWith?: boolean;
+  requirePhone?: boolean;
+  /** A patient to leave out. */
+  exclude?: number;
+  /** Rows per group; the server's defaults when absent. */
+  limit?: number;
+};
+
+/**
+ * GET /api/patients/lookup — the few best matches for the text typed so far.
+ * Read it through `usePatientLookup`, which debounces the typing; a caller that
+ * reads this factory directly sends a request per keystroke.
+ *
+ * The cache holds one small entry per text typed, so they are dropped after a
+ * minute rather than the default five.
+ */
+export const patientLookupQuery = (params: PatientLookupParams) => {
+  const search = new URLSearchParams({ q: params.q, by: params.by });
+  if (params.nameStartsWith) search.set('nameStartsWith', 'true');
+  if (params.requirePhone) search.set('requirePhone', 'true');
+  if (params.exclude !== undefined) search.set('exclude', String(params.exclude));
+  if (params.limit !== undefined) search.set('limit', String(params.limit));
+  return queryOptions({
+    // Flags normalized, so `false` and "absent" are one entry.
+    queryKey: qk.lookups.patientLookup({
+      q: params.q,
+      by: params.by,
+      nameStartsWith: !!params.nameStartsWith,
+      requirePhone: !!params.requirePhone,
+      exclude: params.exclude ?? null,
+      limit: params.limit ?? null,
+    }),
     queryFn: ({ signal }) =>
-      fetchJSON<z.infer<typeof patientContract.patientPhones.response>>('/api/patients/phones', {
-        signal,
-        schema: patientContract.patientPhones.response,
-      }),
+      fetchJSON<z.infer<typeof patientContract.patientLookup.response>>(
+        `/api/patients/lookup?${search.toString()}`,
+        { signal, schema: patientContract.patientLookup.response }
+      ),
+    gcTime: 60_000,
   });
+};
 
 /** GET /api/getworktypes — work-type options. */
 export const workTypesQuery = () =>
@@ -486,6 +522,17 @@ export const shadesQuery = () =>
       fetchJSON<z.infer<typeof lookupContract.shades.response>>('/api/shades', {
         signal,
         schema: lookupContract.shades.response,
+      }),
+  });
+
+/** GET /api/timepoint-names — the common photo-session names (New / Edit Photo Session). */
+export const timepointNamesQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.timepointNames(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof lookupContract.timepointNames.response>>('/api/timepoint-names', {
+        signal,
+        schema: lookupContract.timepointNames.response,
       }),
   });
 
@@ -1222,10 +1269,15 @@ export const alignerDoctorsAdminQuery = () =>
       }),
   });
 
-/** GET /api/aligner/archform/patients — unmatched Archform patients. */
+/**
+ * GET /api/aligner/archform/patients — unmatched Archform patients. A 503 means the
+ * Archform file is not reachable from the server, which the matcher shows as its own
+ * panel: expected, so not a client-error report (see `isExpectedStatus`).
+ */
 export const archformPatientsQuery = () =>
   queryOptions({
     queryKey: qk.aligner.archformPatients(),
+    meta: { expectedStatuses: [503] },
     queryFn: ({ signal }) =>
       fetchJSON<z.infer<typeof alignerContract.archformPatients.response>>(
         '/api/aligner/archform/patients',

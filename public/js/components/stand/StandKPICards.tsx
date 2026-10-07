@@ -39,7 +39,7 @@ export default function StandKPICards({ kpis, loading }: StandKPICardsProps) {
         {/* Today's Sales Count */}
         <div className={`${styles.card} ${styles.purple}`}>
           <div className={styles.cardIcon}>
-            <i className="fas fa-shopping-cart" />
+            <i className="fas fa-shopping-cart" aria-hidden="true" />
           </div>
           <div className={styles.cardLabel}>Today's Sales</div>
           <div className={styles.cardValue}>{kpis.todaySalesCount}</div>
@@ -48,7 +48,7 @@ export default function StandKPICards({ kpis, loading }: StandKPICardsProps) {
         {/* Today's Revenue */}
         <div className={`${styles.card} ${styles.blue}`}>
           <div className={styles.cardIcon}>
-            <i className="fas fa-money-bill-wave" />
+            <i className="fas fa-money-bill-wave" aria-hidden="true" />
           </div>
           <div className={styles.cardLabel}>Today's Revenue</div>
           <div className={styles.cardValue}>
@@ -60,7 +60,7 @@ export default function StandKPICards({ kpis, loading }: StandKPICardsProps) {
         {/* Today's Profit */}
         <div className={`${styles.card} ${styles.green}`}>
           <div className={styles.cardIcon}>
-            <i className="fas fa-chart-line" />
+            <i className="fas fa-chart-line" aria-hidden="true" />
           </div>
           <div className={styles.cardLabel}>Today's Profit</div>
           <div className={styles.cardValue}>
@@ -72,7 +72,7 @@ export default function StandKPICards({ kpis, loading }: StandKPICardsProps) {
         {/* Low Stock */}
         <div className={`${styles.card} ${styles.orange}`}>
           <div className={styles.cardIcon}>
-            <i className="fas fa-exclamation-triangle" />
+            <i className="fas fa-exclamation-triangle" aria-hidden="true" />
           </div>
           <div className={styles.cardLabel}>Low Stock</div>
           <div className={styles.cardValue}>{kpis.lowStockCount}</div>
@@ -81,7 +81,7 @@ export default function StandKPICards({ kpis, loading }: StandKPICardsProps) {
         {/* Inventory Value */}
         <div className={`${styles.card} ${styles.teal}`}>
           <div className={styles.cardIcon}>
-            <i className="fas fa-warehouse" />
+            <i className="fas fa-warehouse" aria-hidden="true" />
           </div>
           <div className={styles.cardLabel}>Inventory Value</div>
           <div className={styles.cardValue}>

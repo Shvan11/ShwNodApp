@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
-import { fetchJSON, putJSON, httpErrorMessage } from '@/core/http';
+import { putJSON, httpErrorMessage } from '@/core/http';
 import { alertTypesQuery, employeesQuery } from '@/query/queries';
+import { usePatientLookup } from '@/hooks/usePatientLookup';
+import { uniquePatients } from '@/utils/patientSearch';
 import { createTask, invalidateTasks, type StaffOption, type TaskRow } from '@/services/tasks';
-import * as patientContract from '@shared/contracts/patient.contract';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import styles from './TaskFormModal.module.css';
@@ -37,8 +38,8 @@ const SEVERITIES = [
 /**
  * TaskFormModal — create or edit a header task (the push surface of `alerts`).
  * Create posts to /api/tasks; edit PUTs /api/alerts/:id. The optional patient link
- * (create only) is a small typeahead: a numeric query resolves a single patient by
- * id, text queries search by name.
+ * (create only) is the app's patient typeahead (`usePatientLookup`): a name, or —
+ * when the text starts with a digit — a patient id or phone number.
  */
 const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
     const { t } = useTranslation('tasks');
@@ -67,10 +68,13 @@ const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
             ? { id: editTask.assigned_to, name: editTask.assignee_name ?? `#${editTask.assigned_to}` }
             : null;
 
-    // Patient typeahead state (create mode only)
+    // Patient typeahead (create mode only). It asks nothing once a patient is picked.
     const [pickerQuery, setPickerQuery] = useState('');
-    const [pickerResults, setPickerResults] = useState<PatientPick[]>([]);
-    const searchAbortRef = useRef<AbortController | null>(null);
+    const lookup = usePatientLookup(pickerQuery, { by: 'auto', enabled: isOpen && !isEdit && !patient });
+    const pickerResults: PatientPick[] = uniquePatients(lookup.matches).map((m) => ({
+        person_id: m.id,
+        patient_name: m.name,
+    }));
 
     // Populate (edit) or reset (close) the form. Done during render (keyed on open +
     // edit-target identity) rather than in an effect, so the React Compiler can
@@ -92,7 +96,6 @@ const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
                     : null
             );
             setPickerQuery('');
-            setPickerResults([]);
         } else if (!isOpen) {
             setDetails('');
             setSeverity('2');
@@ -102,50 +105,8 @@ const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
             setSnoozedUntil('');
             setPatient(null);
             setPickerQuery('');
-            setPickerResults([]);
         }
     }
-
-    // When there's no active search (edit mode, empty query, or a patient already
-    // picked), the results must be empty. Cleared during render rather than in the
-    // search effect, so the effect's only job is the debounced fetch.
-    const searchInactive = isEdit || !pickerQuery.trim() || !!patient;
-    const [prevSearchInactive, setPrevSearchInactive] = useState(searchInactive);
-    if (searchInactive !== prevSearchInactive) {
-        setPrevSearchInactive(searchInactive);
-        if (searchInactive) setPickerResults([]);
-    }
-
-    // Debounced patient search: numeric → resolve by id, text → search by name.
-    useEffect(() => {
-        if (isEdit) return;
-        const q = pickerQuery.trim();
-        if (!q || patient) {
-            return;
-        }
-        const handle = setTimeout(() => {
-            searchAbortRef.current?.abort();
-            const controller = new AbortController();
-            searchAbortRef.current = controller;
-
-            if (/^\d+$/.test(q)) {
-                fetchJSON<{ person_id?: number; patient_name?: string }>(
-                    `/api/patients/${q}/info`,
-                    { signal: controller.signal, schema: patientContract.patientInfo.response }
-                )
-                    .then((p) => setPickerResults(p?.person_id ? [{ person_id: p.person_id, patient_name: p.patient_name ?? `#${p.person_id}` }] : []))
-                    .catch((e) => { if (e instanceof Error && e.name !== 'AbortError') setPickerResults([]); });
-            } else {
-                fetchJSON<{ patients: PatientPick[] }>(
-                    `/api/patients/search?patientName=${encodeURIComponent(q)}&limit=8`,
-                    { signal: controller.signal, schema: patientContract.patientSearch.response }
-                )
-                    .then((r) => setPickerResults(r.patients.slice(0, 8).map((p) => ({ person_id: p.person_id, patient_name: p.patient_name }))))
-                    .catch((e) => { if (e instanceof Error && e.name !== 'AbortError') setPickerResults([]); });
-            }
-        }, 250);
-        return () => clearTimeout(handle);
-    }, [pickerQuery, patient, isEdit]);
 
     const handleSave = async () => {
         if (!details.trim()) {
@@ -199,7 +160,7 @@ const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
             {(dismiss) => (<>
             <ModalHeader
                 titleId="task-modal-title"
-                icon={<i className="fas fa-bell" />}
+                icon={<i className="fas fa-bell" aria-hidden="true" />}
                 title={isEdit ? t('form.editTitle') : t('form.newTitle')}
                 onClose={dismiss}
             />
@@ -245,7 +206,7 @@ const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
                         <label htmlFor="task-patient">{t('form.linkPatient')} <span className={styles.optional}>{t('form.optional')}</span></label>
                         {patient ? (
                             <div className={styles.chip}>
-                                <i className="fas fa-user" />
+                                <i className="fas fa-user" aria-hidden="true" />
                                 <span>{patient.patient_name} <span className={styles.chipId}>#{patient.person_id}</span></span>
                                 <button type="button" className={styles.chipRemove} onClick={() => { setPatient(null); setPickerQuery(''); }} aria-label={t('form.removePatient')}>
                                     &times;
@@ -273,8 +234,8 @@ const TaskFormModal = ({ isOpen, onClose, editTask }: TaskFormModalProps) => {
                                                 tabIndex={0}
                                                 className={styles.pickerOption}
                                                 onMouseDown={(e) => e.preventDefault()}
-                                                onClick={() => { setPatient(p); setPickerResults([]); }}
-                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPatient(p); setPickerResults([]); } }}
+                                                onClick={() => setPatient(p)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPatient(p); } }}
                                             >
                                                 <span>{p.patient_name}</span>
                                                 <span className={styles.chipId}>#{p.person_id}</span>

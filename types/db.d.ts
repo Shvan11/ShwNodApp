@@ -750,6 +750,11 @@ export interface TimePointImages {
   updated_at: Timestamp | null;
 }
 
+export interface TimePointNames {
+  id: Generated<number>;
+  name: string;
+}
+
 export interface TimePoints {
   created_date: Generated<Timestamp>;
   dolphin_pat_id: string | null;
@@ -972,6 +977,7 @@ export interface DB {
   stand_stock_movements: StandStockMovements;
   tag_options: TagOptions;
   time_point_images: TimePointImages;
+  time_point_names: TimePointNames;
   time_points: TimePoints;
   times: Times;
   tooth_numbers: ToothNumbers;

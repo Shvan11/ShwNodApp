@@ -321,7 +321,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
       tabIndex={-1}
     >
       {/* Slide changes are announced (the visible counter hides with the chrome). */}
-      <div className={styles.srOnly} aria-live="polite">
+      <div className="sr-only" aria-live="polite">
         {`Slide ${safeIndex + 1} of ${slides.length}: ${slidePhotos(current)
           .map((p) => [p.label, p.tpDescription, p.tpDate].filter(Boolean).join(', '))
           .join(' and ')}`}
@@ -373,7 +373,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
               aria-label="Toggle framing"
               onClick={() => setFraming((f) => (f === 'fit' ? 'reel' : 'fit'))}
             >
-              <i className={cn('fas', framing === 'reel' ? 'fa-mobile-screen-button' : 'fa-expand')} />
+              <i className={cn('fas', framing === 'reel' ? 'fa-mobile-screen-button' : 'fa-expand')} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -382,7 +382,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
               aria-label="Toggle transition"
               onClick={() => setTransition((t) => (t === 'crossfade' ? 'slide' : 'crossfade'))}
             >
-              <i className={cn('fas', transition === 'crossfade' ? 'fa-circle-half-stroke' : 'fa-arrows-left-right')} />
+              <i className={cn('fas', transition === 'crossfade' ? 'fa-circle-half-stroke' : 'fa-arrows-left-right')} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -391,7 +391,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
               aria-label="Toggle caption"
               onClick={() => setShowCaption((c) => !c)}
             >
-              <i className="fas fa-closed-captioning" />
+              <i className="fas fa-closed-captioning" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -401,7 +401,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
               aria-pressed={annotate}
               onClick={() => setAnnotateMode(!annotate)}
             >
-              <i className="fas fa-pen" />
+              <i className="fas fa-pen" aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -410,7 +410,7 @@ const SlideshowPlayer = ({ slides, onExit }: Props) => {
               aria-label="Close presentation"
               onClick={handleExit}
             >
-              <i className="fas fa-times" />
+              <i className="fas fa-times" aria-hidden="true" />
             </button>
           </div>
         </div>

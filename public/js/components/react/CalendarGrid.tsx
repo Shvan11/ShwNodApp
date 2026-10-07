@@ -11,6 +11,7 @@ import type { Dispatch, DragEvent, KeyboardEvent, MouseEvent, Ref, SetStateActio
 import { to12Hour, formatTime12 } from '../../utils/formatters';
 import { parseLocalDate } from '../../utils/calendarDate';
 import { anchorFrom, type MenuAnchor } from '../../hooks/useFloatingMenu';
+import { useToday, useNowMinute } from '../../hooks/useClock';
 import type {
     CalendarDay,
     CalendarData,
@@ -85,13 +86,17 @@ const extractAppointments = (
 const validOnly = (appts: CalendarAppointment[]): CalendarAppointment[] =>
     appts.filter(a => a && (a.patientName || a.appointment_id));
 
-const isToday = (date: string): boolean => {
-    const today = new Date();
-    const checkDate = parseLocalDate(date);
-    return today.toDateString() === checkDate.toDateString();
-};
+// Both take the clock as an ARGUMENT (the component reads it through useClock).
+// They used to call `new Date()` themselves, from render: the React Compiler
+// caches a render block on its inputs, and the clock was not one, so a calendar
+// left open overnight kept yesterday's column as "today" and a slot stayed
+// "future" after its time had passed, until a week step or an appointment write
+// changed `days` (audit FE-F26-8, the week-grid twin of FE-F26-2).
+const isToday = (date: string, today: string): boolean => date.slice(0, 10) === today;
 
-const isPastSlot = (date: string, time: string): boolean => new Date(`${date}T${time}:00`) < new Date();
+/** `nowMinute` is floored to the minute, so a slot is past from its own minute on. */
+const isPastSlot = (date: string, time: string, nowMinute: number): boolean =>
+    new Date(`${date}T${time}:00`).getTime() <= nowMinute;
 
 const onActivate = (action: (e: KeyboardEvent<HTMLElement>) => void) => (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -118,6 +123,10 @@ const CalendarGrid = ({
     boardRef
 }: CalendarGridProps) => {
     const { days = [] } = calendarData || {};
+    // The clock as state: the "today" column moves at midnight and a slot turns
+    // past on its minute, with no data change needed (see isToday / isPastSlot).
+    const today = useToday();
+    const nowMinute = useNowMinute();
 
     // Close the "+N more" popover on outside click or Escape.
     useEffect(() => {
@@ -235,7 +244,7 @@ const CalendarGrid = ({
         span2: boolean
     ) => {
         const dragId = String(appt.appointment_id ?? '');
-        const isPast = isPastSlot(day.date, time);
+        const isPast = isPastSlot(day.date, time, nowMinute);
         const dt = appt.drID != null ? doctorColors.get(appt.drID) : undefined;
         return (
             <div
@@ -328,7 +337,7 @@ const CalendarGrid = ({
         appts: CalendarAppointment[]
     ) => {
         const hidden = appts.slice(3);
-        const isPast = isPastSlot(day.date, time);
+        const isPast = isPastSlot(day.date, time, nowMinute);
         return (
             // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- container stops mousedown from reaching the click-away dismiss
             <div className="cal-popover" onMouseDown={e => e.stopPropagation()}>
@@ -406,7 +415,7 @@ const CalendarGrid = ({
                     return (
                         <div
                             key={day.date}
-                            className={`cal-day-head ${isToday(day.date) ? 'today' : ''} ${
+                            className={`cal-day-head ${isToday(day.date, today) ? 'today' : ''} ${
                                 holiday ? 'holiday' : ''
                             }`}
                             role="button"
@@ -474,7 +483,7 @@ const CalendarGrid = ({
                     return (
                         <div
                             key={day.date}
-                            className={`cal-day-col ${isToday(day.date) ? 'today' : ''} ${
+                            className={`cal-day-col ${isToday(day.date, today) ? 'today' : ''} ${
                                 holiday ? 'holiday' : ''
                             }`}
                         >
@@ -493,7 +502,7 @@ const CalendarGrid = ({
                                 const appts = getSlotAppointments(day, time);
                                 // Nothing may land on a holiday or in the past; the
                                 // server refuses both too (FE-F10-8).
-                                const forbidden = holiday || isPastSlot(day.date, time);
+                                const forbidden = holiday || isPastSlot(day.date, time, nowMinute);
                                 const isDropTarget =
                                     !!dropTarget &&
                                     dropTarget.date === day.date &&

@@ -13,9 +13,13 @@
  *    doesn't immediately close it) + Escape. Escape is captured and
  *    `stopImmediatePropagation`'d so a menu opened over a shared <Modal> doesn't
  *    also trip that modal's document-level Escape-to-close handler.
+ *  - Keyboard: focus moves to the first item on open and back to the control the
+ *    menu was opened from on close; arrows, Home and End move between items. The
+ *    menu key (or Shift+F10) on a focused `<select>` therefore reaches "Edit values".
  */
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useMenuFocus, handleMenuKeyDown } from '@/hooks/useFloatingMenu';
 import styles from './LookupContextMenu.module.css';
 
 export interface LookupMenuItem {
@@ -75,8 +79,17 @@ const LookupContextMenu = ({ x, y, items, onClose }: LookupContextMenuProps) => 
     };
   }, [onClose]);
 
+  useMenuFocus(menuRef);
+
   return createPortal(
-    <div ref={menuRef} className={styles.menu} style={{ left: `${left}px`, top: `${top}px` }} role="menu">
+    <div
+      ref={menuRef}
+      className={styles.menu}
+      style={{ left: `${left}px`, top: `${top}px` }}
+      role="menu"
+      tabIndex={-1}
+      onKeyDown={(e) => handleMenuKeyDown(e, menuRef.current, onClose)}
+    >
       {items.map((item) => (
         <button
           key={item.key}

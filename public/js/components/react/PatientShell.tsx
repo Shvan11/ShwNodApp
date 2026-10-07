@@ -187,17 +187,17 @@ const PatientShell = () => {
             <div className={styles.mainContentArea}>
                 {/* Enhanced Breadcrumb */}
                 <div className={styles.breadcrumbContainer}>
-                    <nav className={styles.breadcrumb}>
+                    <nav className={styles.breadcrumb} aria-label="Breadcrumb">
                         {/* Patient Link - Disabled for new patients */}
                         {isNewPatient ? (
                             <span className={`${styles.breadcrumbItem} ${styles.breadcrumbItemActive}`}>
-                                <i className="fas fa-user"></i>
+                                <i className="fas fa-user" aria-hidden="true"></i>
                                 {' '}
                                 {patientName}
                             </span>
                         ) : (
                             <Link to={`/patient/${validatedPersonId || personId}/works`} className={`${styles.breadcrumbItem} ${styles.breadcrumbLink}`}>
-                                <i className="fas fa-user"></i>
+                                <i className="fas fa-user" aria-hidden="true"></i>
                                 {' '}
                                 {patientName}
                             </Link>
@@ -208,7 +208,7 @@ const PatientShell = () => {
                             <>
                                 <span className={styles.breadcrumbSeparator}>/</span>
                                 <Link to={`/patient/${validatedPersonId || personId}/works`} className={`${styles.breadcrumbItem} ${styles.breadcrumbLink}`}>
-                                    <i className="fas fa-briefcase-medical"></i> {workTypeName}
+                                    <i className="fas fa-briefcase-medical" aria-hidden="true"></i> {workTypeName}
                                 </Link>
                             </>
                         )}
@@ -218,7 +218,7 @@ const PatientShell = () => {
                             <>
                                 <span className={styles.breadcrumbSeparator}>/</span>
                                 <span className={`${styles.breadcrumbItem} ${styles.breadcrumbItemActive}`}>
-                                    <i className={`fas fa-${effectivePage === 'visits' ? 'calendar-check' : effectivePage === 'appointments' ? 'calendar-alt' : effectivePage === 'xrays' ? 'x-ray' : effectivePage === 'patient-info' ? 'id-card' : effectivePage === 'diagnosis' ? 'stethoscope' : 'file'}`}></i>
+                                    <i className={`fas fa-${effectivePage === 'visits' ? 'calendar-check' : effectivePage === 'appointments' ? 'calendar-alt' : effectivePage === 'xrays' ? 'x-ray' : effectivePage === 'patient-info' ? 'id-card' : effectivePage === 'diagnosis' ? 'stethoscope' : 'file'}`} aria-hidden="true"></i>
                                     {' '}
                                     {effectivePage.charAt(0).toUpperCase() + effectivePage.slice(1).replace(/-/g, ' ')}
                                 </span>

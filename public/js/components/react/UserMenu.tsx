@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { postJSON, httpErrorMessage } from '@/core/http';
+import { useMenuFocus, handleMenuKeyDown } from '@/hooks/useFloatingMenu';
 import styles from './UserMenu.module.css';
 
 interface UserMenuProps {
@@ -20,7 +21,9 @@ const MENU_WIDTH = 220;
  * popover with Change password + Log out. Mirrors TasksBell's mechanics: the
  * popover is portaled to <body> (the fixed, overflow:hidden universal-header
  * would otherwise clip an in-flow dropdown) and anchored to the trigger via
- * viewport-fixed coords, with outside-click + Escape to close.
+ * viewport-fixed coords, with outside-click + Escape to close. Being portaled, its
+ * items sit at the END of the tab order, so focus is moved into the menu on open
+ * and handed back to the pill on close (`useMenuFocus`); arrows move between items.
  */
 const UserMenu = ({ user }: UserMenuProps) => {
     const navigate = useNavigate();
@@ -66,6 +69,8 @@ const UserMenu = ({ user }: UserMenuProps) => {
         if (!open) placeMenu();
         setOpen((o) => !o);
     };
+
+    useMenuFocus(popRef, open && coords !== null);
 
     const goChangePassword = () => {
         setOpen(false);
@@ -117,7 +122,9 @@ const UserMenu = ({ user }: UserMenuProps) => {
                     role="menu"
                     aria-label={menuLabel}
                     ref={popRef}
+                    tabIndex={-1}
                     style={{ position: 'fixed', top: coords.top, left: coords.left }}
+                    onKeyDown={(e) => handleMenuKeyDown(e, popRef.current, () => setOpen(false))}
                 >
                     <div className={styles.identity}>
                         <span className={styles.identityName}>{displayName}</span>

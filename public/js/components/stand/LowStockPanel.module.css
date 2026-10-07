@@ -27,7 +27,7 @@
 }
 
 .title i {
-  color: var(--warning-500);
+  color: var(--warning-700);
 }
 
 .count {
@@ -95,7 +95,7 @@
 
 .currentStock {
   font-weight: var(--font-weight-bold);
-  color: var(--error-600);
+  color: var(--error-700);
 }
 
 .separator {
@@ -113,7 +113,7 @@
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--primary-color);
+  color: var(--blue-700);
   background: var(--blue-50);
   border: 1px solid var(--blue-300);
   border-radius: var(--radius-md);
@@ -123,9 +123,9 @@
 }
 
 .restockBtn:hover {
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
-  border-color: var(--primary-color);
+  border-color: var(--primary-fill);
 }
 
 /* Empty state */

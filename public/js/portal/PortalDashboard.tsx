@@ -5,6 +5,7 @@ import VisitsTab from './tabs/VisitsTab';
 import AppointmentTab from './tabs/AppointmentTab';
 import PaymentsTab from './tabs/PaymentsTab';
 import styles from './portal.module.css';
+import PortalIcon, { type PortalIconName } from './PortalIcon';
 
 interface Props {
   patient: PortalPatient;
@@ -16,14 +17,14 @@ type TabKey = 'appointment' | 'photos' | 'visits' | 'payments';
 interface TabDef {
   key: TabKey;
   label: string;
-  icon: string;
+  icon: PortalIconName;
 }
 
 const TABS: TabDef[] = [
-  { key: 'appointment', label: 'Next Visit', icon: 'fa-calendar-day' },
-  { key: 'photos', label: 'Photos', icon: 'fa-images' },
-  { key: 'visits', label: 'Visits', icon: 'fa-notes-medical' },
-  { key: 'payments', label: 'Payments', icon: 'fa-receipt' },
+  { key: 'appointment', label: 'Next Visit', icon: 'calendar-day' },
+  { key: 'photos', label: 'Photos', icon: 'images' },
+  { key: 'visits', label: 'Visits', icon: 'notes-medical' },
+  { key: 'payments', label: 'Payments', icon: 'receipt' },
 ];
 
 const PortalDashboard = ({ patient, onLogout }: Props) => {
@@ -35,14 +36,14 @@ const PortalDashboard = ({ patient, onLogout }: Props) => {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <div className={styles.headerTitle}>
-            <i className="fas fa-tooth" aria-hidden="true" />
+            <PortalIcon name="tooth" />
             <div>
               <div className={styles.headerHello}>Welcome</div>
               <div className={styles.headerName}>{displayName}</div>
             </div>
           </div>
           <button type="button" className={styles.logoutButton} onClick={onLogout}>
-            <i className="fas fa-sign-out-alt" aria-hidden="true" />
+            <PortalIcon name="sign-out" />
             <span>Sign out</span>
           </button>
         </div>
@@ -66,7 +67,7 @@ const PortalDashboard = ({ patient, onLogout }: Props) => {
               onClick={() => setTab(t.key)}
               aria-pressed={active}
             >
-              <i className={`fas ${t.icon}`} aria-hidden="true" />
+              <PortalIcon name={t.icon} />
               <span>{t.label}</span>
             </button>
           );

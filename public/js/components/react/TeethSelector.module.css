@@ -152,7 +152,7 @@
 .deciduousLabel {
     text-align: center;
     font-weight: var(--font-weight-semibold);
-    color: var(--warning-600);
+    color: var(--warning-700);
     margin-bottom: var(--spacing-sm);
     font-size: var(--font-size-sm);
 }
@@ -198,13 +198,13 @@
 /* Selected deciduous tooth */
 .deciduousBtnSelected {
     border-color: var(--warning-600);
-    background: var(--warning-500);
+    background: var(--warning-fill);
     color: var(--color-white);
     box-shadow: 0 0 0 2px var(--warning-200);
 }
 
 .deciduousBtnSelected:hover {
-    background: var(--warning-600);
+    background: var(--warning-fill);
 }
 
 /* ===== SELECTED DISPLAY ===== */
@@ -232,7 +232,7 @@
     border: 1px solid var(--error-300);
     border-radius: var(--radius-sm);
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     font-size: var(--font-size-xs);
     cursor: pointer;
     transition: all 0.15s ease;

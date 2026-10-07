@@ -226,7 +226,7 @@
 }
 
 :global(.gjs-three-bg) {
-    background-color: var(--primary-color);
+    background-color: var(--primary-fill);
     color: var(--color-white);
 }
 

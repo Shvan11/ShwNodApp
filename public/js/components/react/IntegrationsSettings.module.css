@@ -48,13 +48,13 @@
 }
 
 .primaryBtn {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--primary-fill);
+  border-color: var(--primary-fill);
   color: var(--color-white);
 }
 
 .primaryBtn:hover {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
 }
 
 .dangerBtn {
@@ -63,7 +63,7 @@
 }
 
 .dangerBtn:hover {
-  background: var(--danger-color);
+  background: var(--error-fill);
   color: var(--color-white);
 }
 
@@ -202,7 +202,7 @@
 }
 
 .warnText {
-  color: var(--amber-600);
+  color: var(--warning-700);
 }
 
 /* ── Actions / login flow ── */

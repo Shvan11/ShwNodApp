@@ -20,7 +20,9 @@
   right: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  /* 6%, not 10%: axe cannot see a pseudo-element's sheen, and at 10% the card's
+     white labels sat at 4.5:1 exactly where it is strongest. */
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -105,7 +107,10 @@
   gap: 8px;
 }
 
-.filterGroup label {
+/* The span is the heading of the one group whose control is a checkbox row; without
+   it here the heading kept the page's dark text on the purple card. */
+.filterGroup label,
+.filterGroup > span {
   color: var(--color-white);
   font-size: 13px;
   font-weight: var(--font-weight-medium);
@@ -222,7 +227,7 @@
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
   white-space: nowrap;
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
+  background: linear-gradient(135deg, var(--success-fill) 0%, var(--palette-green-700) 100%);
   color: var(--color-white);
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
@@ -262,7 +267,8 @@
 }
 
 @media (max-width: 480px) {
-  .filterGroup label {
+  .filterGroup label,
+  .filterGroup > span {
     font-size: var(--font-size-xs);
   }
 

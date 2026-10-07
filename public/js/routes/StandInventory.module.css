@@ -24,6 +24,7 @@
 
 .headerActions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
 
@@ -40,7 +41,7 @@
 
 .errorBanner p {
   margin: 0;
-  color: var(--error-600);
+  color: var(--error-700);
   font-weight: var(--font-weight-medium);
 }
 

@@ -215,7 +215,7 @@ const ArchformMatcher: React.FC = () => {
         >
             <span>{label}</span>
             <span className={styles.sortIcon} aria-hidden="true">
-                <i className={`fas ${sortColumn !== column ? 'fa-sort' : sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`}></i>
+                <i className={`fas ${sortColumn !== column ? 'fa-sort' : sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down'}`} aria-hidden="true"></i>
             </span>
         </th>
     );

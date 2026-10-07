@@ -41,15 +41,15 @@
 }
 
 .admin {
-    background: var(--success-color);
+    background: var(--success-fill);
 }
 
 .frontDesk {
-    background: var(--info-color);
+    background: var(--info-fill);
 }
 
 .clinical {
-    background: var(--warning-color);
+    background: var(--warning-fill);
 }
 
 /* ===================================
@@ -112,23 +112,23 @@
 }
 
 .primary {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 
 .primary:hover:not(:disabled) {
-    background: var(--blue-700);
+    background: var(--palette-blue-700);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
 .danger {
-    background: var(--error-color);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
 .danger:hover:not(:disabled) {
-    background: var(--error-600);
+    background: var(--error-fill);
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -218,7 +218,7 @@
 
 .error {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     border: 1px solid var(--error-200);
 }
 

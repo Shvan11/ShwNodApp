@@ -39,7 +39,8 @@ function movementType(type: string): { label: string; className: string } {
 
 function MovementsTable({ movements }: { movements: StandStockMovement[] }) {
   return (
-    <div className={styles.tableWrapper}>
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls must be focusable, or a keyboard user cannot read a long history inside the dialog
+    <div className={styles.tableWrapper} tabIndex={0} role="region" aria-label="Stock movements">
       <table className={styles.movementsTable}>
         <thead>
           <tr>

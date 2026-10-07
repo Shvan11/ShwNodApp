@@ -24,6 +24,7 @@ import {
   generateNoWorkReceiptHTML
 } from '../../services/templates/receipt-service.js';
 import {
+  removeTemplateFile,
   resolveTemplateFile,
   templateFilePathFor,
   templatesDir,
@@ -242,9 +243,20 @@ router.delete(
   validate({ params: templateContract.templateIdParams }),
   async (req: Request<templateContract.TemplateIdParams>, res: Response): Promise<void> => {
     try {
-      const { templateId } = req.params;
+      const id = parseInt(req.params.templateId, 10);
 
-      await templateQueries.deleteTemplate(parseInt(templateId, 10));
+      // The row first, then its design file. A file that cannot be removed is
+      // logged, not an error: the template is gone either way.
+      const orphanedFile = await templateQueries.deleteTemplate(id);
+      if (orphanedFile) {
+        await removeTemplateFile(id, orphanedFile).catch((fileErr: Error) => {
+          log.warn('Deleted template, but its file could not be removed', {
+            templateId: id,
+            file: orphanedFile,
+            error: fileErr.message,
+          });
+        });
+      }
 
       sendSuccess(res, null, 'Template deleted successfully');
     } catch (error) {

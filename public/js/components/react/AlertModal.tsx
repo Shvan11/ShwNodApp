@@ -211,7 +211,7 @@ const AlertModal = ({ isOpen, onClose, onSave, personId, alertTypes, editAlert }
                 <ModalHeader
                     variant="warning"
                     titleId="alert-modal-title"
-                    icon={<i className="fas fa-exclamation-triangle" />}
+                    icon={<i className="fas fa-exclamation-triangle" aria-hidden="true" />}
                     title={isEditMode ? t('alert.editTitle') : t('alert.addTitle')}
                     onClose={handleCancel}
                     closeLabel={t('alert.close')}

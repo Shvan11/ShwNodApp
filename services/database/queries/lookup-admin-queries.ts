@@ -91,6 +91,11 @@ interface LookupTableConfig {
   icon: string;
   idType: 'int' | 'uniqueidentifier';
   columns: ColumnConfig[];
+  /**
+   * Column the editor lists by; defaults to `displayColumn` (alphabetical). Set where the
+   * consuming dropdown has its own order, so the editor shows the list as the dropdown does.
+   */
+  orderColumn?: string;
   protectedRows?: ProtectedRows;
   softReferences?: readonly SoftReference[];
 }
@@ -162,6 +167,21 @@ const LOOKUP_TABLE_CONFIG: Record<string, LookupTableConfig> = {
     columns: [
       { name: 'shade', label: 'Shade', type: 'varchar', maxLength: 20, required: true },
     ],
+  },
+  // Suggestions for a photo session's name (New / Edit Photo Session). A session stores the
+  // name as TEXT, so renaming or deleting a row here never touches an existing session.
+  tblTimePointNames: {
+    tableName: 'time_point_names',
+    idColumn: 'id',
+    displayColumn: 'name',
+    displayName: 'Photo Session Names',
+    icon: 'fas fa-camera',
+    idType: 'int',
+    columns: [
+      { name: 'name', label: 'Name', type: 'varchar', maxLength: 50, required: true },
+    ],
+    // The Name select lists by id — the order the names were added (timepoint-queries.ts).
+    orderColumn: 'id',
   },
   tblLabs: {
     tableName: 'labs',
@@ -460,7 +480,7 @@ export async function getLookupItems(tableKey: string): Promise<LookupItem[]> {
     SELECT ${sql.join(selectParts, sql`, `)}
     FROM ${sql.id(pgTableName(config.tableName))} AS ${baseAlias}
     ${joinClause}
-    ORDER BY ${baseAlias}.${sql.id(config.displayColumn)}
+    ORDER BY ${baseAlias}.${sql.id(config.orderColumn ?? config.displayColumn)}
   `;
 
   const result = await query.execute(db);

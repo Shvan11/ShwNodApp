@@ -240,7 +240,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
         <div className={styles.container}>
             <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
-                    <i className="fas fa-database"></i>
+                    <i className="fas fa-database" aria-hidden="true"></i>
                     Database Configuration
                 </h3>
                 <p className={styles.sectionDescription}>
@@ -250,7 +250,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                 {restart && (
                     <div className={`${styles.connectionStatus} ${restart === 'waiting' ? styles.success : styles.error}`} role="status">
                         <div className={styles.statusHeader}>
-                            <i className={restart === 'waiting' ? 'fas fa-spinner fa-spin' : 'fas fa-exclamation-circle'}></i>
+                            <i className={restart === 'waiting' ? 'fas fa-spinner fa-spin' : 'fas fa-exclamation-circle'} aria-hidden="true"></i>
                             <span>
                                 {restart === 'waiting'
                                     ? 'Restarting the application… this page reloads as soon as it is back.'
@@ -268,13 +268,13 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
                 {isLoading ? (
                     <div className={styles.loadingSpinner}>
-                        <i className="fas fa-spinner fa-spin"></i>
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                         <span>Loading database configuration...</span>
                     </div>
                 ) : isError ? (
                     <div className={`${styles.connectionStatus} ${styles.error}`}>
                         <div className={styles.statusHeader}>
-                            <i className="fas fa-exclamation-circle"></i>
+                            <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                             <span>{httpErrorMessage(loadError, 'Failed to load the database configuration')}</span>
                         </div>
                     </div>
@@ -282,7 +282,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                     <>
                         {/* Connection Information */}
                         <div className={styles.configGroup}>
-                            <h4><i className="fas fa-server"></i> Connection Information</h4>
+                            <h4><i className="fas fa-server" aria-hidden="true"></i> Connection Information</h4>
 
                             <div className={styles.settingGroup}>
                                 <label htmlFor="pg_host">Host</label>
@@ -326,7 +326,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
                         {/* Authentication */}
                         <div className={styles.configGroup}>
-                            <h4><i className="fas fa-key"></i> Authentication</h4>
+                            <h4><i className="fas fa-key" aria-hidden="true"></i> Authentication</h4>
 
                             <div className={styles.settingGroup}>
                                 <label htmlFor="pg_user">Username</label>
@@ -362,7 +362,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                             setShowPassword(prevState => !prevState);
                                         }}
                                     >
-                                        <i className={showPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
+                                        <i className={showPassword ? "fas fa-eye-slash" : "fas fa-eye"} aria-hidden="true"></i>
                                     </button>
                                 </div>
                                 <div className={styles.settingDescription}>
@@ -375,7 +375,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
                         {/* Connection Test */}
                         <div className={styles.configGroup}>
-                            <h4><i className="fas fa-plug"></i> Connection Test</h4>
+                            <h4><i className="fas fa-plug" aria-hidden="true"></i> Connection Test</h4>
 
                             <div className={styles.connectionTest}>
                                 <button
@@ -385,12 +385,12 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                 >
                                     {isTestingConnection ? (
                                         <>
-                                            <i className="fas fa-spinner fa-spin"></i>
+                                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                             Testing Connection...
                                         </>
                                     ) : (
                                         <>
-                                            <i className="fas fa-plug"></i>
+                                            <i className="fas fa-plug" aria-hidden="true"></i>
                                             Test Connection
                                         </>
                                     )}
@@ -399,7 +399,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                                 {connectionStatus && (
                                     <div className={`${styles.connectionStatus} ${connectionStatus.success ? styles.success : styles.error}`} role="status">
                                         <div className={styles.statusHeader}>
-                                            <i className={connectionStatus.success ? "fas fa-check-circle" : "fas fa-exclamation-circle"}></i>
+                                            <i className={connectionStatus.success ? "fas fa-check-circle" : "fas fa-exclamation-circle"} aria-hidden="true"></i>
                                             <span>{connectionStatus.message}</span>
                                         </div>
                                         <div className={styles.statusDetails}>{connectionStatus.details}</div>
@@ -417,7 +417,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                     onClick={saveConfiguration}
                     disabled={!hasChanges || isSaving || restart === 'waiting'}
                 >
-                    <i className="fas fa-save"></i>
+                    <i className="fas fa-save" aria-hidden="true"></i>
                     {hasChanges
                         ? `Save Configuration (${Object.keys(pendingChanges).length} changes)`
                         : 'Save Configuration'
@@ -428,7 +428,7 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                     className={`${styles.btn} ${styles.btnWarning}`}
                     onClick={exportConfiguration}
                 >
-                    <i className="fas fa-download"></i>
+                    <i className="fas fa-download" aria-hidden="true"></i>
                     Export Config
                 </button>
 
@@ -444,14 +444,14 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
                     }}
                     title="Restart application to apply configuration changes"
                 >
-                    <i className="fas fa-sync-alt"></i>
+                    <i className="fas fa-sync-alt" aria-hidden="true"></i>
                     Restart App
                 </button>
             </div>
 
             {hasChanges && (
                 <div className={styles.restartWarning}>
-                    <i className="fas fa-exclamation-triangle"></i>
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <span>Application restart required after saving database configuration changes.</span>
                 </div>
             )}

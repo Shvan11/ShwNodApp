@@ -104,7 +104,8 @@ function lockBodyScroll(): void {
         if (scrollbarWidth > 0) {
             document.body.style.paddingRight = `${scrollbarWidth}px`;
         }
-        document.getElementById('app-root')?.setAttribute('aria-hidden', 'true');
+        // The React mount: everything but the portal targets on <body> (#modal-root,
+        // and the toast live region, which must keep announcing while a dialog is open).
         document.getElementById('single-spa-application')?.setAttribute('aria-hidden', 'true');
     }
 }
@@ -116,7 +117,6 @@ function unlockBodyScroll(): void {
         document.body.style.paddingRight = savedBodyPaddingRight ?? '';
         savedBodyOverflow = null;
         savedBodyPaddingRight = null;
-        document.getElementById('app-root')?.removeAttribute('aria-hidden');
         document.getElementById('single-spa-application')?.removeAttribute('aria-hidden');
     }
 }

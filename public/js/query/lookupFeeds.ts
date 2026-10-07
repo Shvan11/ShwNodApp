@@ -15,6 +15,7 @@ const FEEDS: Readonly<Record<string, readonly QueryKey[]>> = {
   tblKeyWord: [qk.lookups.workKeywords()],
   tblShadeVitaClassic: [qk.lookups.shades()],
   tblShade3dMaster: [qk.lookups.shades()],
+  tblTimePointNames: [qk.lookups.timepointNames()],
   tblLabs: [qk.lookups.labs()],
   tblDetail: [qk.lookups.appointmentDetails()],
   tblTagOptions: [qk.lookups.tagOptions()],

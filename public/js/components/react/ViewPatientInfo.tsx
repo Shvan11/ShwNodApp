@@ -273,7 +273,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
     if (loading) {
         return (
             <div className={styles.patientInfoLoading}>
-                <i className={`fas fa-spinner fa-spin ${styles.patientLoadingSpinner}`}></i>
+                <i className={`fas fa-spinner fa-spin ${styles.patientLoadingSpinner}`} aria-hidden="true"></i>
                 <p>{t('view.loading')}</p>
             </div>
         );
@@ -282,7 +282,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
     if (error && !patientInfo) {
         return (
             <div className={styles.patientInfoError}>
-                <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`}></i>
+                <i className={`fas fa-exclamation-triangle ${styles.patientErrorIcon}`} aria-hidden="true"></i>
                 <p>{error}</p>
                 <button onClick={() => refetchPatientInfo()}>{t('view.retry')}</button>
             </div>
@@ -292,7 +292,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
     if (!patientInfo) {
         return (
             <div className={styles.patientInfoEmpty}>
-                <i className={`fas fa-user ${styles.patientEmptyIcon}`}></i>
+                <i className={`fas fa-user ${styles.patientEmptyIcon}`} aria-hidden="true"></i>
                 <p>{t('view.empty')}</p>
             </div>
         );
@@ -303,7 +303,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             {/* Header Section */}
             <div className={styles.patientInfoHeader}>
                 <div className={styles.patientAvatar}>
-                    <i className={`fas fa-user-circle ${styles.patientAvatarIcon}`}></i>
+                    <i className={`fas fa-user-circle ${styles.patientAvatarIcon}`} aria-hidden="true"></i>
                 </div>
                 <div className={styles.patientHeaderDetails}>
                     <h2 className={styles.patientPrimaryName}>{patientInfo.patient_name}</h2>
@@ -325,7 +325,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                             className="btn btn-primary"
                             disabled={!validPersonId}
                         >
-                            <i className={`fas fa-edit ${styles.piIconGap}`}></i>
+                            <i className={`fas fa-edit ${styles.piIconGap}`} aria-hidden="true"></i>
                             {t('view.editPatient')}
                         </button>
                     )}
@@ -333,7 +333,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         onClick={() => setShowPhotoSessionDialog(true)}
                         className="btn btn-secondary"
                     >
-                        <i className={`fas fa-camera ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-camera ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.addPhotos')}
                     </button>
                     <button
@@ -341,7 +341,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         className="btn btn-secondary"
                         disabled={!validPersonId}
                     >
-                        <i className={`fas fa-brain ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-brain ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.webceph')}
                     </button>
                 </div>
@@ -351,7 +351,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
             <div className={styles.patientAlertsSection}>
                 <div className={styles.patientAlertHeader}>
                     <h3 className={styles.patientSectionTitle}>
-                        <i className={`fas fa-exclamation-triangle ${styles.alertIcon} ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-exclamation-triangle ${styles.alertIcon} ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.alerts.title')}
                     </h3>
                     <button
@@ -362,13 +362,13 @@ const ViewPatientInfo = ({ personId }: Props) => {
                         className="btn btn-warning btn-sm"
                         disabled={!validPersonId}
                     >
-                        <i className={`fas fa-plus ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-plus ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.alerts.add')}
                     </button>
                 </div>
                 {alertsLoading ? (
                     <div className={styles.patientAlertsLoading}>
-                        <i className="fas fa-spinner fa-spin"></i>
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                         {t('view.alerts.loading')}
                     </div>
                 ) : alerts.length > 0 ? (
@@ -403,9 +403,9 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                         aria-label={t('view.alerts.archiveTitle')}
                                     >
                                         {deletingAlertId === alert.alert_id ? (
-                                            <i className="fas fa-spinner fa-spin"></i>
+                                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                         ) : (
-                                            <i className="fas fa-times"></i>
+                                            <i className="fas fa-times" aria-hidden="true"></i>
                                         )}
                                     </button>
                                 </div>
@@ -424,7 +424,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 {/* Contact Information */}
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
-                        <i className={`fas fa-address-book ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-address-book ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.cards.contact')}
                     </h3>
                     <div className={styles.patientInfoRows}>
@@ -456,7 +456,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 {/* Personal Information */}
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
-                        <i className={`fas fa-user ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-user ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.cards.personal')}
                     </h3>
                     <div className={styles.patientInfoRows}>
@@ -490,7 +490,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 {/* Additional Information */}
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
-                        <i className={`fas fa-info-circle ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-info-circle ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.cards.additional')}
                     </h3>
                     <div className={styles.patientInfoRows}>
@@ -526,7 +526,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 {/* Cost Information */}
                 <div className={styles.patientInfoCard}>
                     <h3 className={styles.patientCardTitle}>
-                        <i className={`fas fa-dollar-sign ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-dollar-sign ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.cards.estimatedCost')}
                     </h3>
                     <div className={styles.patientInfoRows}>
@@ -559,7 +559,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                 {/* Cost Presets */}
                                 {presetsLoading ? (
                                     <div className={styles.patientCostPresetsLoading}>
-                                        <i className="fas fa-spinner fa-spin"></i>
+                                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                     </div>
                                 ) : getFilteredPresets().length > 0 && (
                                     <div className={styles.patientCostPresets}>
@@ -614,7 +614,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                                             className={styles.patientCostEditBtn}
                                             title={t('view.editCostTitle')}
                                         >
-                                            <i className="fas fa-pencil-alt"></i>
+                                            <i className="fas fa-pencil-alt" aria-hidden="true"></i>
                                         </button>
                                     )}
                                 </span>
@@ -626,7 +626,7 @@ const ViewPatientInfo = ({ personId }: Props) => {
                 {/* Notes */}
                 <div className={`${styles.patientInfoCard} ${styles.patientNotesCard}`}>
                     <h3 className={styles.patientCardTitle}>
-                        <i className={`fas fa-sticky-note ${styles.piIconGap}`}></i>
+                        <i className={`fas fa-sticky-note ${styles.piIconGap}`} aria-hidden="true"></i>
                         {t('view.cards.notes')}
                     </h3>
                     <div className={styles.patientNotesContent}>

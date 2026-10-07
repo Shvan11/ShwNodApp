@@ -115,10 +115,17 @@ export type ResendAppointmentResponse = z.infer<typeof resendAppointment.respons
 // putJSON with `{ schema }`), so the response IS modeled here — a fully closed
 // shape, so plain `z.object` (no long-tail fields to preserve).
 export const groupSettings = {
-  body: z.object({
-    enabled: z.boolean(),
-    groupName: z.string().trim().min(1, 'Group name is required').max(100),
-  }),
+  // A name is required only to turn the post ON. A new install has none yet, and
+  // saving "off" with the box still empty must not be refused.
+  body: z
+    .object({
+      enabled: z.boolean(),
+      groupName: z.string().trim().max(100),
+    })
+    .refine((b) => !b.enabled || b.groupName.length > 0, {
+      path: ['groupName'],
+      message: 'Group name is required',
+    }),
   response: z.object({
     enabled: z.boolean(),
     groupName: z.string(),

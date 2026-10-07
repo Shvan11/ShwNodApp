@@ -18,6 +18,7 @@ import { deletePatientCascade } from '../business/PatientService.js';
 import { updateExpense, deleteExpense } from '../database/queries/expense-queries.js';
 import { deleteInvoiceById } from '../database/queries/payment-queries.js';
 import type { ApprovalActionType } from '../../shared/contracts/approvals.contract.js';
+import { approvalSummary } from '../../shared/approval-text.js';
 
 // ---------------------------------------------------------------------------
 // Action definition interface
@@ -46,7 +47,11 @@ export interface ApprovalActionDef {
    * (version / stale check is skipped at approve time).
    */
   getVersion: (targetId: number) => Promise<string | null>;
-  /** One-line human summary shown in the approval bell. */
+  /**
+   * One-line summary stored on the request (English: the audit record). Built from
+   * `shared/approval-text.ts`, where the client recognises it and prints its own
+   * language's wording.
+   */
   summarize: (payload: Record<string, unknown>) => string;
   /**
    * Re-execute the write as admin. Called only when the row still exists and
@@ -119,7 +124,7 @@ const workUpdateAction: ApprovalActionDef = {
   getTargetId: (p) => Number(p.workId),
   resolvePersonId: (id) => personIdFromWork(id),
   getVersion: (id) => getUpdatedAt('works', 'work_id', id),
-  summarize: (p) => `Edit work #${p.workId}`,
+  summarize: (p) => approvalSummary('workUpdate', Number(p.workId)),
   apply: async (p) => {
     const { workId, ...workData } = p;
     await validateAndUpdateWork({ workId: Number(workId), userRole: 'admin', workData });
@@ -132,15 +137,15 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
   // can't drift apart the way two copy-pasted blocks would.
   'work.update': {
     ...workUpdateAction,
-    summarize: (p) => `Edit work #${p.workId}`,
   },
 
   'work.discount': {
     ...workUpdateAction,
     summarize: (p) =>
-      p.discount != null && Number(p.discount) > 0
-        ? `Apply discount on work #${p.workId}`
-        : `Remove discount on work #${p.workId}`,
+      approvalSummary(
+        p.discount != null && Number(p.discount) > 0 ? 'discountApply' : 'discountRemove',
+        Number(p.workId)
+      ),
   },
 
   'work.delete': {
@@ -149,7 +154,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     getTargetId: (p) => Number(p.workId),
     resolvePersonId: (id) => personIdFromWork(id),
     getVersion: (id) => getUpdatedAt('works', 'work_id', id),
-    summarize: (p) => `Delete work #${p.workId}`,
+    summarize: (p) => approvalSummary('workDelete', Number(p.workId)),
     apply: async (p) => {
       await validateAndDeleteWork(Number(p.workId));
     },
@@ -162,7 +167,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     resolvePersonId: (id) => personIdFromInvoice(id),
     // invoices has no updated_at — skip stale-detection
     getVersion: async () => null,
-    summarize: (p) => `Delete invoice #${p.invoiceId}`,
+    summarize: (p) => approvalSummary('invoiceDelete', Number(p.invoiceId)),
     apply: async (p) => {
       await deleteInvoiceById(Number(p.invoiceId));
     },
@@ -174,7 +179,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     getTargetId: (p) => Number(p.id),
     // expenses aren't patient-linked — no person_id (no resolvePersonId).
     getVersion: (id) => getUpdatedAt('expenses', 'id', id),
-    summarize: (p) => `Edit expense #${p.id}`,
+    summarize: (p) => approvalSummary('expenseUpdate', Number(p.id)),
     // updateExpense is a FULL-ROW replace (every unset field is written as
     // null/false), so every field the route accepts must be forwarded here.
     // `isMonthly` was missing: approving a held edit silently cleared the
@@ -200,7 +205,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     getTargetId: (p) => Number(p.id),
     // expenses aren't patient-linked — no person_id (no resolvePersonId).
     getVersion: (id) => getUpdatedAt('expenses', 'id', id),
-    summarize: (p) => `Delete expense #${p.id}`,
+    summarize: (p) => approvalSummary('expenseDelete', Number(p.id)),
     apply: async (p) => {
       await deleteExpense(Number(p.id));
     },
@@ -212,7 +217,7 @@ export const APPROVAL_ACTIONS: Record<ApprovalActionType, ApprovalActionDef> = {
     getTargetId: (p) => Number(p.personId),
     resolvePersonId: async (id) => id,
     getVersion: (id) => getUpdatedAt('patients', 'person_id', id),
-    summarize: (p) => `Delete patient #${p.personId}`,
+    summarize: (p) => approvalSummary('patientDelete', Number(p.personId)),
     apply: async (p) => {
       await deletePatientCascade(Number(p.personId));
     },

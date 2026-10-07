@@ -37,7 +37,7 @@ const FolderPickerModal = ({ personId, onAdd, onClose }: Props) => {
       <ModalHeader
         title="Add from patient folder"
         titleId="slideshow-folder-title"
-        icon={<i className="fas fa-folder-open" />}
+        icon={<i className="fas fa-folder-open" aria-hidden="true" />}
         subtitle="Click an image to add it. Add as many as you like, then close."
         onClose={onClose}
       />

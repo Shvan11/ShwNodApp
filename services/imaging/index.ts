@@ -22,7 +22,7 @@ export type ImageDimension = {
   /**
    * File modification time (ms, integer) — a content-version token the gallery
    * appends to the image URL as `?v=`. An edited slot is re-rendered to the SAME
-   * `working/{pid}0{tp}.iNN` filename, so without a changing URL the browser keeps
+   * `working/{pid}{tp:02}.iNN` filename, so without a changing URL the browser keeps
    * showing the stale cached image; mtime changes only when the file actually
    * changes, so unchanged slots stay cached (no needless refetch).
    */

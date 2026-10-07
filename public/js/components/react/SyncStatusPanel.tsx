@@ -83,7 +83,7 @@ const DriftBanner = ({ drift }: { drift: SyncDriftReport }) => {
     if (drift.error) {
         return (
             <div className={styles.errorBanner}>
-                <i className="fas fa-exclamation-triangle"></i>
+                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 <span>
                     Mirror comparison could not run — {drift.error}
                     <span className={styles.subtle}> · attempted {formatTime(drift.checkedAt)}</span>
@@ -94,7 +94,7 @@ const DriftBanner = ({ drift }: { drift: SyncDriftReport }) => {
     if (drift.tables.length === 0) {
         return (
             <div className={styles.driftOk}>
-                <i className="fas fa-check-circle"></i>
+                <i className="fas fa-check-circle" aria-hidden="true"></i>
                 <span>
                     Mirror matches local — {drift.tablesChecked} captured table(s) identical
                     <span className={styles.subtle}> · checked {formatTime(drift.checkedAt)}</span>
@@ -104,7 +104,7 @@ const DriftBanner = ({ drift }: { drift: SyncDriftReport }) => {
     }
     return (
         <div className={styles.errorBanner}>
-            <i className="fas fa-exclamation-triangle"></i>
+            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
             <span>
                 Mirror diverged — {formatNumber(drift.missing)} row(s) missing from the mirror
                 {drift.extra > 0 && `, ${formatNumber(drift.extra)} only on the mirror`}, across{' '}
@@ -140,7 +140,7 @@ const ClockBanner = ({ clock }: { clock: SyncClockReport }) => {
     if (clock.mismatches.length > 0) {
         return (
             <div className={styles.errorBanner}>
-                <i className="fas fa-clock"></i>
+                <i className="fas fa-clock" aria-hidden="true"></i>
                 <span>
                     Clocks disagree — {clock.mismatches.join(' ')}
                     <span className={styles.subtle}> · checked {formatTime(clock.checkedAt)}</span>
@@ -151,7 +151,7 @@ const ClockBanner = ({ clock }: { clock: SyncClockReport }) => {
     if (clock.error || !clock.local) {
         return (
             <div className={styles.errorBanner}>
-                <i className="fas fa-exclamation-triangle"></i>
+                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 <span>
                     Clock check could not read every clock — {clock.error ?? 'local database unreadable'}
                     <span className={styles.subtle}> · attempted {formatTime(clock.checkedAt)}</span>
@@ -161,7 +161,7 @@ const ClockBanner = ({ clock }: { clock: SyncClockReport }) => {
     }
     return (
         <div className={styles.driftOk}>
-            <i className="fas fa-clock"></i>
+            <i className="fas fa-clock" aria-hidden="true"></i>
             <span>
                 Clocks agree — {clock.local.tz} ({formatOffset(clock.local.offsetSec)}) on the app server, local
                 database{clock.mirror ? ' and mirror' : ''}
@@ -177,7 +177,7 @@ const ClockBanner = ({ clock }: { clock: SyncClockReport }) => {
  */
 const CaptureOffNotice = ({ sink, since }: { sink: string; since: string | null }) => (
     <div className={styles.errorBanner} role="alert">
-        <i className="fas fa-exclamation-triangle"></i>
+        <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
         <span>
             This server is set to sync, but the database has stopped recording changes
             {since ? ` (since ${formatTime(since)})` : ''}. Every change since then is missing from
@@ -254,7 +254,7 @@ const SyncStatusPanel = ({
             <div className={styles.header}>
                 <div>
                     <h3 className={styles.title}>
-                        <i className={icon}></i>
+                        <i className={icon} aria-hidden="true"></i>
                         {title}
                     </h3>
                     <p className={styles.description}>
@@ -269,7 +269,7 @@ const SyncStatusPanel = ({
                         onClick={() => refetch()}
                         disabled={isLoading}
                     >
-                        <i className={`fas fa-sync-alt ${isLoading ? styles.spin : ''}`}></i>
+                        <i className={`fas fa-sync-alt ${isLoading ? styles.spin : ''}`} aria-hidden="true"></i>
                         Refresh now
                     </button>
                 </div>
@@ -277,7 +277,7 @@ const SyncStatusPanel = ({
 
             {error && (
                 <div className={styles.errorBanner}>
-                    <i className="fas fa-exclamation-triangle"></i>
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <span>{error}</span>
                 </div>
             )}
@@ -287,7 +287,7 @@ const SyncStatusPanel = ({
 
             {isLoading && !sinks ? (
                 <div className={styles.loading}>
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <span>Checking {subject} status…</span>
                 </div>
             ) : (

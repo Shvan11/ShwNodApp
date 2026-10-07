@@ -48,7 +48,9 @@ export async function resolveShareRef(ref: SendFileRef): Promise<ResolvedShareFi
  */
 async function resolveWorkingImage(ref: SendFileRef): Promise<ResolvedShareFile> {
   const basename = ref.ref;
-  if (!/^\d+0\d+\.i\d+$/i.test(basename)) {
+  // Dolphin's `{personId}{tpCode as two digits}.iNN` (working-file-names.ts): digits, no
+  // fixed `0` in the middle (patient 634's session 12 is `63412.i10`).
+  if (!/^\d{3,}\.i\d+$/i.test(basename)) {
     throw new FileExplorerError('Invalid image reference', 400);
   }
   const root = workingDir();

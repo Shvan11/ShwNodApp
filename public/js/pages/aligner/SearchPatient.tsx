@@ -90,7 +90,7 @@ const SearchPatient: React.FC = () => {
                     <div className={styles.searchResults}>
                         {searchResults.length === 0 ? (
                             <div className={styles.searchNoResults}>
-                                <i className="fas fa-user-slash"></i>
+                                <i className="fas fa-user-slash" aria-hidden="true"></i>
                                 <p>No aligner patients found</p>
                             </div>
                         ) : (
@@ -112,9 +112,9 @@ const SearchPatient: React.FC = () => {
                                         )}
                                     </div>
                                     <div className={styles.resultMeta}>
-                                        <span><i className="fas fa-id-card"></i> {patient.person_id}</span>
-                                        <span><i className="fas fa-phone"></i> <PhoneDisplay phone={patient.phone} />{!patient.phone && 'N/A'}</span>
-                                        <span><i className="fas fa-tooth"></i> {patient.work_type}</span>
+                                        <span><i className="fas fa-id-card" aria-hidden="true"></i> {patient.person_id}</span>
+                                        <span><i className="fas fa-phone" aria-hidden="true"></i> <PhoneDisplay phone={patient.phone} />{!patient.phone && 'N/A'}</span>
+                                        <span><i className="fas fa-tooth" aria-hidden="true"></i> {patient.work_type}</span>
                                     </div>
                                 </div>
                             ))
@@ -130,7 +130,7 @@ const SearchPatient: React.FC = () => {
                 {/* Empty State */}
                 {!loading && !showResults && !isError && (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-search"></i>
+                        <i className="fas fa-search" aria-hidden="true"></i>
                         <h3>Quick Search</h3>
                         <p>Enter a patient name, phone number, or ID to find their aligner records</p>
                     </div>

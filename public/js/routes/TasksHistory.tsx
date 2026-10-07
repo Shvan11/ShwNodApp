@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useToday } from '@/hooks/useClock';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../contexts/ToastContext';
@@ -9,7 +10,6 @@ import {
     setTaskStatus,
     deleteTask,
     invalidateTasks,
-    dateFromTodayYmd,
     type CompletedTaskRow,
 } from '@/services/tasks';
 import { formatLocaleDateTime } from '@/utils/formatters';
@@ -82,7 +82,7 @@ const TasksHistory = () => {
 
     const { data, isLoading: loading, isError, error } = useQuery(tasksHistoryQuery());
     const rows = data ?? [];
-    const today = dateFromTodayYmd(0);
+    const today = useToday(); // not a render-time `new Date()`: it would be cached (FE-F26-8)
 
     useEffect(() => {
         if (isError) toast.error(httpErrorMessage(error, 'Failed to load tasks'));
@@ -129,7 +129,7 @@ const TasksHistory = () => {
         <div className={styles.page}>
             <header className={styles.header}>
                 <button type="button" className={styles.backBtn} onClick={() => navigate(-1)} aria-label="Back">
-                    <i className="fas fa-arrow-left" />
+                    <i className="fas fa-arrow-left" aria-hidden="true" />
                 </button>
                 <h1 className={styles.title}>
                     <i className="fas fa-list-check" aria-hidden="true" /> Tasks
@@ -155,10 +155,10 @@ const TasksHistory = () => {
             </header>
 
             {loading ? (
-                <div className={styles.state}><i className="fas fa-spinner fa-spin" /> Loading…</div>
+                <div className={styles.state}><i className="fas fa-spinner fa-spin" aria-hidden="true" /> Loading…</div>
             ) : filtered.length === 0 ? (
                 <div className={styles.state}>
-                    <i className="fas fa-inbox" />
+                    <i className="fas fa-inbox" aria-hidden="true" />
                     <span>{rows.length === 0 ? 'No tasks yet' : 'No matches'}</span>
                 </div>
             ) : (
@@ -172,7 +172,7 @@ const TasksHistory = () => {
                                 <th>Severity</th>
                                 <th>Assigned to</th>
                                 <th>Completed</th>
-                                <th aria-label="Actions" />
+                                <th><span className="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -217,7 +217,7 @@ const TasksHistory = () => {
                                                             disabled={busy}
                                                             onClick={() => runAction(r, () => setTaskStatus(r.alert_id, 'done'), 'Task completed', 'Failed to complete task')}
                                                         >
-                                                            {busy ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-check" /> Done</>}
+                                                            {busy ? <i className="fas fa-spinner fa-spin" aria-hidden="true" /> : <><i className="fas fa-check" aria-hidden="true" /> Done</>}
                                                         </button>
                                                         <button
                                                             type="button"
@@ -225,7 +225,7 @@ const TasksHistory = () => {
                                                             disabled={busy}
                                                             onClick={() => runAction(r, () => setTaskStatus(r.alert_id, 'dismissed'), 'Task dismissed', 'Failed to dismiss task')}
                                                         >
-                                                            <i className="fas fa-ban" /> Dismiss
+                                                            <i className="fas fa-ban" aria-hidden="true" /> Dismiss
                                                         </button>
                                                     </>
                                                 ) : (
@@ -237,7 +237,7 @@ const TasksHistory = () => {
                                                                 disabled={busy}
                                                                 onClick={() => runAction(r, () => setTaskStatus(r.alert_id, 'active'), 'Task reopened', 'Failed to reopen task')}
                                                             >
-                                                                {busy ? <i className="fas fa-spinner fa-spin" /> : <><i className="fas fa-rotate-left" /> Reopen</>}
+                                                                {busy ? <i className="fas fa-spinner fa-spin" aria-hidden="true" /> : <><i className="fas fa-rotate-left" aria-hidden="true" /> Reopen</>}
                                                             </button>
                                                         )}
                                                         <button
@@ -247,7 +247,7 @@ const TasksHistory = () => {
                                                             onClick={() => handleDelete(r)}
                                                             aria-label="Delete task permanently"
                                                         >
-                                                            <i className="fas fa-trash" /> Delete
+                                                            <i className="fas fa-trash" aria-hidden="true" /> Delete
                                                         </button>
                                                     </>
                                                 )}

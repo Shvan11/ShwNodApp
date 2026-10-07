@@ -112,11 +112,11 @@
 }
 
 .metaSuccess {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .metaDanger {
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 /* Action Buttons Container */
@@ -255,7 +255,7 @@
 /* Error/Loading States */
 .error {
     background-color: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     padding: 0.5rem 0.75rem;
     border-radius: 4px;
     margin-bottom: 0.5rem;
@@ -268,7 +268,7 @@
 .errorClose {
     background: none;
     border: none;
-    color: var(--error-600);
+    color: var(--error-700);
     font-size: 1.25rem;
     cursor: pointer;
     padding: 0;
@@ -331,6 +331,12 @@
     color: var(--text-primary);
     padding: 0;
     min-width: 0;
+}
+
+/* The input is borderless inside the bordered bar, so the bar shows focus. */
+.searchBar:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
 }
 
 .searchInput::placeholder {

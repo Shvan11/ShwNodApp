@@ -51,6 +51,8 @@ interface UseLookupManagerResult {
   onContextMenu: (event: MouseEvent) => void;
   /** Render once in the component tree (portals out — placement is irrelevant). */
   overlay: ReactNode;
+  /** Whether this user gets the menu at all — gate a "right-click to edit" hint on it. */
+  canManage: boolean;
 }
 
 export function useLookupManager({
@@ -116,5 +118,5 @@ export function useLookupManager({
     </>
   );
 
-  return { onContextMenu: handleContextMenu, overlay };
+  return { onContextMenu: handleContextMenu, overlay, canManage };
 }

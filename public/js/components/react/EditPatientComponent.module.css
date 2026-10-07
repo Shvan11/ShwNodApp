@@ -99,7 +99,7 @@
 
 .editPatientLoadingSpinner {
     font-size: var(--font-size-2xl);
-    color: var(--blue-300);
+    color: var(--blue-700);
     margin-bottom: var(--spacing-md);
 }
 
@@ -107,7 +107,7 @@
 .editPatientError {
     background-color: var(--error-50);
     border: 1px solid var(--error-200);
-    color: var(--error-600);
+    color: var(--error-700);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
@@ -121,7 +121,7 @@
     border: none;
     font-size: 1.5rem;
     cursor: pointer;
-    color: var(--error-600);
+    color: var(--error-700);
     padding: 0;
     width: 24px;
     height: 24px;
@@ -132,7 +132,7 @@
 
 /* Required Field Indicator */
 .requiredAsterisk {
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 /* Utility classes */
@@ -166,7 +166,7 @@
 }
 
 .deleteModalWarning {
-    color: var(--error-600);
+    color: var(--error-700);
     font-size: 0.9375rem;
     display: flex;
     gap: var(--spacing-sm);

@@ -175,6 +175,12 @@
   outline: none;
 }
 
+/* Inset: the box sits flush between the stepper's two buttons. */
+.quantityInput:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
 .lineTotal {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -198,7 +204,7 @@
 }
 
 .removeButton:hover {
-  color: var(--error-color);
+  color: var(--error-700);
   background-color: var(--error-50);
 }
 

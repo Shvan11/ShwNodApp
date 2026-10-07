@@ -73,9 +73,24 @@
     border-collapse: collapse;
   }
 
+  /* Inline code here is an env name, a path or a URL: one long unbreakable word
+     that otherwise pushes a phone-width page sideways. */
+  code {
+    overflow-wrap: anywhere;
+  }
+
   footer {
     text-align: center;
     padding: 1rem;
+  }
+
+  /* Keyboard focus. Zero specificity (:where), so this is only the FALLBACK: a
+     rule that styles its own focus state, or removes the outline on purpose,
+     still wins. There was no baseline at all, so a control with neither showed
+     nothing wherever one of the 84 `outline: none` rules reached it (FE-F25-5). */
+  :where(:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
   }
 
   /* Accessibility */

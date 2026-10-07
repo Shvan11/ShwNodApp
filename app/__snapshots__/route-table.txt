@@ -54,6 +54,7 @@ GET     /api/genders
 GET     /api/alert-types
 GET     /api/implant-manufacturers
 GET     /api/shades
+GET     /api/timepoint-names
 GET     /api/labs
 MOUNT   /api
 MOUNT   /api/templates
@@ -70,7 +71,7 @@ GET     /api/templates/receipt/no-work/:personId
 MOUNT   /api
 GET     /api/patients/:personId/info
 GET     /api/settings/patients-folder
-GET     /api/patients/phones
+GET     /api/patients/lookup  [validate(query)]
 GET     /api/patients/search  [validate(query)]
 GET     /api/patients/tag-options
 GET     /api/patients/:personId
@@ -476,6 +477,7 @@ POST    /api/sync/queue-notify  [authorize(admin)]
 GET     /api/sync/features
 GET     /api/sync/supabase-status
 GET     /api/sync/dolphin-status
+USE     /api  [apiNotFound]
 USE     /  [serveStatic]
 MOUNT   /
 GET     /*splat

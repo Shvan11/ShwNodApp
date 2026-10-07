@@ -81,7 +81,7 @@
 .layoutToolBtnActive:hover {
   background: var(--error-50);
   border-color: var(--error-color);
-  color: var(--error-color);
+  color: var(--error-700);
 }
 
 /* While fullscreen the controls float top-right over the black backdrop. */
@@ -211,7 +211,7 @@
   background-color: var(--surface-muted);
   border: 1px dashed var(--border-color);
   border-radius: var(--radius-lg);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .placeholderCell i {
@@ -270,7 +270,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(220, 53, 69, 0.92);
+  background: var(--error-fill-hover);
   color: var(--color-white);
   font-size: 0.75rem;
   pointer-events: none;
@@ -290,7 +290,7 @@
 
 :global(.pswp__visibility-btn i) {
   font-size: 19px;
-  color: var(--pswp-icon-color, #fff);
+  color: var(--pswp-icon-color);
 }
 
 :global(.pswp__button--visibility-private i) {
@@ -310,7 +310,7 @@
   padding: 6px 12px;
   border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.55);
-  color: var(--pswp-icon-color, #fff);
+  color: var(--pswp-icon-color);
   font-size: var(--font-size-sm);
   text-align: center;
 }
@@ -392,7 +392,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--spacing-lg);
-  color: var(--error-color);
+  color: var(--error-700);
   background-color: var(--error-50);
   border-radius: var(--radius-md);
   margin: var(--spacing-md);

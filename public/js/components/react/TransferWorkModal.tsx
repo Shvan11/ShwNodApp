@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import styles from './TransferWorkModal.module.css';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
-import PatientSearchCombobox from './PatientSearchCombobox';
+import PatientSearchCombobox, { type PatientOption } from './PatientSearchCombobox';
 import { useToast } from '../../contexts/ToastContext';
 import { postJSON, httpErrorMessage, type HttpError } from '@/core/http';
-import { patientPhonesQuery, transferPreviewQuery } from '@/query/queries';
+import { transferPreviewQuery } from '@/query/queries';
 import { WORK_STATUS } from '@shared/treatment-taxonomy';
 import * as workContract from '@shared/contracts/work.contract';
 import type { Work } from './WorkCard';
@@ -44,12 +44,6 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   // Modal would otherwise focus its first focusable, the header's close button).
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
-  // The jump-list source (shared with the patient search), minus the work's own patient.
-  // It used to be a three-AsyncSelect `PatientQuickSearch` kept alive for this one
-  // dialog (audit FE-F4-13).
-  const { data: patientsData } = useQuery(patientPhonesQuery());
-  const candidates = (patientsData ?? []).filter((p) => p.id !== work.person_id);
-
   // The preview loads once a target is chosen; the confirm step shows when it has.
   const {
     data: preview,
@@ -61,10 +55,11 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
   });
   const step: 'search' | 'confirm' = selectedPatient && preview ? 'confirm' : 'search';
 
-  const selectPatient = (personId: number) => {
-    const patient = candidates.find((p) => p.id === personId);
-    if (patient) setSelectedPatient({ person_id: patient.id, patient_name: patient.name });
-  };
+  // The pickers are the patient search's own (it used to be a three-AsyncSelect
+  // `PatientQuickSearch` kept alive for this one dialog: audit FE-F4-13). They never
+  // offer the work's own patient (`exclude`).
+  const selectPatient = (patient: PatientOption) =>
+    setSelectedPatient({ person_id: patient.id, patient_name: patient.name });
 
   const handleTransfer = async (): Promise<void> => {
     if (!selectedPatient) return;
@@ -124,7 +119,7 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
         <ModalHeader
           titleId="transfer-work-modal-title"
           title={t('transfer.title')}
-          icon={<i className="fas fa-exchange-alt" />}
+          icon={<i className="fas fa-exchange-alt" aria-hidden="true" />}
           onClose={onClose}
         />
 
@@ -158,12 +153,13 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                       id="transfer-search-name"
                       value={nameQuery}
                       onChange={setNameQuery}
-                      onJump={selectPatient}
-                      patients={candidates}
+                      onPick={selectPatient}
+                      exclude={work.person_id}
                       mode="name"
                       rtl
                       placeholder={t('transfer.namePlaceholder')}
                       hint={t('transfer.pickHint')}
+                      errorText={t('transfer.lookupFailed')}
                       inputRef={nameInputRef}
                     />
                   </label>
@@ -173,12 +169,13 @@ const TransferWorkModal: React.FC<TransferWorkModalProps> = ({
                       id="transfer-search-phone-id"
                       value={phoneIdQuery}
                       onChange={setPhoneIdQuery}
-                      onJump={selectPatient}
-                      patients={candidates}
+                      onPick={selectPatient}
+                      exclude={work.person_id}
                       mode="phoneId"
                       placeholder={t('transfer.phoneIdPlaceholder')}
                       hint={t('transfer.pickHint')}
                       groupLabels={groupLabels}
+                      errorText={t('transfer.lookupFailed')}
                     />
                   </label>
                 </div>

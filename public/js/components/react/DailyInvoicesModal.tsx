@@ -123,7 +123,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
                 <ModalHeader
                     variant="info"
                     titleId="daily-invoices-modal-title"
-                    icon={<i className="fas fa-file-invoice-dollar" />}
+                    icon={<i className="fas fa-file-invoice-dollar" aria-hidden="true" />}
                     title={`Daily Invoices - ${formatDate(dateValue)}`}
                     onClose={onClose}
                 />
@@ -139,7 +139,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
                     {error && (
                         <div className={styles.errorState}>
-                            <i className="fas fa-exclamation-triangle"></i>
+                            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                             <p>{error}</p>
                             <button onClick={() => void refetch()}>Retry</button>
                         </div>
@@ -201,7 +201,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
                             {invoices.length === 0 ? (
                                 <div className={styles.emptyState}>
-                                    <i className="fas fa-inbox"></i>
+                                    <i className="fas fa-inbox" aria-hidden="true"></i>
                                     <p>No invoices found for this date</p>
                                 </div>
                             ) : (
@@ -259,7 +259,7 @@ const DailyInvoicesModal = ({ selectedDate, onClose }: DailyInvoicesModalProps) 
 
                     {!loading && !error && invoices.length === 0 && !totals && (
                         <div className={styles.emptyState}>
-                            <i className="fas fa-inbox"></i>
+                            <i className="fas fa-inbox" aria-hidden="true"></i>
                             <p>No invoices found for this date</p>
                         </div>
                     )}

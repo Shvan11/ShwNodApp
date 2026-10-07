@@ -13,9 +13,14 @@
  * The compiler emits `Symbol.for("react.memo_cache_sentinel")` in every function
  * it compiles, and minification keeps the string. React's own runtime carries it
  * once too, so chunks holding React internals (`react.transitional.element`) are
- * not counted. A healthy build has ~50 compiled chunks; MIN is deliberately low
- * so routine code-splitting changes never trip it. It only fails when the
- * compiler is effectively off.
+ * not counted. A healthy build has ~50 compiled chunks (49 on 2026-10-06). MIN is
+ * 30: low enough that routine code-splitting changes never trip it, high enough
+ * that it also fails when a config change stops compiling a large part of the
+ * tree, not only when the compiler is off altogether (it was 10; audit
+ * FE-F26-10). It is a coarse net on purpose. A list of expected bailouts would
+ * fail the gate on every new `try { … } finally { … }` in a component, the most
+ * common skip there is and a safe one. `node scripts/audit/compiler-census.mjs`
+ * is the fine-grained view: what compiles, what is skipped and why.
  *
  * Run after `vite build` (the gate does). `scripts/**` is eslint-ignored.
  */
@@ -27,7 +32,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = join(ROOT, 'dist', 'assets');
 const SENTINEL = 'react.memo_cache_sentinel';
 const REACT_INTERNAL = 'react.transitional.element';
-const MIN_COMPILED_CHUNKS = 10;
+const MIN_COMPILED_CHUNKS = 30;
 
 let files;
 try {

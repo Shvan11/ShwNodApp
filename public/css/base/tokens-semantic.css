@@ -25,19 +25,50 @@
     /* ===============================================================
        Core brand-interactive colours
        =============================================================== */
-    --primary-color: #007bff;
+    /* WCAG AA (owner decision 2026-10-06, audit FE-F25-2): every colour here reads
+       4.5:1 under white text AND as text — on white and on the off-white surfaces
+       text really sits on (table stripes, tinted cards: down to --gray-100). The
+       earlier values did not: #007bff 3.98, #4CAF50 2.78, #28a745 3.13, #17a2b8
+       3.04, #dc3545 4.1 on a stripe. #0d6efd and #198754 pass on pure white only. */
+    --primary-color: #0a66ee;
     --primary-hover: #0056b3;
-    --secondary-color: #4CAF50;
+    --secondary-color: #2e7d32;
     --accent-color: #55608f;
 
-    --success-color: #28a745;
-    --error-color: #dc3545;
+    --success-color: #177e4e;
+    --error-color: #d42a3a;
     --warning-color: #ffc107;
-    --info-color: #17a2b8;
+    --info-color: #117a8b;
 
     --primary-light: #66b3ff;
-    --primary-alpha: rgba(0, 123, 255, 0.25);
-    --secondary-hover: #3c9a3f;
+    --primary-alpha: rgba(10, 102, 238, 0.25);
+    --secondary-hover: #1b5e20;
+
+    /* ===============================================================
+       FILLS UNDER WHITE TEXT — use these for a filled button, badge,
+       chip or table header, never the colour tokens above.
+       The split exists for the dark theme: there `--primary-color` and
+       its siblings are BRIGHT, because they are also link, icon and
+       border colours on a dark surface, and white on them read 2.0–2.8:1
+       on every screen (audit FE-F25-1). A fill keeps a solid mid in both
+       themes; white on every one of these is at least 4.5:1.
+       =============================================================== */
+    --primary-fill: var(--primary-color);
+    --primary-fill-hover: var(--primary-hover);
+    --success-fill: var(--success-color);
+    --success-fill-hover: var(--palette-green-800);
+    --info-fill: var(--info-color);
+    --info-fill-hover: var(--palette-cyan-800);
+    --secondary-fill: var(--secondary-color);
+    --secondary-fill-hover: var(--secondary-hover);
+    --error-fill: var(--error-color);
+    --error-fill-hover: var(--palette-red-700);
+    /* Orange cannot carry white text until it is this deep (#ff9800 was 2.2:1). */
+    --warning-fill: var(--palette-orange-700);
+    --warning-fill-hover: var(--palette-orange-800);
+    /* Two one-off hues, fixed in both themes for the same reason. */
+    --purple-fill: #7c3aed;
+    --accent-fill: #55608f;
 
     /* ===============================================================
        Text colours — CANONICAL SCALE
@@ -47,11 +78,15 @@
        ONLY these for text colour. Placeholders get their own tier so dark
        mode can dim them without dragging muted body text down with it.
        =============================================================== */
+    /* AA on every surface they are used on (FE-F25-2): secondary reads 4.7:1 even on
+       the gray chips (--gray-200, --surface-muted); muted is for white and the
+       near-white surfaces (4.5:1 down to --gray-100) — on a gray chip use secondary.
+       They were #6c757d (3.8–4.5 on the chips) and #999 (2.85 on white). */
     --text-primary: #212529;                 /* body / strong text */
-    --text-secondary: #6c757d;               /* secondary text, labels */
-    --text-muted: #999999;                   /* muted / tertiary */
+    --text-secondary: #5f666d;               /* secondary text, labels */
+    --text-muted: #6f6f6f;                   /* muted / tertiary */
     --text-heading: var(--color-dark-blue);  /* card/section titles — flips in dark */
-    --text-placeholder: #999999;             /* form input placeholders */
+    --text-placeholder: #6f6f6f;             /* form input placeholders */
 
     /* ===============================================================
        Surfaces & backgrounds
@@ -86,15 +121,10 @@
     --border-color: #cccccc;
     --border: #dee2e6;
     --border-light: #e9ecef;
-    --border-accent: #e0e7ed;
 
     /* ===============================================================
        Gradients
        =============================================================== */
-    --gradient-primary: linear-gradient(45deg, #9cc4c2, #ffffff);
-    --gradient-secondary: linear-gradient(45deg, #aedfd0, #ffffff);
-    --gradient-accent: linear-gradient(45deg, #49a09d, #5f2c82);
-
     /* Appointments sticky sub-header background. Single source of truth so the bar
        can be re-skinned in one place (and differentiated from the universal header,
        which shares the same brand purple). Light = teal; dark theme swaps to a
@@ -116,37 +146,32 @@
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    --shadow-focus: 0 0 0 3px rgba(0, 123, 255, 0.1);
-    /* Focus outline shadow */
-    --shadow-focus-strong: 0 0 0 1px var(--primary-color);
-    /* Stronger focus outline */
+    --shadow-focus: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    /* Focus halo around a field whose border also changes. At 10% alpha it read
+       1.1:1 against the page — where it was the only signal there was none. */
+    --focus-ring: var(--blue-600);
+    /* The keyboard focus outline (reset.css). --blue-600 is a solid mid in both
+       themes: 5.2:1 on the light surface, 4.4:1 on the dark one. */
     --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
-    --shadow-medium: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
-    --shadow-heavy: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
     /* Warning shadows */
     --shadow-warning-sm: 0 4px 6px -1px rgba(249, 115, 22, 0.3), 0 2px 4px -1px rgba(249, 115, 22, 0.2);
-    --shadow-warning-lg: 0 10px 15px -3px rgba(249, 115, 22, 0.4), 0 4px 6px -2px rgba(249, 115, 22, 0.3);
 
     /* ===============================================================
        Extended named colours (status-adjacent, themable)
        =============================================================== */
     --neutral-gray: #6c757d;
-    --neutral-gray-dark: #495057;
-    /* Dark neutral gray */
-    --warning-orange: #ff9800;
-    --warning-orange-dark: #e68900;
+    /* As TEXT and borders. Was #ff9800 (2.2:1 on white); a fill takes --warning-fill. */
+    --warning-orange: var(--palette-orange-700);
+    --warning-orange-dark: var(--palette-orange-800);
     /* Dark warning orange */
-    --error-pink: #E91E63;
-    --error-red: #dc3545;
+    --error-red: var(--error-color);
     /* Primary error red */
     --error-red-dark: #bd2130;
     /* Dark error red */
     --error-red-light: #ff6b6b;
     /* Light red for alerts/notifications */
-    --success-darker: #1e7e34;
-    --danger-color: #dc3545;
+    --danger-color: var(--error-color);
     /* Alias for error-color */
-    --pink-100: #fce7f3;
     --primary-blue: #3b82f6;
     /* Primary blue (alias for blue-500) */
     --primary-blue-dark: #1d4ed8;
@@ -199,8 +224,8 @@
     --success-600: var(--palette-green-600);
     --success-700: var(--palette-green-700);
     --success-800: var(--palette-green-800);
-    --success-green: var(--palette-green-500);
-    /* Primary success green (alias for success-500) */
+    --success-green: var(--palette-green-700);
+    /* Money and "done" figures as TEXT. Was green-500 (2.3:1 on white). */
     --success-green-dark: var(--palette-green-700);
     /* Dark success green (alias for success-700) */
 
@@ -239,7 +264,6 @@
     /* ===============================================================
        Extended state colours (tint / dark pairs)
        =============================================================== */
-    --success-dark: #1e7e34;
     --success-light: #d4edda;
 
     --error-dark: #c82333;
@@ -248,22 +272,18 @@
     --warning-dark: #e0a800;
     --warning-light: #fff3cd;
 
-    --info-dark: #138496;
     --info-light: #d1ecf1;
 
     /* ===============================================================
        Calendar colours
        =============================================================== */
     --calendar-today-highlight: #fff9e6;
-    --calendar-weekend-bg: #f0f3f5;
-    --calendar-header-gradient: linear-gradient(to right, #ffffff 0%, #f8f9fa 100%);
 
     --cal-line: oklch(90% 0.005 260);
     --cal-line-2: oklch(82% 0.006 260);
     --cal-ink: oklch(22% 0.014 260);
     --cal-ink-2: oklch(40% 0.012 260);
-    --cal-ink-3: oklch(58% 0.008 260);
-    --cal-ink-4: oklch(74% 0.006 260);
+    --cal-ink-3: oklch(50% 0.008 260);
     --cal-surface: #ffffff;
     --cal-surface-2: oklch(97% 0.004 260);
     --cal-zebra: oklch(96.5% 0.006 260); /* on-the-hour zebra band (week/day grid) */
@@ -273,27 +293,9 @@
     --cal-purple-ink: #4c44a8;
 
     /* ===============================================================
-       Appointment status colours (bg / text pairs)
+       Appointment status colours
        =============================================================== */
-    --status-scheduled-bg: #f3f4f6;
-    /* gray-100 */
-    --status-scheduled-text: #6b7280;
-    /* gray-500 */
-    --status-present-bg: #eff6ff;
-    /* blue-50 */
-    --status-present-text: #1d4ed8;
-    /* blue-700 */
-    --status-seated-bg: #fff7ed;
-    /* warning-50 */
-    --status-seated-text: #c2410c;
-    /* warning-700 */
-    --status-dismissed-bg: #f0fdf4;
-    /* success-50 */
-    --status-dismissed-text: #15803d;
-    /* success-700 */
-
-    /* Seated appointment — vivid-yellow FILLED button (distinct from the subtle
-       --status-seated-bg badge above). Like the green/red filled status buttons
+    /* Seated appointment — vivid-yellow FILLED button. Like the green/red filled status buttons
        it stays vivid in dark mode (yellow + dark-brown text reads in both), so
        these are not overridden in theme-dark.css. */
     --status-seated-fill: #FFEB3B;
@@ -317,7 +319,6 @@
     --bg-muted: #f5f7fb;
     --bg-secondary: var(--gray-100);
     --table-header-bg: var(--gray-100);
-    --white: #ffffff;
 
     /* Primary scale (blue-tinted; matches existing --blue-* scale) */
     --primary-50: #eff6ff;
@@ -325,18 +326,12 @@
     --primary-300: var(--blue-300);
     --primary-700: var(--blue-700);
     --primary-dark: var(--primary-hover);
-    --primary-color-dark: var(--primary-hover);
 
     /* Amber scale (warning-adjacent; used for advisory states) */
     --amber-50: var(--palette-amber-50);
     --amber-300: var(--palette-amber-300);
-    --amber-600: var(--palette-amber-600);
     --amber-800: var(--palette-amber-800);
 
     /* Purple / accent */
     --purple-500: #8b5cf6;
-    --accent-dark: var(--success-green);
-
-    /* Misc */
-    --error-alpha: rgba(220, 53, 69, 0.25);
 }

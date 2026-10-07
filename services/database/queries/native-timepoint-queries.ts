@@ -139,7 +139,7 @@ export async function getNativeTimePoint(
 
 /**
  * List every tpCode a patient has, so the on-disk `working/` gallery files
- * (`{personId}0{tpCode}.i{view}`) can be removed when the patient is deleted.
+ * (`{personId}{tpCode:02}.i{view}`) can be removed when the patient is deleted.
  * Must be called BEFORE deletePatient — the `ON DELETE CASCADE` on
  * `fk_time_points_tblpatients` wipes these rows with the patient.
  */

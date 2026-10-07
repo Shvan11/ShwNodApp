@@ -46,11 +46,11 @@ const WorkDetailsPanel = ({ workId, typeOfWork, onItemDirtyChange }: WorkDetails
         <div className={styles.panel}>
             <div className={styles.header}>
                 <h4>
-                    <i className={config.icon}></i>
+                    <i className={config.icon} aria-hidden="true"></i>
                     {' '}{config.name} Items
                 </h4>
                 <button type="button" onClick={() => setIsAdding(true)} className="btn btn-sm btn-primary" disabled={isAdding}>
-                    <i className="fas fa-plus"></i> Add Item
+                    <i className="fas fa-plus" aria-hidden="true"></i> Add Item
                 </button>
             </div>
 

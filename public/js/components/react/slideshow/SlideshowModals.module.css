@@ -60,7 +60,7 @@
 .input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px var(--primary-color-translucent, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 0 0 2px var(--primary-alpha);
 }
 
 /* --- Save-as-template checkbox --- */
@@ -195,8 +195,8 @@
 }
 
 .iconBtnDanger:hover:not(:disabled) {
-  border-color: var(--error-color);
-  background: var(--error-color);
+  border-color: var(--error-fill);
+  background: var(--error-fill);
   color: var(--color-white);
 }
 

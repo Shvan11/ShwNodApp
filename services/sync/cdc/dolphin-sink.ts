@@ -5,7 +5,7 @@
  * (tblTimePoints / tblTimePointImages, written by the photo editor) into the legacy Dolphin
  * Imaging SQL Server DB (DolphinPlatform.dbo.Patients / TimePoints / TimePointImages) so Dolphin
  * Imaging "sees" photos the app cropped. DB ROWS ONLY — the physical JPEGs already land in the
- * shared working/ dir under Dolphin's exact {personId}0{tpCode}.I{NN} naming. Meant to be DELETED
+ * shared working/ dir under Dolphin's exact {personId}{tpCode:02}.I{NN} naming. Meant to be DELETED
  * (this file + its migration + the index.ts entry) once the native pipeline is trusted.
  *
  * Reuses the surviving mssql pool (services/database/pool.ts, connected to ShwanNew); Dolphin is
@@ -332,7 +332,8 @@ export class DolphinSink implements SyncSink {
     }
 
     // Else INSERT. The Dolphin tpCode MUST equal the tpCode embedded in the rendered image
-    // filename ({person_id}0{tpCode}.I{NN}, written by the photo editor with OUR PG tpCode) —
+    // filename ({person_id}{tpCode:02}.I{NN}, services/files/working-file-names.ts, written by the photo
+    // editor with OUR PG tpCode) —
     // Dolphin Imaging locates a timepoint's images by deriving that name from patOtherID + tpCode,
     // so a mismatch means Dolphin finds no images (and crashes on the inconsistency). We therefore
     // reuse our PG tpCode as the Dolphin tpCode. Fallback (non-numeric/missing PG tpCode): mirror

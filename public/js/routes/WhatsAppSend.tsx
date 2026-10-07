@@ -18,6 +18,7 @@ import ProgressBar from '../components/whatsapp-send/ProgressBar';
 import ActionButtons from '../components/whatsapp-send/ActionButtons';
 import MessageStatusTable from '../components/whatsapp-send/MessageStatusTable';
 import LookupContextMenu, { type LookupMenuItem } from '../components/react/LookupContextMenu';
+import { anchorFrom } from '../hooks/useFloatingMenu';
 import { API_ENDPOINTS, MESSAGE_STATUS } from '../utils/whatsapp-send-constants';
 import { fetchJSON, postJSON, httpErrorMessage } from '@/core/http';
 
@@ -246,7 +247,8 @@ export default function WhatsAppSend() {
 
   const handleRowContextMenu = useCallback((event: ReactMouseEvent, msg: StatusRow) => {
     event.preventDefault();
-    setContextMenu({ x: event.clientX, y: event.clientY, msg });
+    // anchorFrom: the row's ⋮ button pressed from the keyboard has no pointer position.
+    setContextMenu({ ...anchorFrom(event), msg });
   }, []);
 
   const rowName = (m: StatusRow) => m.patientName || m.name || 'patient';
@@ -361,7 +363,7 @@ export default function WhatsAppSend() {
 
   return (
     <div id="app">
-      <main className={`${styles.container} ${styles.mainLayout}`} role="main">
+      <div className={`${styles.container} ${styles.mainLayout}`}>
         <div className={styles.pageHeaderArea}>
           <h2>WhatsApp Messaging</h2>
           <Link
@@ -438,7 +440,7 @@ export default function WhatsAppSend() {
             />
           </div>
         </section>
-      </main>
+      </div>
 
       {/* Right-click resend/copy menu on a status row */}
       {contextMenu && (

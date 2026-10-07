@@ -4,7 +4,7 @@
  * Mirrors photo-editor.routes.ts#processRenderJob step for step, so a demo timepoint is
  * indistinguishable from one a user saved: the originals go into the patient's timepoint folder
  * (`clinic1/{pid}/{Name}_{DD-MM-YYYY}/`) already carrying the editor's `{view}-` tag, each view is
- * rendered through `renderSlotToWorking` into `working/{pid}0{tp}.{view}`, and its
+ * rendered through `renderSlotToWorking` into `working/{pid}{tp:02}.{view}`, and its
  * `time_point_images` row is upserted. The editor can reopen and re-crop them like any others.
  *
  * The pack (data/demo/photos/<timepoint>/<view>.jpg) is already cut to each view's aspect, so the
@@ -14,7 +14,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { VIEW_CODES } from '../../../shared/photo-views.js';
-import { patientPath, workingDir } from '../../files/clinic-paths.js';
+import { dolphinImageFileName, patientPath, workingDir } from '../../files/clinic-paths.js';
 import { timepointFolderName } from '../../imaging/photo-cleanup.service.js';
 import { renderSlotToWorking } from '../../imaging/photo-render.service.js';
 import {
@@ -66,7 +66,7 @@ export async function placeDemoTimepoint(
       output: { width, height },
     });
     const digits = view.slice(1);
-    await upsertNativeTimePointImage(timePointId, personId, digits, `${personId}0${tpCode}.I${digits}`, date, null);
+    await upsertNativeTimePointImage(timePointId, personId, digits, dolphinImageFileName(personId, tpCode, view), date, null);
     views++;
   }
   return { tpCode, views };

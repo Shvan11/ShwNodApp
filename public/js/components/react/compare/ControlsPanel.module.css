@@ -87,7 +87,7 @@
 
 .segmentActive {
     background: var(--surface);
-    color: var(--primary-color);
+    color: var(--blue-700);
     font-weight: var(--font-weight-semibold);
     box-shadow: var(--shadow-sm);
 }
@@ -178,7 +178,7 @@
 .iconButtonActive {
     background: var(--blue-50);
     border-color: var(--primary-color);
-    color: var(--primary-color);
+    color: var(--blue-700);
 }
 
 .viewRow {
@@ -281,7 +281,7 @@
 .cropToggleActive:hover:not(:disabled) {
     background: var(--blue-50);
     border-color: var(--primary-color);
-    color: var(--primary-color);
+    color: var(--blue-700);
     font-weight: var(--font-weight-semibold);
 }
 

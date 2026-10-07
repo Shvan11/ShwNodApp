@@ -76,6 +76,18 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* The gap is drawn 8px wide (3px on a phone) but takes the pointer a little past
+   each edge, over the margins of its two teeth: the drawn width alone was too
+   thin to hit. */
+.between::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline: -4px;
 }
 
 .betweenIndicator {
@@ -150,6 +162,10 @@
     .between {
         width: 3px;
         height: 50px;
+    }
+    /* Teeth are 18px here: take less of them. */
+    .between::before {
+        inset-inline: -3px;
     }
 }
 

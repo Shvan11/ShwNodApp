@@ -24,7 +24,7 @@ function TemplateStats({ stats, styles }: TemplateStatsProps) {
         <div className={styles.statsGrid}>
             <div className={styles.statCard}>
                 <div className={styles.statIcon}>
-                    <i className="fas fa-file-alt"></i>
+                    <i className="fas fa-file-alt" aria-hidden="true"></i>
                 </div>
                 <div className={styles.statContent}>
                     <h3>{stats.total}</h3>
@@ -33,7 +33,7 @@ function TemplateStats({ stats, styles }: TemplateStatsProps) {
             </div>
             <div className={styles.statCard}>
                 <div className={`${styles.statIcon} ${styles.statIconActive}`}>
-                    <i className="fas fa-check-circle"></i>
+                    <i className="fas fa-check-circle" aria-hidden="true"></i>
                 </div>
                 <div className={styles.statContent}>
                     <h3>{stats.active}</h3>
@@ -42,7 +42,7 @@ function TemplateStats({ stats, styles }: TemplateStatsProps) {
             </div>
             <div className={styles.statCard}>
                 <div className={`${styles.statIcon} ${styles.statIconSystem}`}>
-                    <i className="fas fa-shield-alt"></i>
+                    <i className="fas fa-shield-alt" aria-hidden="true"></i>
                 </div>
                 <div className={styles.statContent}>
                     <h3>{stats.system}</h3>
@@ -51,7 +51,7 @@ function TemplateStats({ stats, styles }: TemplateStatsProps) {
             </div>
             <div className={styles.statCard}>
                 <div className={`${styles.statIcon} ${styles.statIconUsage}`}>
-                    <i className="fas fa-clock"></i>
+                    <i className="fas fa-clock" aria-hidden="true"></i>
                 </div>
                 <div className={styles.statContent}>
                     <h3>{stats.usedToday}</h3>

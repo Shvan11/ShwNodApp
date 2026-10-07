@@ -34,12 +34,14 @@
 
 .completed {
     border-inline-start-color: var(--gray-500);
-    opacity: 0.85;
+    /* Desaturated, not faded (see .discontinued): at 85% opacity the badge read 3.5:1. */
+    filter: grayscale(0.5);
 }
 
 .discontinued {
     border-inline-start-color: var(--warning-color);
-    opacity: 0.75;
+    /* Desaturated, not faded: opacity took the card's text under 4.5:1. */
+    filter: grayscale(0.85);
     background: linear-gradient(135deg, var(--surface) 0%, var(--amber-50) 100%);
 }
 
@@ -52,8 +54,10 @@
     cursor: pointer;
 }
 
-.collapsedHeader:hover {
-    opacity: 0.8;
+/* The chevron answers the pointer. The header used to fade to 80%, which took its
+   meta line to 3.7:1 under the pointer. */
+.collapsedHeader:hover .chevronIcon {
+    color: var(--text-primary);
 }
 
 .chevronIcon {
@@ -70,7 +74,7 @@
 }
 
 .balanceIndicator {
-    color: var(--error-500);
+    color: var(--error-700);
     font-weight: var(--font-weight-semibold);
 }
 
@@ -86,7 +90,7 @@
 }
 
 .title i:global(.fa-tooth) {
-    color: var(--success-500);
+    color: var(--success-700);
     font-size: var(--font-size-base);
 }
 
@@ -209,21 +213,21 @@
 
 /* Delete button styling */
 .dropdownDeleteBtn {
-    color: var(--error-500);
+    color: var(--error-700);
     border-top: var(--border-width-thin) solid var(--gray-100);
 }
 
 .dropdownDeleteBtn:hover {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
 }
 
 .dropdownDeleteBtn i {
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 .dropdownDeleteBtn:hover i {
-    color: var(--error-600);
+    color: var(--error-700);
 }
 
 /* Progress Section */
@@ -247,7 +251,7 @@
 .progressPercentage {
     font-size: 0.875rem;
     font-weight: var(--font-weight-semibold);
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .progressBarContainer {
@@ -296,19 +300,19 @@
 }
 
 .financialValuePaid {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .financialValueRemaining {
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 .financialValuePaidFull {
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .financialValueDiscount {
-    color: var(--warning-color);
+    color: var(--warning-800);
 }
 
 .financialValueNet {
@@ -320,7 +324,7 @@
 }
 
 .infoItem.discountBadge i {
-    color: var(--warning-color);
+    color: var(--warning-800);
 }
 
 /* Additional Info Section */

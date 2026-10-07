@@ -470,7 +470,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             dense
                             titleId="payment-modal-title"
                             title={t('modal.title')}
-                            icon={<i className="fas fa-credit-card" />}
+                            icon={<i className="fas fa-credit-card" aria-hidden="true" />}
                             subtitle={workData.type_name || t('modal.workFallback', { id: workData.work_id })}
                             onClose={dismiss}
                             actions={
@@ -479,7 +479,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     <span className={styles.balanceAmount}>{formatCurrency(remainingBalance, accountCurrency)}</span>
                                     {Number(workData.discount ?? 0) > 0 && (
                                         <span className={`${styles.balanceLabel} ${styles.discountNote}`}>
-                                            <i className="fas fa-tag"></i> {formatCurrency(Number(workData.discount), accountCurrency)} {t('balance.discountApplied')}
+                                            <i className="fas fa-tag" aria-hidden="true"></i> {formatCurrency(Number(workData.discount), accountCurrency)} {t('balance.discountApplied')}
                                         </span>
                                     )}
                                 </div>
@@ -491,13 +491,13 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                             set the real one), or this day's own rate. */}
                         {!exchangeRate ? (
                             <div className={styles.exchangeRateErrorCompact}>
-                                <i className="fas fa-exclamation-triangle"></i>
+                                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                 <span>{t('exchangeRate.noRate', { date: form.paymentDate })}</span>
                                 {rateEditor}
                             </div>
                         ) : (
                             <div className={styles.exchangeRateCompact}>
-                                <i className="fas fa-exchange-alt"></i>
+                                <i className="fas fa-exchange-alt" aria-hidden="true"></i>
                                 <span>{t('exchangeRate.display', { rate: formatNumber(exchangeRate) })}</span>
                                 {rateIsCarriedForward ? (
                                     <>
@@ -630,7 +630,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                                 onClick={handleCashOverrideToggle}
                                                                 title={isOverriding ? t('form.lockAuto') : t('form.unlockBill')}
                                                             >
-                                                                <i className={`fas fa-${isOverriding ? 'lock-open' : 'lock'}`}></i>
+                                                                <i className={`fas fa-${isOverriding ? 'lock-open' : 'lock'}`} aria-hidden="true"></i>
                                                             </button>
                                                         )}
                                                     </div>
@@ -662,7 +662,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                                                 onClick={handleCashOverrideToggle}
                                                                 title={form.cashOverrideEnabled ? t('form.lockAuto') : t('form.unlockReceived')}
                                                             >
-                                                                <i className={`fas fa-${form.cashOverrideEnabled ? 'lock-open' : 'lock'}`}></i>
+                                                                <i className={`fas fa-${form.cashOverrideEnabled ? 'lock-open' : 'lock'}`} aria-hidden="true"></i>
                                                             </button>
                                                         )}
                                                     </div>
@@ -765,7 +765,7 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                     </div>
                                     {isShort && (
                                         <div className={styles.summaryWarningText}>
-                                            <i className="fas fa-exclamation-triangle"></i>
+                                            <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                                             {t('summary.shortBy', { amount: formatCurrency((parseFloat(String(form.amountToRegister)) || 0) - (totals?.totalReceived ?? 0), accountCurrency) })}
                                         </div>
                                     )}
@@ -779,9 +779,9 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                                 </button>
                                 <button type="submit" className="btn btn-primary" disabled={loading || (rateRequired && !exchangeRate)}>
                                     {loading ? (
-                                        <><i className="fas fa-spinner fa-spin"></i> {t('actions.saving')}</>
+                                        <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> {t('actions.saving')}</>
                                     ) : (
-                                        <><i className="fas fa-check"></i> {t('actions.savePayment')}</>
+                                        <><i className="fas fa-check" aria-hidden="true"></i> {t('actions.savePayment')}</>
                                     )}
                                 </button>
                             </div>
@@ -800,14 +800,14 @@ const PaymentModal = ({ workData, onClose, onSuccess }: PaymentModalProps) => {
                         />
                         <div className={styles.paymentSuccessCompact}>
                         <div className={styles.successIcon}>
-                            <i className="fas fa-check-circle"></i>
+                            <i className="fas fa-check-circle" aria-hidden="true"></i>
                         </div>
                         <p className={styles.successAmount}>
                             {formatCurrency(paidToday?.amount ?? 0, paidToday?.currency ?? accountCurrency)}
                         </p>
                         <div className={styles.successActions}>
                             <button onClick={handlePrint} className="btn btn-primary">
-                                <i className="fas fa-print"></i> {t('success.printReceipt')}
+                                <i className="fas fa-print" aria-hidden="true"></i> {t('success.printReceipt')}
                             </button>
                             <button onClick={handleCloseAfterSuccess} className="btn btn-secondary">
                                 {t('success.done')}

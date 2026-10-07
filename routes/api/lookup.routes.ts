@@ -26,6 +26,7 @@ import {
 import { getAlertTypes } from '../../services/database/queries/alert-queries.js';
 import { getImplantManufacturers, getLabs } from '../../services/database/queries/work-lookup-queries.js';
 import { getShades } from '../../services/database/queries/shade-queries.js';
+import { getTimePointNames } from '../../services/database/queries/timepoint-queries.js';
 import * as lookup from '../../shared/contracts/lookup.contract.js';
 
 const router = Router();
@@ -126,6 +127,21 @@ router.get('/shades', async (_req: Request, res: Response): Promise<void> => {
   } catch (error) {
     log.error('Error fetching shades:', error);
     ErrorResponses.internalError(res, 'Failed to fetch shades', error as Error);
+  }
+});
+
+/**
+ * GET /timepoint-names
+ * Fetch the clinic's common photo-session names for the New / Edit Photo Session
+ * Name select.
+ */
+router.get('/timepoint-names', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const names = await getTimePointNames();
+    sendData(res, lookup.timepointNames.response, names);
+  } catch (error) {
+    log.error('Error fetching time point names:', error);
+    ErrorResponses.internalError(res, 'Failed to fetch photo session names', error as Error);
   }
 });
 

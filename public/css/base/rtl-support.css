@@ -106,15 +106,6 @@
     left: 0;
 }
 
-/* Appointment Calendar RTL */
-[dir="rtl"] .calendar-header {
-    flex-direction: row-reverse;
-}
-
-[dir="rtl"] .calendar-navigation {
-    flex-direction: row-reverse;
-}
-
 /* Work Card RTL */
 [dir="rtl"] .work-card {
     direction: rtl;

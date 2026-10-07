@@ -419,13 +419,13 @@ const SlideshowBuilder = ({
             )}
           </div>
           <button type="button" className={styles.configBtn} disabled={selected.length === 0} onClick={() => setSaveOpen(true)}>
-            <i className="fas fa-floppy-disk" /> Save
+            <i className="fas fa-floppy-disk" aria-hidden="true" /> Save
           </button>
           <button type="button" className={styles.configBtn} disabled={configs.length === 0} onClick={() => setManageOpen(true)}>
-            <i className="fas fa-sliders" /> Manage
+            <i className="fas fa-sliders" aria-hidden="true" /> Manage
           </button>
           <button type="button" className={styles.configBtn} onClick={() => setFolderOpen(true)}>
-            <i className="fas fa-images" /> Add from folder
+            <i className="fas fa-images" aria-hidden="true" /> Add from folder
           </button>
         </div>
       </header>
@@ -433,11 +433,11 @@ const SlideshowBuilder = ({
       <div className={styles.sessions}>
         {loadingTimepoints ? (
           <div className={styles.state}>
-            <i className="fas fa-spinner fa-spin" /> Loading photo sessions…
+            <i className="fas fa-spinner fa-spin" aria-hidden="true" /> Loading photo sessions…
           </div>
         ) : timepoints.length === 0 ? (
           <div className={styles.state}>
-            <i className="fas fa-info-circle" /> No photo sessions yet.
+            <i className="fas fa-info-circle" aria-hidden="true" /> No photo sessions yet.
           </div>
         ) : (
           timepoints.map((tp) => {
@@ -453,7 +453,7 @@ const SlideshowBuilder = ({
                   aria-expanded={isOpen}
                   onClick={() => toggleExpand(tp)}
                 >
-                  <i className={cn('fas', isOpen ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevron)} />
+                  <i className={cn('fas', isOpen ? 'fa-chevron-down' : 'fa-chevron-right', styles.chevron)} aria-hidden="true" />
                   <span className={styles.sessionName}>{tp.tp_description || `Timepoint ${tp.tp_code}`}</span>
                   <span className={styles.sessionDate}>{formatSessionDate(tp.tp_date_time)}</span>
                   {count > 0 && <span className={styles.sessionBadge}>{count} added</span>}
@@ -463,11 +463,11 @@ const SlideshowBuilder = ({
                   <div className={styles.grid}>
                     {status === 'loading' ? (
                       <div className={styles.state}>
-                        <i className="fas fa-spinner fa-spin" /> Loading…
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true" /> Loading…
                       </div>
                     ) : status === 'error' ? (
                       <div className={styles.state}>
-                        <i className="fas fa-exclamation-triangle" /> Couldn’t load photos.
+                        <i className="fas fa-exclamation-triangle" aria-hidden="true" /> Couldn’t load photos.
                       </div>
                     ) : items.length === 0 ? (
                       <div className={styles.state}>No photos in this session.</div>
@@ -565,7 +565,7 @@ const SlideshowBuilder = ({
                       aria-label="Split combined photos"
                       onClick={() => onUnpair(index)}
                     >
-                      <i className="fas fa-link-slash" />
+                      <i className="fas fa-link-slash" aria-hidden="true" />
                     </button>
                   )}
                   <button
@@ -575,7 +575,7 @@ const SlideshowBuilder = ({
                     aria-label={`Remove ${item.label}`}
                     onClick={() => onRemove(item.uid)}
                   >
-                    <i className="fas fa-times" />
+                    <i className="fas fa-times" aria-hidden="true" />
                   </button>
                 </div>
               );
@@ -595,7 +595,7 @@ const SlideshowBuilder = ({
             disabled={selected.length === 0}
             onClick={onPlay}
           >
-            <i className="fas fa-play" /> Play{selected.length > 0 ? ` (${selected.length})` : ''}
+            <i className="fas fa-play" aria-hidden="true" /> Play{selected.length > 0 ? ` (${selected.length})` : ''}
           </button>
         </div>
       </div>

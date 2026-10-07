@@ -174,7 +174,7 @@ const BookingForm = ({
             <header className={styles.pageHeader}>
                 <div>
                     <h1>
-                        <i className={`fas ${isEdit ? 'fa-calendar-edit' : 'fa-calendar-plus'}`}></i>{' '}
+                        <i className={`fas ${isEdit ? 'fa-calendar-edit' : 'fa-calendar-plus'}`} aria-hidden="true"></i>{' '}
                         {isEdit ? t('form.editTitle') : t('form.newTitle')}
                     </h1>
                     <p>{t('form.patientLabel', { id: personId })}</p>
@@ -186,7 +186,7 @@ const BookingForm = ({
                     title={t('form.close')}
                     aria-label={t('form.close')}
                 >
-                    <i className="fas fa-times"></i>
+                    <i className="fas fa-times" aria-hidden="true"></i>
                 </button>
             </header>
 
@@ -202,19 +202,19 @@ const BookingForm = ({
                 {/* RIGHT COLUMN: Form */}
                 <div className={styles.formColumn} ref={formColumnRef}>
                     <div className={styles.formHeader}>
-                        <h2><i className="fas fa-clipboard-list"></i> {t('form.detailsHeading')}</h2>
+                        <h2><i className="fas fa-clipboard-list" aria-hidden="true"></i> {t('form.detailsHeading')}</h2>
                     </div>
 
                     <form onSubmit={handleSubmit} className={styles.form}>
                         {error && (
                             <div className={cn(styles.alert, styles.alertError)} role="alert">
-                                <i className="fas fa-exclamation-circle"></i>
+                                <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                                 <span>{error}</span>
                             </div>
                         )}
 
                         <div className={styles.formField}>
-                            <span><i className="fas fa-calendar-check"></i> {t('form.selectedTime')}</span>
+                            <span><i className="fas fa-calendar-check" aria-hidden="true"></i> {t('form.selectedTime')}</span>
                             <div
                                 ref={selectedTimeRef}
                                 className={cn(styles.selectedTime, {
@@ -229,7 +229,7 @@ const BookingForm = ({
                         </div>
 
                         <div className={styles.formField}>
-                            <label htmlFor="doctor"><i className="fas fa-user-md"></i> {t('form.doctor')}</label>
+                            <label htmlFor="doctor"><i className="fas fa-user-md" aria-hidden="true"></i> {t('form.doctor')}</label>
                             <select
                                 id="doctor"
                                 name="DrID"
@@ -249,7 +249,7 @@ const BookingForm = ({
                         </div>
 
                         <div className={styles.formField}>
-                            <label htmlFor="details"><i className="fas fa-notes-medical"></i> {t('form.appointmentType')}</label>
+                            <label htmlFor="details"><i className="fas fa-notes-medical" aria-hidden="true"></i> {t('form.appointmentType')}</label>
                             <select
                                 id="details"
                                 name="AppDetail"
@@ -275,7 +275,7 @@ const BookingForm = ({
                                 onClick={onClose}
                                 disabled={submitting}
                             >
-                                <i className="fas fa-times"></i>
+                                <i className="fas fa-times" aria-hidden="true"></i>
                                 {t('form.cancel')}
                             </button>
                             <button
@@ -285,12 +285,12 @@ const BookingForm = ({
                             >
                                 {submitting ? (
                                     <>
-                                        <i className="fas fa-spinner fa-spin"></i>
+                                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                         {isEdit ? t('form.updating') : t('form.creating')}
                                     </>
                                 ) : (
                                     <>
-                                        <i className={`fas ${isEdit ? 'fa-save' : 'fa-check'}`}></i>
+                                        <i className={`fas ${isEdit ? 'fa-save' : 'fa-check'}`} aria-hidden="true"></i>
                                         {isEdit ? t('form.update') : t('form.create')}
                                     </>
                                 )}

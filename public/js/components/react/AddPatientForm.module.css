@@ -52,7 +52,7 @@
 /* Improved form rows with better alignment */
 .formRow {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
 }
@@ -339,7 +339,7 @@
 }
 
 .accordionHeaderExpanded {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+    background: linear-gradient(135deg, var(--primary-fill) 0%, var(--primary-fill-hover) 100%);
     color: var(--color-white);
 }
 
@@ -507,7 +507,7 @@
 
 .intakeRadioMark {
     font-size: var(--font-size-sm);
-    color: var(--text-muted, var(--text-secondary));
+    color: var(--text-muted);
 }
 
 .intakeRadioLabel:hover {
@@ -524,7 +524,7 @@
 .intakeRadioLabelActive {
     border-color: var(--primary-color);
     background: var(--primary-50);
-    color: var(--primary-color);
+    color: var(--blue-700);
     font-weight: var(--font-weight-semibold);
 }
 

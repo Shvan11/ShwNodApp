@@ -484,11 +484,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                         <button type="submit" className="btn btn-primary" disabled={saving}>
                             {saving ? (
                                 <>
-                                    <i className="fas fa-spinner fa-spin"></i> Saving...
+                                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving...
                                 </>
                             ) : (
                                 <>
-                                    <i className="fas fa-save"></i> {batch ? 'Update Batch' : 'Create Batch'}
+                                    <i className="fas fa-save" aria-hidden="true"></i> {batch ? 'Update Batch' : 'Create Batch'}
                                 </>
                             )}
                         </button>
@@ -700,7 +700,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                 onClick={() => handleSetManufactureDate(tempManufactureDate)}
                                                 disabled={!tempManufactureDate || savingDate}
                                             >
-                                                {savingDate ? <i className="fas fa-spinner fa-spin"></i> : 'Apply'}
+                                                {savingDate ? <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> : 'Apply'}
                                             </button>
                                             <button
                                                 type="button"
@@ -729,7 +729,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                 }}
                                                 title={liveBatch.manufacture_date ? 'Change date' : 'Set manufacture date'}
                                             >
-                                                <i className="fas fa-calendar-alt"></i> {liveBatch.manufacture_date ? 'Edit' : 'Set'}
+                                                <i className="fas fa-calendar-alt" aria-hidden="true"></i> {liveBatch.manufacture_date ? 'Edit' : 'Set'}
                                             </button>
                                             {liveBatch.manufacture_date && !liveBatch.delivered_to_patient_date && (
                                                 <button
@@ -739,7 +739,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                     disabled={savingDate}
                                                     title="Clear manufacture date"
                                                 >
-                                                    <i className="fas fa-times"></i> Clear
+                                                    <i className="fas fa-times" aria-hidden="true"></i> Clear
                                                 </button>
                                             )}
                                         </div>
@@ -780,7 +780,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                 onClick={() => handleSetDeliveryDate(tempDeliveryDate)}
                                                 disabled={!tempDeliveryDate || savingDate}
                                             >
-                                                {savingDate ? <i className="fas fa-spinner fa-spin"></i> : 'Apply'}
+                                                {savingDate ? <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> : 'Apply'}
                                             </button>
                                             <button
                                                 type="button"
@@ -810,7 +810,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                     }}
                                                     title={liveBatch.delivered_to_patient_date ? 'Change date' : 'Set delivery date'}
                                                 >
-                                                    <i className="fas fa-calendar-alt"></i> {liveBatch.delivered_to_patient_date ? 'Edit' : 'Set'}
+                                                    <i className="fas fa-calendar-alt" aria-hidden="true"></i> {liveBatch.delivered_to_patient_date ? 'Edit' : 'Set'}
                                                 </button>
                                             ) : (
                                                 <span className="field-hint">Requires manufacture date</span>
@@ -823,7 +823,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                                     disabled={savingDate}
                                                     title="Clear delivery date"
                                                 >
-                                                    <i className="fas fa-times"></i> Clear
+                                                    <i className="fas fa-times" aria-hidden="true"></i> Clear
                                                 </button>
                                             )}
                                         </div>
@@ -906,11 +906,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                         <button type="submit" className="btn btn-primary" disabled={saving}>
                             {saving ? (
                                 <>
-                                    <i className="fas fa-spinner fa-spin"></i> Saving...
+                                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving...
                                 </>
                             ) : (
                                 <>
-                                    <i className="fas fa-save"></i> {batch ? 'Update Batch' : 'Create Batch'}
+                                    <i className="fas fa-save" aria-hidden="true"></i> {batch ? 'Update Batch' : 'Create Batch'}
                                 </>
                             )}
                         </button>

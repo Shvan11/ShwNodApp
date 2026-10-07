@@ -104,7 +104,7 @@
 
 .btnNav {
     padding: 0.75rem 1rem;
-    background-color: var(--primary-color);
+    background-color: var(--primary-fill);
     color: var(--color-white);
     border: none;
     border-radius: 8px;
@@ -114,7 +114,7 @@
 }
 
 .btnNav:hover:not(:disabled) {
-    background-color: var(--primary-dark);
+    background-color: var(--primary-fill-hover);
     transform: translateY(-2px);
 }
 
@@ -146,7 +146,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1.5rem;
-    background-color: var(--accent-color);
+    background-color: var(--accent-fill);
     color: var(--color-white);
     border: none;
     border-radius: 8px;
@@ -156,7 +156,7 @@
 }
 
 .btnAction:hover:not(:disabled) {
-    background-color: var(--accent-dark);
+    background-color: var(--success-fill);
     transform: translateY(-2px);
 }
 
@@ -200,7 +200,7 @@
 .btnRetry {
     margin-top: 1rem;
     padding: 0.75rem 2rem;
-    background-color: var(--primary-color);
+    background-color: var(--primary-fill);
     color: var(--color-white);
     border: none;
     border-radius: 8px;
@@ -210,13 +210,13 @@
 }
 
 .btnRetry:hover {
-    background-color: var(--primary-dark);
+    background-color: var(--primary-fill-hover);
 }
 
 /* Summary Cards */
 .summaryCards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
     gap: 1.5rem;
     margin-bottom: 2rem;
 }
@@ -357,7 +357,7 @@
 
 .periodEndDisplay {
     font-weight: var(--font-weight-semibold);
-    color: var(--primary-color);
+    color: var(--blue-700);
     background: var(--background-primary);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-md);
@@ -375,14 +375,15 @@
 /* Charts Section */
 .chartsSection {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr));
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
 }
 
 /* Single chart layout */
 .chartsSectionSingle {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): a bare 1fr track cannot go narrower than the chart canvas. */
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .chartCard {
@@ -455,7 +456,7 @@
 }
 
 .dataTable thead {
-    background-color: var(--primary-color);
+    background-color: var(--primary-fill);
     color: var(--color-white);
 }
 
@@ -517,7 +518,8 @@
 
 th.expectedCashColumn {
     background-color: var(--warning-color);
-    color: var(--color-white);
+    /* Dark ink on yellow: white read 1.6:1 here (1.4:1 in dark). */
+    color: var(--palette-gray-900);
 }
 
 .totalRow {
@@ -569,6 +571,22 @@ th.expectedCashColumn {
 
 .clickableRow:hover {
     background-color: rgba(52, 152, 219, 0.1);
+}
+
+/* The day in a clickable row: a real button that looks like the cell's text. */
+.dayButton {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    text-align: inherit;
+}
+
+.dayButton:hover,
+.dayButton:focus-visible {
+    text-decoration: underline;
 }
 
 /* ===================================================================
@@ -702,7 +720,7 @@ th.expectedCashColumn {
     padding: 0.75rem;
     text-align: left;
     font-weight: var(--font-weight-semibold);
-    background-color: var(--info-color);
+    background-color: var(--info-fill);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -741,12 +759,12 @@ th.expectedCashColumn {
 }
 
 .statisticsInvoicesTable .currencyBadge .badge.badgeIqd {
-    background: var(--success-green);
+    background: var(--success-fill);
     color: var(--color-white);
 }
 
 .statisticsInvoicesTable .currencyBadge .badge.badgeUsd {
-    background: var(--info-color);
+    background: var(--info-fill);
     color: var(--color-white);
 }
 
@@ -782,7 +800,7 @@ th.expectedCashColumn {
 
 .statisticsBtnClose {
     padding: 0.75rem 2rem;
-    background-color: var(--gray-400);
+    background-color: var(--palette-gray-500);
     color: var(--color-white);
     border: none;
     border-radius: 8px;
@@ -812,7 +830,7 @@ th.expectedCashColumn {
     }
 
     .chartsSection {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
@@ -875,7 +893,7 @@ th.expectedCashColumn {
     }
 
     .chartsSection {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         gap: 1.25rem;
     }
 
@@ -1195,12 +1213,12 @@ th.expectedCashColumn {
     }
 
     .statisticsInvoicesTable .badge.badgeIqd {
-        background: var(--success-green);
+        background: var(--success-fill);
         color: var(--color-white);
     }
 
     .statisticsInvoicesTable .badge.badgeUsd {
-        background: var(--info-color);
+        background: var(--info-fill);
         color: var(--color-white);
     }
 
@@ -1231,7 +1249,7 @@ th.expectedCashColumn {
     }
 
     .statisticsInvoicesTable tbody td.change {
-        color: var(--warning-color);
+        color: var(--warning-800);
         font-weight: var(--font-weight-bold);
     }
 }

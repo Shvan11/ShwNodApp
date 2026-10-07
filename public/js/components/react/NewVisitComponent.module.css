@@ -50,7 +50,7 @@
 /* Error Display */
 .error {
     background-color: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     padding: 0.375rem 0.5rem;
     border-radius: 4px;
     border-inline-start: 3px solid var(--error-500);
@@ -68,7 +68,7 @@
 .errorClose {
     background: none;
     border: none;
-    color: var(--error-600);
+    color: var(--error-700);
     font-size: 1.25rem;
     cursor: pointer;
     padding: 0;
@@ -125,7 +125,7 @@
 }
 
 .required {
-    color: var(--error-500);
+    color: var(--error-700);
     margin-inline-start: 0.125rem;
 }
 
@@ -222,12 +222,14 @@
 }
 
 .wireBtn.active.upper {
-    background-color: var(--blue-300);
+    background-color: var(--palette-blue-600);
+    border-color: var(--palette-blue-600);
     color: var(--color-white);
 }
 
 .wireBtn.active.lower {
-    background-color: var(--success-300);
+    background-color: var(--success-fill);
+    border-color: var(--success-fill);
     color: var(--color-white);
 }
 
@@ -318,7 +320,7 @@
 .chartHint {
     font-size: 0.6875rem;
     font-weight: 500;
-    color: var(--indigo-600);
+    color: var(--indigo-700);
     background-color: var(--indigo-50);
     padding: 0.1875rem 0.375rem;
     border-radius: 3px;
@@ -368,12 +370,12 @@
 }
 
 .tab:hover {
-    color: var(--indigo-600);
+    color: var(--indigo-700);
     background-color: var(--gray-100);
 }
 
 .tab.active {
-    color: var(--indigo-600);
+    color: var(--indigo-700);
     border-bottom-color: var(--indigo-600);
     background-color: var(--gray-50);
 }

@@ -6,7 +6,7 @@
  * constant; this is the one place we must out-stack a third-party fullscreen UI.
  */
 .overlay {
-  z-index: 100010;
+  z-index: var(--z-index-over-lightbox);
 }
 
 .modal {
@@ -118,13 +118,13 @@
 }
 
 .primaryButton {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--primary-fill);
+  border-color: var(--primary-fill);
   color: var(--color-white);
 }
 
 .primaryButton:hover {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
 }
 
 .linkButton {

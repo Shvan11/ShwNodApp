@@ -388,7 +388,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                             title="Move to Early"
                             disabled={isSaving}
                         >
-                            <i className="fas fa-sun"></i>
+                            <i className="fas fa-sun" aria-hidden="true"></i>
                         </button>
                     )}
                     {canMoveToMain && (
@@ -398,7 +398,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                             title="Move to Main"
                             disabled={isSaving}
                         >
-                            <i className="fas fa-calendar"></i>
+                            <i className="fas fa-calendar" aria-hidden="true"></i>
                         </button>
                     )}
                     {canMoveToLate && (
@@ -408,7 +408,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                             title="Move to Late"
                             disabled={isSaving}
                         >
-                            <i className="fas fa-moon"></i>
+                            <i className="fas fa-moon" aria-hidden="true"></i>
                         </button>
                     )}
                     {isDeleting ? (
@@ -419,7 +419,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                 title="Confirm Delete"
                                 disabled={isSaving}
                             >
-                                <i className="fas fa-check"></i>
+                                <i className="fas fa-check" aria-hidden="true"></i>
                             </button>
                             <button
                                 className={styles.moveBtn}
@@ -427,7 +427,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                 title="Cancel"
                                 disabled={isSaving}
                             >
-                                <i className="fas fa-times"></i>
+                                <i className="fas fa-times" aria-hidden="true"></i>
                             </button>
                         </>
                     ) : (
@@ -437,7 +437,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                             title="Delete"
                             disabled={isSaving}
                         >
-                            <i className="fas fa-trash"></i>
+                            <i className="fas fa-trash" aria-hidden="true"></i>
                         </button>
                     )}
                 </div>
@@ -449,7 +449,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         return (
             <div className={sectionStyles.section}>
                 <div className={sectionStyles.loadingContainer}>
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <span>Loading calendar time settings...</span>
                 </div>
             </div>
@@ -460,7 +460,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
         <div>
             <div className={sectionStyles.section}>
                 <h3>
-                    <i className="fas fa-clock"></i>
+                    <i className="fas fa-clock" aria-hidden="true"></i>
                     Calendar Time Slots
                 </h3>
                 <p className={sectionStyles.sectionDescription}>
@@ -469,14 +469,14 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
 
                 {error && (
                     <div className={styles.errorMessage}>
-                        <i className="fas fa-exclamation-circle"></i>
+                        <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                         {error}
                     </div>
                 )}
 
                 {successMessage && (
                     <div className={styles.successMessage}>
-                        <i className="fas fa-check-circle"></i>
+                        <i className="fas fa-check-circle" aria-hidden="true"></i>
                         {successMessage}
                     </div>
                 )}
@@ -508,7 +508,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                     {/* Add New Time Slot */}
                     <div className={styles.addSlotSection}>
                         <h4>
-                            <i className="fas fa-plus-circle"></i>
+                            <i className="fas fa-plus-circle" aria-hidden="true"></i>
                             Add New Time Slot
                         </h4>
                         <div className={styles.addSlotForm}>
@@ -518,6 +518,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                     min="0"
                                     max="23"
                                     placeholder="HH"
+                                    aria-label="Hour"
                                     value={newTimeHour}
                                     onChange={(e) => setNewTimeHour(e.target.value)}
                                     className={styles.timeInput}
@@ -527,6 +528,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                     value={newTimeMinute}
                                     onChange={(e) => setNewTimeMinute(e.target.value)}
                                     className={styles.minuteSelect}
+                                    aria-label="Minutes"
                                 >
                                     <option value="00">00</option>
                                     <option value="30">30</option>
@@ -536,6 +538,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                 value={newTimeCategory}
                                 onChange={(e) => setNewTimeCategory(e.target.value as SlotCategory)}
                                 className={styles.categorySelect}
+                                aria-label="Slot category"
                             >
                                 <option value="early">Early</option>
                                 <option value="main">Main</option>
@@ -546,7 +549,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                                 onClick={handleAddTimeSlot}
                                 disabled={isSaving || !newTimeHour}
                             >
-                                <i className="fas fa-plus"></i>
+                                <i className="fas fa-plus" aria-hidden="true"></i>
                                 Add
                             </button>
                         </div>
@@ -557,7 +560,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                         {/* Early Slots */}
                         <div className={`${styles.slotCategory} ${styles.earlyCategory}`}>
                             <div className={styles.categoryHeader}>
-                                <i className="fas fa-sun"></i>
+                                <i className="fas fa-sun" aria-hidden="true"></i>
                                 <span>Early Slots</span>
                                 <span className={styles.categoryCount}>{categorizedSlots.early.length}</span>
                             </div>
@@ -576,7 +579,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                         {/* Main Slots */}
                         <div className={`${styles.slotCategory} ${styles.mainCategory}`}>
                             <div className={styles.categoryHeader}>
-                                <i className="fas fa-calendar"></i>
+                                <i className="fas fa-calendar" aria-hidden="true"></i>
                                 <span>Main Slots</span>
                                 <span className={styles.categoryCount}>{categorizedSlots.main.length}</span>
                             </div>
@@ -595,7 +598,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                         {/* Late Slots */}
                         <div className={`${styles.slotCategory} ${styles.lateCategory}`}>
                             <div className={styles.categoryHeader}>
-                                <i className="fas fa-moon"></i>
+                                <i className="fas fa-moon" aria-hidden="true"></i>
                                 <span>Late Slots</span>
                                 <span className={styles.categoryCount}>{categorizedSlots.late.length}</span>
                             </div>
@@ -622,12 +625,12 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                 >
                     {isSaving ? (
                         <>
-                            <i className="fas fa-spinner fa-spin"></i>
+                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                             Saving...
                         </>
                     ) : (
                         <>
-                            <i className="fas fa-save"></i>
+                            <i className="fas fa-save" aria-hidden="true"></i>
                             Save Changes
                         </>
                     )}
@@ -637,7 +640,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                     onClick={handleReset}
                     disabled={!hasChanges || isSaving}
                 >
-                    <i className="fas fa-undo"></i>
+                    <i className="fas fa-undo" aria-hidden="true"></i>
                     Reset
                 </button>
             </div>
@@ -645,7 +648,7 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
             {/* Regenerate Calendar Section */}
             <div className={`${sectionStyles.section} ${styles.regenerateSection}`}>
                 <h3>
-                    <i className="fas fa-sync-alt"></i>
+                    <i className="fas fa-sync-alt" aria-hidden="true"></i>
                     Regenerate Calendar
                 </h3>
                 <p className={sectionStyles.sectionDescription}>
@@ -658,12 +661,12 @@ const CalendarTimesSettings = ({ onChangesUpdate }: CalendarTimesSettingsProps) 
                 >
                     {isRegenerating ? (
                         <>
-                            <i className="fas fa-spinner fa-spin"></i>
+                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                             Regenerating...
                         </>
                     ) : (
                         <>
-                            <i className="fas fa-sync-alt"></i>
+                            <i className="fas fa-sync-alt" aria-hidden="true"></i>
                             Regenerate Calendar Entries
                         </>
                     )}

@@ -17,7 +17,7 @@ export default function LowStockPanel({ items, loading, onRestock }: LowStockPan
     <div className={styles.panel}>
       <div className={styles.header}>
         <h3 className={styles.title}>
-          <i className="fas fa-exclamation-triangle" />
+          <i className="fas fa-exclamation-triangle" aria-hidden="true" />
           Low Stock Items
         </h3>
         {items.length > 0 && (
@@ -31,7 +31,7 @@ export default function LowStockPanel({ items, loading, onRestock }: LowStockPan
         </div>
       ) : items.length === 0 ? (
         <div className={styles.emptyState}>
-          <i className="fas fa-check-circle" />
+          <i className="fas fa-check-circle" aria-hidden="true" />
           <p>All items are well-stocked</p>
         </div>
       ) : (
@@ -51,7 +51,7 @@ export default function LowStockPanel({ items, loading, onRestock }: LowStockPan
                 onClick={() => onRestock(item)}
                 type="button"
               >
-                <i className="fas fa-plus" />
+                <i className="fas fa-plus" aria-hidden="true" />
                 Restock
               </button>
             </li>

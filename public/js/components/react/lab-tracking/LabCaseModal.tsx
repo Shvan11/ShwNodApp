@@ -315,7 +315,7 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
             <ModalHeader
                 title={isCreate ? 'Start Lab Flow' : `Lab Case — ${caseRow ? labelForStage(caseRow.status as LabStage, caseRow.material) : '…'}`}
                 titleId={titleId}
-                icon={<i className="fas fa-flask" />}
+                icon={<i className="fas fa-flask" aria-hidden="true" />}
                 subtitle={caseRow ? `${caseRow.patient_name} · ${caseRow.restoration}${caseRow.teeth ? ` · ${caseRow.teeth}` : ''}` : undefined}
                 onClose={dismiss}
             />
@@ -438,30 +438,30 @@ const LabCaseModal = ({ isOpen, onClose, workId, workItemId, labCaseId, prefillL
                             <div className={styles.actionsRow}>
                                 {laterStages.length > 0 && (
                                     <button type="button" className="btn btn-sm btn-primary" onClick={openAdvance}>
-                                        <i className="fas fa-arrow-right" /> Advance
+                                        <i className="fas fa-arrow-right" aria-hidden="true" /> Advance
                                     </button>
                                 )}
                                 {earlierStages.length > 0 && (
                                     <button type="button" className="btn btn-sm btn-secondary" onClick={openRemake}>
-                                        <i className="fas fa-rotate-left" /> Send back (remake)
+                                        <i className="fas fa-rotate-left" aria-hidden="true" /> Send back (remake)
                                     </button>
                                 )}
                                 {!isTerminal && (
                                     <button type="button" className="btn btn-sm btn-success" onClick={submitDeliver} disabled={advanceMut.isPending}>
-                                        <i className="fas fa-check" /> Deliver
+                                        <i className="fas fa-check" aria-hidden="true" /> Deliver
                                     </button>
                                 )}
                                 {!isTerminal && (
                                     <button type="button" className="btn btn-sm btn-secondary" onClick={toggleHold} disabled={holdMut.isPending || resumeMut.isPending}>
-                                        <i className={caseRow.is_on_hold ? 'fas fa-play' : 'fas fa-pause'} /> {caseRow.is_on_hold ? 'Resume' : 'Hold'}
+                                        <i className={caseRow.is_on_hold ? 'fas fa-play' : 'fas fa-pause'} aria-hidden="true" /> {caseRow.is_on_hold ? 'Resume' : 'Hold'}
                                     </button>
                                 )}
                                 <button type="button" className="btn btn-sm btn-secondary" onClick={openEdit}>
-                                    <i className="fas fa-pen" /> Edit
+                                    <i className="fas fa-pen" aria-hidden="true" /> Edit
                                 </button>
                                 {!isTerminal && (
                                     <button type="button" className="btn btn-sm btn-danger" onClick={openCancel}>
-                                        <i className="fas fa-ban" /> Cancel Case
+                                        <i className="fas fa-ban" aria-hidden="true" /> Cancel Case
                                     </button>
                                 )}
                             </div>

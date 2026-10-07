@@ -93,7 +93,7 @@ export default function UserManagement() {
       {/* User Account Info Section */}
       <div className={styles.sectionCard}>
         <h2 className={styles.sectionTitle}>
-          <i className="fas fa-user"></i>
+          <i className="fas fa-user" aria-hidden="true"></i>
           Account Information
         </h2>
         <p className={styles.sectionDescription}>
@@ -121,7 +121,7 @@ export default function UserManagement() {
       {/* Change Password Section */}
       <div className={styles.sectionCard}>
         <h2 className={styles.sectionTitle}>
-          <i className="fas fa-key"></i>
+          <i className="fas fa-key" aria-hidden="true"></i>
           Change Password
         </h2>
         <p className={styles.sectionDescription}>
@@ -191,7 +191,7 @@ export default function UserManagement() {
         {/* Logout Section */}
         <div className={styles.logoutSection}>
           <h3 className={`${styles.sectionTitle} ${styles.sectionTitleSmall}`}>
-            <i className="fas fa-sign-out-alt"></i>
+            <i className="fas fa-sign-out-alt" aria-hidden="true"></i>
             Session Management
           </h3>
           <p className={styles.sectionDescription}>
@@ -201,7 +201,7 @@ export default function UserManagement() {
             onClick={handleLogout}
             className={`${styles.userMgmtBtn} ${styles.danger}`}
           >
-            <i className="fas fa-sign-out-alt"></i>
+            <i className="fas fa-sign-out-alt" aria-hidden="true"></i>
             <span>Logout</span>
           </button>
         </div>

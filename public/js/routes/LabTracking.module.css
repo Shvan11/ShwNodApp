@@ -13,12 +13,12 @@
 
 .header h1 {
     margin: 0;
-    font-size: var(--font-size-xl, 1.5rem);
+    font-size: var(--font-size-xl);
     color: var(--text-primary);
 }
 
 .stateMsg {
-    padding: var(--spacing-xl, 2rem);
+    padding: var(--spacing-xl);
     text-align: center;
     color: var(--text-secondary);
 }

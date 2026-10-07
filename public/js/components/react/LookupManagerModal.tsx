@@ -65,7 +65,7 @@ const LookupManagerModal = ({ isOpen, onClose, tableKey, title, onChanged }: Loo
       <ModalHeader
         titleId={TITLE_ID}
         title={heading}
-        icon={config ? <i className={config.icon} /> : undefined}
+        icon={config ? <i className={config.icon} aria-hidden="true" /> : undefined}
         onClose={onClose}
       />
       <div className={styles.body}>

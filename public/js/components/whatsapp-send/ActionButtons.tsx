@@ -84,7 +84,7 @@ export default function ActionButtons({
           <span>Go to Authentication</span>
         </button>
       )}
-      <p id="send-instructions" className={`${styles.helpText} ${styles.srOnly}`}>
+      <p id="send-instructions" className={`${styles.helpText} sr-only`}>
         Click to begin sending WhatsApp messages to selected date appointments
       </p>
     </div>

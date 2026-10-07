@@ -179,7 +179,6 @@ async function initializeApplication(): Promise<AppInitResult> {
 
     log.info('🎉 Application started successfully!');
     log.info(`🌐 Server running at http://localhost:${port}`);
-    log.info(`🔒 HTTPS available via Caddy at https://local.shwan-orthodontics.com`);
     log.info(`📊 Health check available at http://localhost:${port}/api/health`);
 
     return { wsEmitter };
@@ -272,7 +271,7 @@ const { wsEmitter } = await initializeApplication();
 // Log application readiness
 log.info('🎯 Application initialization complete - ready to serve requests');
 log.info(`📋 Available endpoints:
-  • Main Application: http://localhost:${port} (via Caddy: https://local.shwan-orthodontics.com)
+  • Main Application: http://localhost:${port}
   • API Health Check: http://localhost:${port}/api/health
   • Basic Health: http://localhost:${port}/health/basic
   • WhatsApp Status: http://localhost:${port}/api/wa/initial-state

@@ -22,6 +22,7 @@ import { ErrorResponses, sendSuccess, sendData } from '../../utils/error-respons
 import { validate } from '../../middleware/validate.js';
 import { authorize } from '../../middleware/auth.js';
 import { FINANCE_ROLES } from '../../shared/auth/roles.js';
+import { isUniqueViolation } from '../../utils/pg-errors.js';
 import * as lookupAdmin from '../../shared/contracts/lookup-admin.contract.js';
 
 const router = Router();
@@ -57,6 +58,10 @@ type TableNameParams = lookupAdmin.TableNameParams;
 // (`lookupAdmin.{updateItem,deleteItem}.params`) instead of a parallel hand-written
 // shape that could drift from it.
 type TableNameIdParams = lookupAdmin.TableIdParams;
+
+// A table with a UNIQUE value column (`time_point_names.name`) refuses a second row
+// spelling the same value; say so instead of a generic 500.
+const DUPLICATE_VALUE = 'That value is already in the list.';
 
 /**
  * Get all available lookup table configurations
@@ -155,6 +160,10 @@ router.post(
 
       sendData(res, lookupAdmin.createItem.response, { id: newId }, 'Item created successfully');
     } catch (error) {
+      if (isUniqueViolation(error)) {
+        ErrorResponses.conflict(res, DUPLICATE_VALUE);
+        return;
+      }
       log.error('Error creating lookup item:', {
         table: req.params.tableName,
         error: (error as Error).message
@@ -212,6 +221,10 @@ router.put(
 
       sendSuccess(res, null, 'Item updated successfully');
     } catch (error) {
+      if (isUniqueViolation(error)) {
+        ErrorResponses.conflict(res, DUPLICATE_VALUE);
+        return;
+      }
       log.error('Error updating lookup item:', {
         table: req.params.tableName,
         id: req.params.id,

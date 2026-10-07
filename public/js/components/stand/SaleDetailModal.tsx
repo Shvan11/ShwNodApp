@@ -36,7 +36,7 @@ export default function SaleDetailModal({ isOpen, sale, loading, error, onRetry,
         {/* Header */}
         <ModalHeader
           titleId="sale-detail-modal-title"
-          icon={<i className="fas fa-receipt" />}
+          icon={<i className="fas fa-receipt" aria-hidden="true" />}
           title={`Sale #${sale?.sale_id ?? '...'}`}
           subtitle={
             sale ? (
@@ -185,7 +185,7 @@ export default function SaleDetailModal({ isOpen, sale, loading, error, onRetry,
                   onClick={() => onVoid(sale.sale_id)}
                   type="button"
                 >
-                  <i className="fas fa-ban" />
+                  <i className="fas fa-ban" aria-hidden="true" />
                   Void Sale
                 </button>
               )}

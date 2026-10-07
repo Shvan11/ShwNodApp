@@ -17,7 +17,7 @@
 }
 
 .title {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     font-size: 1.8rem;
     margin: 0 0 0.5rem;
     display: flex;
@@ -103,7 +103,7 @@
     align-items: center;
     gap: 0.5rem;
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
     border-left: 4px solid var(--error-400);
     padding: 0.85rem 1rem;
     border-radius: 8px;
@@ -132,7 +132,7 @@
 /* Sink cards */
 .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
     gap: 1.5rem;
 }
 
@@ -210,7 +210,7 @@
 
 .badge.down {
     background: var(--error-50);
-    color: var(--error-600);
+    color: var(--error-700);
 }
 
 .badge.off {

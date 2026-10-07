@@ -27,6 +27,7 @@
     "addWork": "إضافة عمل جديد"
   },
   "filter": {
+    "label": "تصفية الأعمال حسب الحالة",
     "all": "جميع الأعمال",
     "active": "نشط",
     "completed": "مكتمل",
@@ -184,6 +185,7 @@
     "namePlaceholder": "اكتب اسمًا…",
     "phoneIdPlaceholder": "الهاتف أو الرقم…",
     "pickHint": "اختر مريضًا من القائمة",
+    "lookupFailed": "تعذّر تحميل الاقتراحات",
     "groupId": "الرقم",
     "groupPhone": "الهاتف",
     "loadingPreview": "جاري تحميل المعاينة...",

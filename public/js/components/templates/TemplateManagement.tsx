@@ -4,6 +4,8 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useToday } from '@/hooks/useClock';
+import { toLocalDateString } from '@/utils/calendarDate';
 import { useNavigate } from 'react-router-dom';
 import styles from './TemplateManagement.module.css';
 import TemplateCard from './TemplateCard';
@@ -34,6 +36,7 @@ function TemplateManagement() {
 
     const { data: templatesData, isLoading, isError, refetch } = useQuery(templatesQuery());
     const allTemplates = useMemo(() => templatesData ?? [], [templatesData]);
+    const today = useToday(); // a dependency of the stats below, so "used today" turns over at midnight
     const error = isError ? 'Failed to load templates' : null;
 
     const [currentDocumentType, setCurrentDocumentType] = useState<number | null>(null);
@@ -51,11 +54,9 @@ function TemplateManagement() {
         system: allTemplates.filter(t => t.is_system).length,
         usedToday: allTemplates.filter(t => {
             if (!t.last_used_date) return false;
-            const lastUsed = new Date(t.last_used_date);
-            const today = new Date();
-            return lastUsed.toDateString() === today.toDateString();
+            return toLocalDateString(new Date(t.last_used_date)) === today;
         }).length
-    }), [allTemplates]);
+    }), [allTemplates, today]);
 
     const handleCreateTemplate = async (templateData: templateContract.CreateTemplateBody) => {
         try {
@@ -112,13 +113,13 @@ function TemplateManagement() {
     );
 
     return (
-        <main className={styles.mainContent}>
+        <div className={styles.mainContent}>
             <div className={styles.container}>
                 {/* Page Header */}
                 <div className={styles.pageHeader}>
                     <div className={styles.headerContent}>
                         <h2>
-                            <i className="fas fa-file-alt"></i> Document Template Management
+                            <i className="fas fa-file-alt" aria-hidden="true"></i> Document Template Management
                         </h2>
                         <p>Design and manage templates for receipts, invoices, prescriptions, and more</p>
                     </div>
@@ -126,7 +127,7 @@ function TemplateManagement() {
                         className="btn btn-primary"
                         onClick={() => setIsCreateModalOpen(true)}
                     >
-                        <i className="fas fa-plus"></i> Create New Template
+                        <i className="fas fa-plus" aria-hidden="true"></i> Create New Template
                     </button>
                 </div>
 
@@ -147,7 +148,7 @@ function TemplateManagement() {
                                     className={`${styles.tab} ${effectiveDocumentType === docType.type_id ? styles.tabActive : ''}`}
                                     onClick={() => setCurrentDocumentType(docType.type_id)}
                                 >
-                                    <i className={`fas ${docType.icon ?? 'fa-file-alt'}`}></i>
+                                    <i className={`fas ${docType.icon ?? 'fa-file-alt'}`} aria-hidden="true"></i>
                                     {docType.type_name}
                                     <span className={styles.tabBadge}>{templateCount}</span>
                                 </button>
@@ -160,12 +161,12 @@ function TemplateManagement() {
                 <div className={styles.templatesContainer}>
                     {isLoading ? (
                         <div className={styles.loadingState}>
-                            <i className="fas fa-spinner fa-spin"></i>
+                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                             <p>Loading templates...</p>
                         </div>
                     ) : error ? (
                         <div className={styles.errorState}>
-                            <i className="fas fa-exclamation-circle"></i>
+                            <i className="fas fa-exclamation-circle" aria-hidden="true"></i>
                             <p>{error}</p>
                             <button className="btn btn-primary" onClick={() => refetch()}>
                                 Retry
@@ -173,14 +174,14 @@ function TemplateManagement() {
                         </div>
                     ) : filteredTemplates.length === 0 ? (
                         <div className={styles.emptyState}>
-                            <i className="fas fa-file-alt"></i>
+                            <i className="fas fa-file-alt" aria-hidden="true"></i>
                             <h3>No templates found</h3>
                             <p>Create your first template to get started</p>
                             <button
                                 className="btn btn-primary"
                                 onClick={() => setIsCreateModalOpen(true)}
                             >
-                                <i className="fas fa-plus"></i> Create Template
+                                <i className="fas fa-plus" aria-hidden="true"></i> Create Template
                             </button>
                         </div>
                     ) : (
@@ -210,7 +211,7 @@ function TemplateManagement() {
                     styles={styles}
                 />
             )}
-        </main>
+        </div>
     );
 }
 

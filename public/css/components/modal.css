@@ -15,38 +15,6 @@
 }
 
 /* ===================================
-   WHATSAPP FORM ELEMENTS
-   =================================== */
-.whatsapp-form-group {
-    margin-bottom: var(--spacing-lg);
-}
-
-.whatsapp-form-label {
-    display: block;
-    margin-bottom: var(--spacing-sm);
-    font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
-}
-
-.whatsapp-textarea {
-    width: 100%;
-    padding: var(--spacing-md);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    resize: vertical;
-    box-sizing: border-box;
-    font-family: var(--font-primary);
-    transition: var(--transition-fast);
-}
-
-.whatsapp-textarea:focus {
-    outline: none;
-    border-color: var(--success-color);
-    box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
-}
-
-/* ===================================
    WHATSAPP ACTION BUTTONS
    =================================== */
 .whatsapp-actions {
@@ -57,7 +25,9 @@
 
 .whatsapp-btn-cancel {
     padding: var(--spacing-md) var(--spacing-lg);
-    background-color: var(--text-secondary);
+    /* A fixed gray: --text-secondary is a TEXT colour and turns near-white in dark,
+       which left this button white-on-white. */
+    background-color: var(--palette-gray-500);
     color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
@@ -67,12 +37,12 @@
 }
 
 .whatsapp-btn-cancel:hover {
-    background-color: var(--gray-600);
+    background-color: var(--palette-gray-600);
 }
 
 .whatsapp-btn-send {
     padding: var(--spacing-md) var(--spacing-lg);
-    background-color: var(--success-color);
+    background-color: var(--success-fill);
     color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
@@ -82,7 +52,7 @@
 }
 
 .whatsapp-btn-send:hover:not(:disabled) {
-    background-color: var(--success-color);
+    background-color: var(--success-fill);
 }
 
 .whatsapp-btn-send:disabled {
@@ -203,7 +173,7 @@
 }
 
 .alert-modal .severity-option input:checked + .severity-badge.severity-1 {
-    background: var(--success-500);
+    background: var(--success-fill);
     color: var(--color-white);
     border-color: var(--success-600);
 }
@@ -215,7 +185,7 @@
 }
 
 .alert-modal .severity-option input:checked + .severity-badge.severity-2 {
-    background: var(--warning-500);
+    background: var(--warning-fill);
     color: var(--color-white);
     border-color: var(--warning-600);
 }
@@ -227,7 +197,7 @@
 }
 
 .alert-modal .severity-option input:checked + .severity-badge.severity-3 {
-    background: var(--error-500);
+    background: var(--error-fill);
     color: var(--color-white);
     border-color: var(--error-600);
 }
@@ -260,11 +230,12 @@
 
 .modal-content.alert-modal .modal-footer .btn-secondary:hover:not(:disabled) {
     background: var(--gray-300);
+    color: var(--text-primary);
 }
 
 .modal-content.alert-modal .modal-footer .btn-primary {
     padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--warning-500);
+    background: var(--warning-fill);
     color: var(--color-white);
     border: none;
     border-radius: var(--radius-md);
@@ -278,7 +249,7 @@
 }
 
 .alert-modal .modal-footer .btn-primary:hover:not(:disabled) {
-    background: var(--warning-600);
+    background: var(--warning-fill-hover);
 }
 
 .alert-modal .modal-footer .btn-primary:disabled,

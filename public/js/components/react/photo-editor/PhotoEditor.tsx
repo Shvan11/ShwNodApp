@@ -1,7 +1,7 @@
 /**
  * Native Dolphin-style photo layout manager (Phase 4). Drag originals from the
  * Sequence Files sidebar into the 8 view slots (or click a photo, then a slot), frame
- * each, then Save — the server (sharp) renders working/{pid}0{tp}.iNN so the grid
+ * each, then Save — the server (sharp) renders working/{pid}{tp:02}.iNN so the grid
  * lights up. Save writes only the slots that differ from what is saved; Cancel leaves
  * without saving (asking first when something would be lost).
  *
@@ -638,8 +638,8 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
             below the grid — clears the active slot. Clicks that land on a cell
             (which carries data-slot-cell) keep their own selection; the cell's
             onClick has already run by the time this bubbles up. */}
-        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss (clears active slot on empty-space click) */}
-        <main
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- backdrop click-to-dismiss (clears active slot on empty-space click) */}
+        <div
           className={styles.gridArea}
           onClick={(e) => {
             if (!(e.target as HTMLElement).closest('[data-slot-cell], [data-slot-menu]')) setActiveView(null);
@@ -657,7 +657,7 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
             overlayUrls={overlayUrls}
             overlayOpacity={overlayOpacity}
           />
-        </main>
+        </div>
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a focusable separator with a value is the WAI-ARIA window-splitter pattern; ←/→ resize it */}
         <div
           className={styles.resizer}

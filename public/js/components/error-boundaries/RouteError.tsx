@@ -81,7 +81,7 @@ export function RouteError() {
   return (
     <div className="route-error-container">
       <div className="route-error-content">
-        <i className={`${icon} route-error-icon`}></i>
+        <i className={`${icon} route-error-icon`} aria-hidden="true"></i>
         <h1>{title}</h1>
         <p>{message}</p>
         <div className="route-error-actions">
@@ -89,11 +89,11 @@ export function RouteError() {
             className="btn btn-primary"
             onClick={() => navigate(-1)}
           >
-            <i className="fas fa-arrow-left"></i>
+            <i className="fas fa-arrow-left" aria-hidden="true"></i>
             Go Back
           </button>
           <Link to="/" className="btn btn-secondary">
-            <i className="fas fa-home"></i>
+            <i className="fas fa-home" aria-hidden="true"></i>
             Dashboard
           </Link>
         </div>

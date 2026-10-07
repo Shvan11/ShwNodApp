@@ -2,7 +2,7 @@
 
 .overlay {
   /* Match LocalSendShareModal: out-stack the PhotoSwipe lightbox if opened from it. */
-  z-index: 100010;
+  z-index: var(--z-index-over-lightbox);
 }
 
 .modal {
@@ -60,13 +60,13 @@
 }
 
 .primaryButton {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--primary-fill);
+  border-color: var(--primary-fill);
   color: var(--color-white);
 }
 
 .primaryButton:hover {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
 }
 
 .toolButton:disabled,
@@ -119,7 +119,7 @@
 .progressTrack {
   width: 100%;
   height: 8px;
-  border-radius: var(--radius-pill, 999px);
+  border-radius: var(--radius-full);
   background: var(--hover-bg);
   overflow: hidden;
 }
@@ -133,7 +133,7 @@
 
 .progressErrors {
   font-size: var(--font-size-sm);
-  color: var(--color-danger, var(--text-secondary));
+  color: var(--error-color);
 }
 
 /* ── Result summary ──────────────────────────────────────────────── */

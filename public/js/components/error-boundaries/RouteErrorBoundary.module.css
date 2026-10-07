@@ -56,31 +56,31 @@
 }
 
 .primaryBtn {
-  background-color: var(--primary-color);
+  background-color: var(--primary-fill);
   color: var(--color-white);
 }
 
 .primaryBtn:hover {
-  background-color: var(--primary-hover);
+  background-color: var(--primary-fill-hover);
   transform: translateY(-1px);
 }
 
 .secondaryBtn {
-  background-color: var(--success-color);
+  background-color: var(--success-fill);
   color: var(--color-white);
 }
 
 .secondaryBtn:hover {
-  background-color: var(--success-darker);
+  background-color: var(--success-fill-hover);
   transform: translateY(-1px);
 }
 
 .tertiaryBtn {
-  background-color: var(--neutral-gray);
+  background-color: var(--palette-gray-500);
   color: var(--color-white);
 }
 
 .tertiaryBtn:hover {
-  background-color: var(--neutral-gray-dark);
+  background-color: var(--palette-gray-600);
   transform: translateY(-1px);
 }

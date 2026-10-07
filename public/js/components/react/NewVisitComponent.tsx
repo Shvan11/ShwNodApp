@@ -251,7 +251,7 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
             {/* Header */}
             <div className={styles.header}>
                 <h3>
-                    <i className="fas fa-calendar-plus"></i> {visitId ? 'Edit Visit' : 'Add New Visit'}
+                    <i className="fas fa-calendar-plus" aria-hidden="true"></i> {visitId ? 'Edit Visit' : 'Add New Visit'}
                 </h3>
             </div>
 
@@ -268,11 +268,11 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                 {/* Top Action Buttons */}
                 <div className={cn(styles.formActions, styles.topActions)}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
-                        <i className="fas fa-save"></i> {loading ? 'Saving...' : (visitId ? 'Update' : 'Add Visit')}
+                        <i className="fas fa-save" aria-hidden="true"></i> {loading ? 'Saving...' : (visitId ? 'Update' : 'Add Visit')}
                     </button>
                     {onCancel && (
                         <button type="button" onClick={onCancel} className="btn btn-secondary">
-                            <i className="fas fa-times"></i> Cancel
+                            <i className="fas fa-times" aria-hidden="true"></i> Cancel
                         </button>
                     )}
                 </div>
@@ -288,7 +288,7 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                         className={cn(styles.tab, { [styles.active]: activeTab === 'basic' })}
                         onClick={() => setActiveTab('basic')}
                     >
-                        <i className="fas fa-calendar"></i> Basic Info
+                        <i className="fas fa-calendar" aria-hidden="true"></i> Basic Info
                     </button>
                     <button
                         type="button"
@@ -299,7 +299,7 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                         className={cn(styles.tab, { [styles.active]: activeTab === 'treatment' })}
                         onClick={() => setActiveTab('treatment')}
                     >
-                        <i className="fas fa-teeth"></i> Treatment Details
+                        <i className="fas fa-teeth" aria-hidden="true"></i> Treatment Details
                     </button>
                 </div>
 
@@ -343,7 +343,7 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                 {!visitId && latestWires && (latestWires.UpperWireName || latestWires.LowerWireName) && (
                     <div className={styles.latestWiresSection}>
                         <div className={styles.sectionLabel}>
-                            <i className="fas fa-info-circle"></i> Most Recent Wires:
+                            <i className="fas fa-info-circle" aria-hidden="true"></i> Most Recent Wires:
                         </div>
                         <div className={styles.wiresGrid}>
                             {latestWires.UpperWireName && (
@@ -451,10 +451,10 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                 <div className={styles.dentalChartSection}>
                     <span className={styles.chartLabel}>
                         <span>
-                            <i className="fas fa-tooth"></i> Select Teeth
+                            <i className="fas fa-tooth" aria-hidden="true"></i> Select Teeth
                         </span>
                         <span className={styles.chartHint}>
-                            <i className="fas fa-arrow-down"></i> Appends to: <strong>{lastFocusedField === 'others' ? 'Other Notes' : 'Next Visit'}</strong>
+                            <i className="fas fa-arrow-down" aria-hidden="true"></i> Appends to: <strong>{lastFocusedField === 'others' ? 'Other Notes' : 'Next Visit'}</strong>
                         </span>
                     </span>
                     <DentalChart onToothClick={handleToothClick} />
@@ -466,7 +466,7 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                         Other Notes
                         {lastFocusedField === 'others' && (
                             <span className={styles.activeIndicator}>
-                                <i className="fas fa-tooth"></i> Active
+                                <i className="fas fa-tooth" aria-hidden="true"></i> Active
                             </span>
                         )}
                     </label>
@@ -488,7 +488,7 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                         Next Visit Instructions
                         {lastFocusedField === 'next_visit' && (
                             <span className={styles.activeIndicator}>
-                                <i className="fas fa-tooth"></i> Active
+                                <i className="fas fa-tooth" aria-hidden="true"></i> Active
                             </span>
                         )}
                     </label>
@@ -554,11 +554,11 @@ const NewVisitComponent = ({ workId, visitId = null, personId = null, onSave, on
                 {/* Bottom Form Actions */}
                 <div className={styles.formActions}>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
-                        <i className="fas fa-save"></i> {loading ? 'Saving...' : (visitId ? 'Update Visit' : 'Add Visit')}
+                        <i className="fas fa-save" aria-hidden="true"></i> {loading ? 'Saving...' : (visitId ? 'Update Visit' : 'Add Visit')}
                     </button>
                     {onCancel && (
                         <button type="button" onClick={onCancel} className="btn btn-secondary">
-                            <i className="fas fa-times"></i> Cancel
+                            <i className="fas fa-times" aria-hidden="true"></i> Cancel
                         </button>
                     )}
                 </div>

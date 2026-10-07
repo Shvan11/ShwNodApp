@@ -92,7 +92,7 @@
 }
 
 .item.expanded .itemHeader {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 

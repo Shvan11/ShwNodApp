@@ -45,7 +45,11 @@ interface MessageStatusTableProps {
   loading: boolean;
   currentDate: string;
   summary: MessageSummary;
-  /** Right-click on a row — opens the resend/copy context menu (owner: page). */
+  /**
+   * Opens the row's resend/copy menu (owner: page). Fired by a right-click on the
+   * row AND by the row's ⋮ button: right-click alone left the four actions with no
+   * keyboard path and none at all on a tablet (FE-F25-6).
+   */
   onRowContextMenu?: (event: ReactMouseEvent, msg: StatusRow) => void;
 }
 
@@ -121,6 +125,7 @@ export default function MessageStatusTable({
               <th>Phone</th>
               <th>Status</th>
               <th>Time Sent</th>
+              {onRowContextMenu && <th><span className="sr-only">Actions</span></th>}
             </tr>
           </thead>
           <tbody>
@@ -149,6 +154,20 @@ export default function MessageStatusTable({
                     )}
                   </td>
                   <td className={styles.timeSent}>{timeSent}</td>
+                  {onRowContextMenu && (
+                    <td className={styles.rowActionsCell}>
+                      <button
+                        type="button"
+                        className={styles.rowActionsBtn}
+                        aria-haspopup="menu"
+                        aria-label={`Actions for ${patientName}`}
+                        title="Re-send, open in WhatsApp, copy"
+                        onClick={(e) => onRowContextMenu(e, msg)}
+                      >
+                        <i className="fas fa-ellipsis-v" aria-hidden="true" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

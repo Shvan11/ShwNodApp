@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { myApprovalsQuery, HEADER_BELL_POLL } from '@/query/queries';
-import { ACTION_LABEL_KEY } from '@/services/approvals';
+import { ACTION_LABEL_KEY, approvalNoteText, approvalSummaryText } from '@/services/approvals';
 import type { ApprovalStatus } from '@shared/contracts/approvals.contract';
 import HeaderPopover, { RelativeAge } from './HeaderPopover';
 import styles from './MyApprovalsBadge.module.css';
@@ -64,7 +64,7 @@ const MyApprovalsBadge = () => {
                                 className={`${styles.item} ${isPending ? '' : styles.decided}`}
                             >
                                 <div className={styles.itemBody}>
-                                    <div className={styles.itemText}>{row.summary}</div>
+                                    <div className={styles.itemText}>{approvalSummaryText(row, t)}</div>
                                     <div className={styles.itemMeta}>
                                         {patient && (
                                             <span className={styles.patientTag} title={patient}>
@@ -79,8 +79,8 @@ const MyApprovalsBadge = () => {
                                             {t(`status.${row.status}`)}
                                         </span>
                                         {row.review_note && (
-                                            <span className={styles.note} title={row.review_note}>
-                                                {row.review_note}
+                                            <span className={styles.note} title={approvalNoteText(row.review_note, t)}>
+                                                {approvalNoteText(row.review_note, t)}
                                             </span>
                                         )}
                                         <RelativeAge iso={row.requested_at} className={styles.age} />

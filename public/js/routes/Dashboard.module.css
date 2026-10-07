@@ -17,7 +17,7 @@
 
 .dashboardGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
     gap: 1.5rem;
     margin-top: 0.25rem;
 }
@@ -64,7 +64,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--info-color), var(--success-color));
+    background: linear-gradient(135deg, var(--info-fill), var(--success-fill));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -108,7 +108,7 @@
 }
 
 .cardFooter:hover {
-    color: var(--info-600);
+    color: var(--info-700);
 }
 
 .cardFooter i {
@@ -316,13 +316,13 @@
 
 /* Doubled class so the active state outranks `.customizeButton:hover` without !important. */
 .customizeButton.customizeButtonActive {
-    background: var(--info-color);
+    background: var(--info-fill);
     color: var(--color-white);
-    border-color: var(--info-color);
+    border-color: var(--info-fill);
 }
 
 .customizeButton.customizeButtonActive:hover {
-    background: var(--info-600);
+    background: var(--info-fill);
 }
 
 /* Card customization mode states */
@@ -342,7 +342,7 @@
 }
 
 .cardLink.editable .dashboardCard::before {
-    background: linear-gradient(90deg, var(--info-color), var(--info-400));
+    background: linear-gradient(90deg, var(--info-color), var(--info-300));
     animation: borderPulse 2s infinite ease-in-out;
 }
 
@@ -380,7 +380,7 @@
 }
 
 .gripHandle {
-    color: var(--gray-400);
+    color: var(--text-muted);
     font-size: 1rem;
     cursor: grab;
     padding: 0.15rem 0.35rem;
@@ -414,9 +414,9 @@
 }
 
 .actionBtn:hover:not(:disabled) {
-    background: var(--info-color);
+    background: var(--info-fill);
     color: var(--color-white);
-    border-color: var(--info-color);
+    border-color: var(--info-fill);
 }
 
 .actionBtn:disabled {

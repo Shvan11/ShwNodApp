@@ -3,8 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
 import { useImportFolder } from '@/hooks/useImportFolder';
+import { useTimepointNames } from '@/hooks/useTimepointNames';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
+import TimepointNameSelect from './TimepointNameSelect';
 import styles from './PhotoSessionDialog.module.css';
 import { formatISODate } from '../../core/utils';
 import { postJSON, httpErrorMessage } from '../../core/http';
@@ -22,18 +24,6 @@ interface Props {
     onPrepared?: (result: { tpCode: number; tpName: string; tpDate: string }) => void;
 }
 
-interface TimepointType {
-    value: string;
-    label: string;
-}
-
-const TIMEPOINT_TYPES: TimepointType[] = [
-    { value: 'Initial', label: 'Initial' },
-    { value: 'Progress', label: 'Progress' },
-    { value: 'Final', label: 'Final' },
-    { value: 'Retention', label: 'Retention' }
-];
-
 interface ConflictInfo {
     conflictType: string;
     existingDate: string;
@@ -49,7 +39,12 @@ const PhotoSessionDialog = ({ personId, onClose, onPrepared }: Props) => {
     // here so the user sees/grants access before opening the editor.
     const importFolder = useImportFolder('readwrite');
     const [submitting, setSubmitting] = useState(false);
-    const [timepointType, setTimepointType] = useState('Initial');
+    // The session names come from the clinic's list (Settings → Lookups). Until one is
+    // picked — or if the picked one is then removed from the list — it is the first.
+    const timepointNames = useTimepointNames();
+    const [pickedType, setPickedType] = useState<string | null>(null);
+    const timepointType =
+        pickedType !== null && timepointNames.includes(pickedType) ? pickedType : timepointNames[0];
     const [selectedDate, setSelectedDate] = useState(formatISODate());
     const [conflictInfo, setConflictInfo] = useState<ConflictInfo | null>(null);
     // Set (with a message) when the server reports the patient has no English name. Dolphin's
@@ -186,7 +181,7 @@ const PhotoSessionDialog = ({ personId, onClose, onPrepared }: Props) => {
                     {conflictInfo && (
                         <div className={styles.conflictWarning}>
                             <div className={styles.conflictIcon}>
-                                <i className="fas fa-exclamation-triangle" />
+                                <i className="fas fa-exclamation-triangle" aria-hidden="true" />
                             </div>
                             <div className={styles.conflictContent}>
                                 <strong>Date Conflict Detected</strong>
@@ -218,7 +213,7 @@ const PhotoSessionDialog = ({ personId, onClose, onPrepared }: Props) => {
                     {needsProfileFix ? (
                         <div className={`${styles.conflictWarning} ${styles.conflictError}`}>
                             <div className={styles.conflictIcon}>
-                                <i className="fas fa-language" />
+                                <i className="fas fa-language" aria-hidden="true" />
                             </div>
                             <div className={styles.conflictContent}>
                                 <strong>English name required</strong>
@@ -229,7 +224,7 @@ const PhotoSessionDialog = ({ personId, onClose, onPrepared }: Props) => {
                                         className="btn btn-primary"
                                         onClick={handleOpenEditPatient}
                                     >
-                                        <i className="fas fa-user-edit" /> Open Edit Patient Form
+                                        <i className="fas fa-user-edit" aria-hidden="true" /> Open Edit Patient Form
                                     </button>
                                     <button
                                         type="button"
@@ -246,17 +241,13 @@ const PhotoSessionDialog = ({ personId, onClose, onPrepared }: Props) => {
                     {/* Session Type */}
                     <div className={styles.formGroup}>
                         <label htmlFor="photo-session-type">Session Type</label>
-                        <select
+                        <TimepointNameSelect
                             id="photo-session-type"
                             value={timepointType}
-                            onChange={(e: ChangeEvent<HTMLSelectElement>) => setTimepointType(e.target.value)}
+                            onChange={setPickedType}
                             className={styles.formSelect}
                             disabled={!!conflictInfo}
-                        >
-                            {TIMEPOINT_TYPES.map(tp => (
-                                <option key={tp.value} value={tp.value}>{tp.label}</option>
-                            ))}
-                        </select>
+                        />
                     </div>
 
                     {/* Date Selection */}

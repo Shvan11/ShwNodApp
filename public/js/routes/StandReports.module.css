@@ -72,7 +72,6 @@
   margin: 0 0 8px;
   font-size: 14px;
   font-weight: var(--font-weight-medium);
-  opacity: 0.9;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -86,19 +85,18 @@
 .summaryCard .cardNote {
   margin: var(--spacing-xs) 0 0;
   font-size: var(--font-size-xs);
-  opacity: 0.85;
 }
 
 .revenueCard {
-  background: linear-gradient(135deg, var(--info-color) 0%, var(--blue-700) 100%);
+  background: linear-gradient(135deg, var(--info-fill) 0%, var(--palette-blue-700) 100%);
 }
 
 .profitCard {
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-600) 100%);
+  background: linear-gradient(135deg, var(--success-fill) 0%, var(--success-fill-hover) 100%);
 }
 
 .purchasesCard {
-  background: linear-gradient(135deg, var(--warning-orange) 0%, var(--warning-600) 100%);
+  background: linear-gradient(135deg, var(--warning-fill) 0%, var(--warning-fill-hover) 100%);
 }
 
 .netCard {
@@ -146,6 +144,6 @@
   }
 
   .chartsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

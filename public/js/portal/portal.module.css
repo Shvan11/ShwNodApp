@@ -6,7 +6,7 @@
   width: 24px;
   height: 24px;
   border: 3px solid #e3e7ef;
-  border-top-color: #007bff;
+  border-top-color: #0a66ee;
   border-radius: 50%;
   animation: portalSpin 0.9s linear infinite;
 }
@@ -21,7 +21,7 @@
   justify-content: center;
   gap: 0.75rem;
   height: 100vh;
-  color: #6c757d;
+  color: #5f666d;
   font-size: 0.95rem;
 }
 
@@ -52,26 +52,37 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 2rem 1rem;
-  color: #6c757d;
+  color: #5f666d;
   font-size: 0.9rem;
 }
 
 .emptyState {
   text-align: center;
   padding: 3rem 1rem;
-  color: #6c757d;
+  color: #5f666d;
 }
 
+/* PortalIcon: an inline SVG that behaves like the icon-font glyph it replaced —
+   sized by the font size around it, coloured by the text colour. */
+.icon {
+  display: inline-block;
+  fill: currentColor;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
+/* A block-level SVG is not centred by its parent's text-align (the icon-font
+   glyph was): the auto side margins do it. */
 .emptyIcon {
   font-size: 2.5rem;
   color: #c7cfda;
-  margin-bottom: 0.75rem;
+  margin: 0 auto 0.75rem;
   display: block;
 }
 
 .emptyHint {
   font-size: 0.85rem;
-  color: #8b94a1;
+  color: #69717d;
   margin-top: 0.25rem;
 }
 
@@ -104,8 +115,8 @@
 
 .loginIcon {
   font-size: 2rem;
-  color: #007bff;
-  margin-bottom: 0.5rem;
+  color: #0a66ee;
+  margin: 0 auto 0.5rem;
   display: block;
 }
 
@@ -117,7 +128,7 @@
 
 .loginSubtitle {
   margin: 0.2rem 0 0 0;
-  color: #6c757d;
+  color: #5f666d;
   font-size: 0.9rem;
 }
 
@@ -146,18 +157,18 @@
 
 .input:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: #0a66ee;
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
 }
 
 .input:disabled {
   background: #f6f7f9;
-  color: #8b94a1;
+  color: #69717d;
 }
 
 .primaryButton {
   padding: 0.85rem 1rem;
-  background: #007bff;
+  background: #0a66ee;
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -168,7 +179,7 @@
 }
 
 .primaryButton:hover:not(:disabled) {
-  background: #0065d1;
+  background: #0854c9;
 }
 
 .primaryButton:disabled {
@@ -178,7 +189,7 @@
 
 .loginHint {
   font-size: 0.8rem;
-  color: #6c757d;
+  color: #5f666d;
   text-align: center;
   margin: 0.5rem 0 0;
   line-height: 1.4;
@@ -219,14 +230,14 @@
   min-width: 0;
 }
 
-.headerTitle i {
-  color: #007bff;
+.headerTitle .icon {
+  color: #0a66ee;
   font-size: 1.35rem;
 }
 
 .headerHello {
   font-size: 0.75rem;
-  color: #8b94a1;
+  color: #69717d;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -298,19 +309,19 @@
   padding: 0.65rem 0.25rem;
   border: none;
   background: transparent;
-  color: #6c757d;
+  color: #5f666d;
   font-size: 0.7rem;
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
 }
 
-.tabButton i {
+.tabButton .icon {
   font-size: 1.1rem;
 }
 
 .tabActive {
-  color: #007bff;
+  color: #0a66ee;
 }
 
 /* ---------- appointment tab ---------- */
@@ -324,7 +335,7 @@
 
 .appointmentLabel {
   font-size: 0.75rem;
-  color: #8b94a1;
+  color: #69717d;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.5rem;
@@ -339,7 +350,7 @@
 
 .appointmentTime {
   margin-top: 0.25rem;
-  color: #007bff;
+  color: #0a66ee;
   font-size: 1.1rem;
   font-weight: 500;
 }
@@ -353,10 +364,10 @@
   font-size: 0.9rem;
 }
 
-.appointmentRow i {
-  color: #8b94a1;
+/* A fixed-width slot, so the two rows' labels line up under icons of different widths. */
+.appointmentRow .icon {
+  color: #69717d;
   width: 1.1rem;
-  text-align: center;
 }
 
 /* ---------- photos tab ---------- */
@@ -386,7 +397,7 @@
 }
 
 .tpChipActive {
-  border-color: #007bff;
+  border-color: #0a66ee;
   background: #e9f1ff;
   color: #0056b3;
 }
@@ -398,7 +409,7 @@
 
 .tpChipDesc {
   font-size: 0.7rem;
-  color: #8b94a1;
+  color: #69717d;
   margin-top: 0.15rem;
   white-space: nowrap;
   overflow: hidden;
@@ -511,7 +522,7 @@
 
 /* ---------- payments tab ---------- */
 .totalCard {
-  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(135deg, #0a66ee 0%, #0056b3 100%);
   color: #fff;
   border-radius: 14px;
   padding: 1.25rem;

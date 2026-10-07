@@ -121,7 +121,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
     return (
         <div className={styles.container}>
             <div className={styles.header}>
-                <h2><i className="fas fa-dollar-sign"></i> Exchange Rates</h2>
+                <h2><i className="fas fa-dollar-sign" aria-hidden="true"></i> Exchange Rates</h2>
                 <p>Manage today's USD → IQD exchange rate and review rate history.</p>
             </div>
 
@@ -130,7 +130,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
 
                 {todayLoading ? (
                     <div className={styles.loading}>
-                        <i className="fas fa-spinner fa-spin"></i> Loading...
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading...
                     </div>
                 ) : editing ? (
                     <div className={styles.editRow}>
@@ -155,7 +155,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                                 onClick={handleSave}
                                 disabled={saving}
                             >
-                                {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : 'Save'}
+                                {saving ? <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Saving...</> : 'Save'}
                             </button>
                             <button
                                 type="button"
@@ -175,7 +175,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                             </span>
                         ) : (
                             <span className={styles.notSet}>
-                                <i className="fas fa-exclamation-triangle"></i> Not set for today
+                                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> Not set for today
                             </span>
                         )}
                         <button
@@ -183,7 +183,7 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
                             className="btn btn-primary"
                             onClick={handleStartEdit}
                         >
-                            <i className="fas fa-edit"></i> {todayRate !== null ? 'Edit' : 'Set Rate'}
+                            <i className="fas fa-edit" aria-hidden="true"></i> {todayRate !== null ? 'Edit' : 'Set Rate'}
                         </button>
                     </div>
                 )}
@@ -218,11 +218,11 @@ const ExchangeRatesSettings = ({ onChangesUpdate }: ExchangeRatesSettingsProps) 
 
                 {historyLoading ? (
                     <div className={styles.loading}>
-                        <i className="fas fa-spinner fa-spin"></i> Loading...
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading...
                     </div>
                 ) : history.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-inbox fa-2x"></i>
+                        <i className="fas fa-inbox fa-2x" aria-hidden="true"></i>
                         <p>No rates recorded in this range</p>
                     </div>
                 ) : (

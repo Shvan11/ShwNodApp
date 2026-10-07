@@ -8,7 +8,7 @@
  *  POST /:personId/prepare     — find/create a timepoint in the local clone tables
  *                                (+ tblwork Initial/Final date conflict/override).
  *  POST /:personId/render      — resolve the timepoint, then render framed slots to
- *                                working/{pid}0{tp}.iNN + record rows in the local clone
+ *                                working/{pid}{tp:02}.iNN + record rows in the local clone
  *                                tables IN THE BACKGROUND (202 + SSE on completion).
  *  GET  /:personId/framing/:tp — each saved view's recorded framing ("Continue editing").
  *  GET  /:personId/source-size — an original's post-EXIF pixel size (resolution readout).
@@ -36,11 +36,12 @@ import {
   deleteNativeTimePointImage,
 } from '../../services/database/queries/native-timepoint-queries.js';
 import { renderSlotToWorking, deleteWorkingView } from '../../services/imaging/photo-render.service.js';
+import { dolphinImageFileName } from '../../services/files/clinic-paths.js';
 import { tagOriginalForView, untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
 import { listTakenDates } from '../../services/imaging/photo-taken-date.service.js';
 import { readSavedFramings, readSourceSize } from '../../services/imaging/photo-framing.service.js';
-import { FileExplorerError } from '../../services/files/file-explorer.service.js';
+import { FileExplorerError, sanitizeName } from '../../services/files/file-explorer.service.js';
 import { toDateOnly, parseLocalDate } from '../../utils/date.js';
 import { log } from '../../utils/logger.js';
 
@@ -134,6 +135,15 @@ router.post(
         ErrorResponses.badRequest(res, 'Invalid tpDate (expected YYYY-MM-DD)');
         return;
       }
+      // The name becomes a folder segment on the share ({name}_{DD-MM-YYYY}) — the same
+      // guard as renaming a session. The dialog's list is clinic-editable (Settings →
+      // Lookups), so a name with a path character can be picked here.
+      try {
+        sanitizeName(tpDescription);
+      } catch {
+        ErrorResponses.badRequest(res, 'Name cannot contain path characters such as / \\ :');
+        return;
+      }
 
       const patient = await getPatientForPhotoSession(personId);
       if (!patient) {
@@ -205,7 +215,7 @@ router.post(
 /**
  * POST /:personId/render
  * Resolve the timepoint synchronously, answer 202, then render each framed slot to
- * working/{pid}0{tp}.iNN and upsert local image rows IN THE BACKGROUND (see
+ * working/{pid}{tp:02}.iNN and upsert local image rows IN THE BACKGROUND (see
  * processRenderJob). Slots are processed sequentially; partial success is tolerated.
  * Completion (with a warning count) is announced over SSE so the photo grid refetches.
  */
@@ -373,7 +383,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           timePointId,
           personId,
           digits,
-          `${personId}0${tp_code}.I${digits}`, // stored image-file form (uppercase I)
+          dolphinImageFileName(personId, tp_code, view), // stored image-file form (uppercase I)
           parsedDate,
           null
         );

@@ -5,7 +5,8 @@ import Select, { SingleValue } from 'react-select';
 import { useQuery } from '@tanstack/react-query';
 import { useWhatsAppStatus } from '../../contexts/GlobalStateContext';
 import { postFormData, httpErrorMessage } from '@/core/http';
-import { patientPhonesQuery, googleContactsQuery } from '@/query/queries';
+import { googleContactsQuery } from '@/query/queries';
+import { usePatientContacts, PATIENT_CONTACTS_PROMPT } from '@/hooks/usePatientContacts';
 import { GOOGLE_CONTACT_ACCOUNTS } from '@shared/google-contacts-accounts';
 import styles from './SendMessage.module.css';
 
@@ -56,6 +57,9 @@ const SendMessage = () => {
     });
     const [selectedSource, setSelectedSource] = useState('pat');
     const [selectedContact, setSelectedContact] = useState<ContactOption | null>(null);
+    // What is typed in the contact picker. For the patients' source it is the search
+    // the server answers; for a Google account the picker filters its own list.
+    const [contactSearch, setContactSearch] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [program, setProgram] = useState('WhatsApp');
     const [status, setStatus] = useState<{ type: StatusType; message: string } | null>(null);
@@ -67,17 +71,20 @@ const SendMessage = () => {
     const showAuthRequired = authPrompted && program === 'WhatsApp' && !whatsappClientReady;
 
     // Contacts come from one of the sources above; only the active one fetches.
-    const phonesResult = useQuery({ ...patientPhonesQuery(), enabled: selectedSource === 'pat' });
+    // Patients are searched on the server as the user types (only those with a phone
+    // number: one without can't be sent anything). A Google account is one list.
+    const fromPatients = selectedSource === 'pat';
+    const patientResult = usePatientContacts(contactSearch, fromPatients);
     const googleResult = useQuery({
         ...googleContactsQuery(selectedSource),
-        enabled: selectedSource !== 'pat',
+        enabled: !fromPatients,
     });
-    const activeResult = selectedSource === 'pat' ? phonesResult : googleResult;
-    // A patient with no phone can't be sent anything — it used to be listed as "Name - null".
-    const contacts: Contact[] =
-        selectedSource === 'pat'
-            ? (phonesResult.data ?? []).flatMap((c) => (c.phone ? [{ id: c.id, name: c.name, phone: c.phone }] : []))
-            : (googleResult.data ?? []).map((c) => ({ id: c.id, name: c.text, phone: c.phone }));
+    const activeResult = fromPatients
+        ? { isError: patientResult.isError, error: patientResult.error, isFetching: patientResult.isLoading }
+        : googleResult;
+    const contacts: Contact[] = fromPatients
+        ? patientResult.contacts
+        : (googleResult.data ?? []).map((c) => ({ id: c.id, name: c.text, phone: c.phone }));
     const contactOptions: ContactOption[] = contacts.map((contact) => ({
         value: contact.id,
         label: `${contact.name} - ${contact.phone}`,
@@ -99,6 +106,7 @@ const SendMessage = () => {
     const handleSourceChange = (newSource: string) => {
         setSelectedSource(newSource);
         setSelectedContact(null);
+        setContactSearch('');
         setPhoneNumber('');
     };
 
@@ -265,11 +273,18 @@ const SendMessage = () => {
                         value={selectedContact}
                         onChange={handleContactSelect}
                         options={contactOptions}
+                        inputValue={contactSearch}
+                        onInputChange={(text) => setContactSearch(text)}
+                        // The server has already matched the patients; filtering them again by
+                        // label would drop one found by their ID or second number.
+                        filterOption={fromPatients ? null : undefined}
                         isSearchable={true}
                         isClearable={true}
                         isLoading={activeResult.isFetching}
                         placeholder="Search and select a contact..."
-                        noOptionsMessage={() => 'No contacts found'}
+                        noOptionsMessage={() =>
+                            fromPatients && patientResult.needsInput ? PATIENT_CONTACTS_PROMPT : 'No contacts found'
+                        }
                         classNamePrefix="react-select"
                     />
                 </div>

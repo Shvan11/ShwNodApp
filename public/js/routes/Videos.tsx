@@ -393,14 +393,14 @@ export default function Videos() {
       <div className={styles.videosHeader}>
         <h1>Educational Videos</h1>
         <button className="btn btn-primary" onClick={handleAddVideo}>
-          <i className="fas fa-plus"></i> Add Video
+          <i className="fas fa-plus" aria-hidden="true"></i> Add Video
         </button>
       </div>
 
       {/* Search and Filter Bar */}
       <div className={styles.filterBar}>
         <div className={styles.searchBox}>
-          <i className="fas fa-search"></i>
+          <i className="fas fa-search" aria-hidden="true"></i>
           <input
             type="text"
             placeholder="Search videos..."
@@ -412,6 +412,7 @@ export default function Videos() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
+            aria-label="Filter by category"
           >
             <option value="">All Categories</option>
             {categories.map((cat) => (
@@ -444,7 +445,7 @@ export default function Videos() {
       {/* Empty State */}
       {!loading && filteredVideos.length === 0 && (
         <div className={styles.emptyState}>
-          <i className="fas fa-video-slash"></i>
+          <i className="fas fa-video-slash" aria-hidden="true"></i>
           <p>
             {searchQuery || selectedCategory
               ? 'No videos match your filters'
@@ -475,7 +476,7 @@ export default function Videos() {
                   }}
                 />
                 <div className={styles.playOverlay}>
-                  <i className="fas fa-play-circle"></i>
+                  <i className="fas fa-play-circle" aria-hidden="true"></i>
                 </div>
               </div>
               <div className={styles.cardContent}>
@@ -493,21 +494,21 @@ export default function Videos() {
                   onClick={() => handleShowQR(video)}
                   title="Share QR Code"
                 >
-                  <i className="fas fa-qrcode"></i>
+                  <i className="fas fa-qrcode" aria-hidden="true"></i>
                 </button>
                 <button
                   className={styles.actionBtn}
                   onClick={() => handleEditVideo(video)}
                   title="Edit"
                 >
-                  <i className="fas fa-edit"></i>
+                  <i className="fas fa-edit" aria-hidden="true"></i>
                 </button>
                 <button
                   className={`${styles.actionBtn} ${styles.deleteBtn}`}
                   onClick={() => void handleDeleteClick(video)}
                   title="Delete"
                 >
-                  <i className="fas fa-trash"></i>
+                  <i className="fas fa-trash" aria-hidden="true"></i>
                 </button>
               </div>
             </div>
@@ -527,7 +528,7 @@ export default function Videos() {
           <ModalHeader
             title={currentVideo.description}
             titleId="video-player-title"
-            icon={<i className="fas fa-play-circle" />}
+            icon={<i className="fas fa-play-circle" aria-hidden="true" />}
             onClose={handleClosePlayer}
           />
           <div className={styles.playerBody}>
@@ -550,7 +551,7 @@ export default function Videos() {
             <ModalHeader
               title={editingVideo ? 'Edit Video' : 'Add New Video'}
               titleId="video-form-title"
-              icon={<i className={editingVideo ? 'fas fa-edit' : 'fas fa-plus'} />}
+              icon={<i className={editingVideo ? 'fas fa-edit' : 'fas fa-plus'} aria-hidden="true" />}
               onClose={dismiss}
             />
             <form onSubmit={handleSubmitForm}>
@@ -668,7 +669,7 @@ export default function Videos() {
             <ModalHeader
               title="Share Video"
               titleId="video-qr-title"
-              icon={<i className="fas fa-qrcode" />}
+              icon={<i className="fas fa-qrcode" aria-hidden="true" />}
               variant="info"
               onClose={handleCloseQR}
             />
@@ -694,6 +695,7 @@ export default function Videos() {
                       type="text"
                       value={qrData.url}
                       readOnly
+                      aria-label="Video link"
                       className={styles.shareUrlInput}
                     />
                     <button
@@ -701,7 +703,7 @@ export default function Videos() {
                       onClick={handleCopyUrl}
                       title="Copy link"
                     >
-                      <i className="fas fa-copy"></i>
+                      <i className="fas fa-copy" aria-hidden="true"></i>
                     </button>
                   </div>
                 </>
@@ -709,7 +711,7 @@ export default function Videos() {
             </div>
             <div className={styles.qrModalFooter}>
               <button className="btn btn-secondary" onClick={handlePrintQR} disabled={!qrData}>
-                <i className="fas fa-print"></i> Print
+                <i className="fas fa-print" aria-hidden="true"></i> Print
               </button>
               <button className="btn btn-primary" onClick={handleCloseQR}>
                 Close

@@ -6,6 +6,7 @@ import { isOrthoWork, needsDetails } from '../../config/workTypeConfig';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { workBalance } from '../../utils/workBalance';
 import { useToday } from '../../hooks/useClock';
+import { useMenuFocus, handleMenuKeyDown } from '../../hooks/useFloatingMenu';
 import { isClinicDoctorName } from '@shared/clinic-doctor';
 import { ALIGNER_SET_WORK_TYPE_IDS, WORK_STATUS } from '@shared/treatment-taxonomy';
 import type { WorkRow } from '@shared/contracts/work.contract';
@@ -110,6 +111,7 @@ const WorkCard = ({
     const [showActions, setShowActions] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+    const dropdownRef = useRef<HTMLDivElement | null>(null);
 
     // Treatment-item editors inside this card that hold unsaved input. Collapsing the
     // card unmounts them, so a collapse with any open asks first (audit FE-F7-14).
@@ -156,6 +158,10 @@ const WorkCard = ({
             document.removeEventListener('keydown', onKey);
         };
     }, [showActions]);
+
+    // Focus into the open menu and back to the ⋮ button on close; arrows move
+    // between items (the menu took Tab only, which a `role="menu"` doesn't promise).
+    useMenuFocus(dropdownRef, showActions);
 
     const getStatusBadge = () => {
         if (work.status === WORK_STATUS.FINISHED) {
@@ -249,7 +255,15 @@ const WorkCard = ({
                         <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
                     </button>
                     {showActions && (
-                        <div className={styles.dropdown} id={menuId} role="menu" aria-label={t('card.moreActions')}>
+                        <div
+                            className={styles.dropdown}
+                            id={menuId}
+                            ref={dropdownRef}
+                            role="menu"
+                            tabIndex={-1}
+                            aria-label={t('card.moreActions')}
+                            onKeyDown={(e) => handleMenuKeyDown(e, dropdownRef.current, () => setShowActions(false))}
+                        >
                             {editRecords && (
                                 <button type="button" role="menuitem" onClick={() => runMenuAction(onEdit)}>
                                     <i className="fas fa-edit" aria-hidden="true"></i> {t('card.editWork')}

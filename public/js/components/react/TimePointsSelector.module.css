@@ -129,7 +129,7 @@
 }
 
 .tabActive {
-    background: linear-gradient(135deg, var(--indigo-500) 0%, var(--color-purple-medium) 100%);
+    background: linear-gradient(135deg, var(--palette-indigo-600) 0%, var(--color-purple-medium) 100%);
     border-color: var(--indigo-600);
     color: var(--color-white);
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
@@ -156,7 +156,7 @@
 
 .addTab:hover {
     border-color: var(--indigo-500);
-    color: var(--indigo-500);
+    color: var(--indigo-600);
     background: rgba(99, 102, 241, 0.06);
     transform: translateY(-2px);
 }
@@ -169,7 +169,7 @@
     height: 24px;
     background: rgba(99, 102, 241, 0.1);
     border-radius: 6px;
-    color: var(--indigo-500);
+    color: var(--indigo-600);
     font-size: 0.8125rem;
     flex-shrink: 0;
 }
@@ -211,7 +211,7 @@
 }
 
 .tabActive .tabDate {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--color-white);
 }
 
 .tabActive .tabDate::before {
@@ -242,7 +242,7 @@
 .allSessions:hover,
 .allSessions[aria-expanded="true"] {
     border-color: var(--indigo-500);
-    color: var(--indigo-500);
+    color: var(--indigo-600);
 }
 
 /* Responsive */

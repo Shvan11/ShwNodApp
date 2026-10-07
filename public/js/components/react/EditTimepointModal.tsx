@@ -2,10 +2,14 @@
  * Edit a time point's name and date. Prefilled from the selected tab; on save it
  * PUTs to /api/patients/:personId/timepoints/:tpCode (the parent owns the request
  * + list refresh). Mirrors the expenses edit-modal pattern.
+ *
+ * The name is picked from the clinic's common session names (`TimepointNameSelect`),
+ * with "Custom name…" for anything else.
  */
 import { useState, type FormEvent } from 'react';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
+import TimepointNameSelect from './TimepointNameSelect';
 import styles from './TimepointModals.module.css';
 import type { TimepointRow } from '@shared/contracts/patient.contract';
 
@@ -58,18 +62,18 @@ const EditTimepointModal = ({ isOpen, timepoint, saving, onClose, onSave }: Prop
                 <ModalHeader title="Edit Photo Session" titleId="edit-tp-title" onClose={onClose} closeLabel="Close modal" />
 
                 <div className={styles.modalBody}>
-                    <label className={styles.field}>
-                        <span className={styles.label}>Name</span>
-                        <input
-                            className={styles.input}
-                            type="text"
+                    <div className={styles.field}>
+                        <label className={styles.label} htmlFor="edit-tp-name">Name</label>
+                        <TimepointNameSelect
+                            // Per session: "Custom name…" chosen for one must not carry to the next.
+                            key={timepoint.tp_code}
+                            id="edit-tp-name"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="e.g. Initial, Progress, Final"
-                            // eslint-disable-next-line jsx-a11y/no-autofocus -- intentional focus on open
-                            autoFocus
+                            onChange={setName}
+                            allowCustom
+                            className={styles.input}
                         />
-                    </label>
+                    </div>
                     <label className={styles.field}>
                         <span className={styles.label}>Date</span>
                         <input

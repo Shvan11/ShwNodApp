@@ -67,7 +67,7 @@
 .retryBtn {
     background: none;
     border: none;
-    color: var(--indigo-500);
+    color: var(--indigo-600);
     cursor: pointer;
     text-decoration: underline;
 }
@@ -137,7 +137,7 @@
     top: 4px;
     right: 4px;
     line-height: 1;
-    color: var(--indigo-600);
+    color: var(--indigo-700);
     background: var(--surface);
     border-radius: var(--radius-full);
 }

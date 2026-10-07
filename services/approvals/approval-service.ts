@@ -20,6 +20,7 @@ import { normalizeRole, ROLES } from '../../shared/auth/roles.js';
 import { log } from '../../utils/logger.js';
 import { APPROVAL_ACTIONS, readTargetVersion, type ApprovalActionDef } from './approval-actions.js';
 import type { ApprovalActionType, ApprovalStatus } from '../../shared/contracts/approvals.contract.js';
+import { APPROVAL_SYSTEM_NOTES, approvalApplyErrorNote } from '../../shared/approval-text.js';
 
 // Narrow session-only interface — the service only reads req.session fields, so
 // it accepts any Express Request<...> variant without needing the exact generic args.
@@ -156,7 +157,7 @@ export async function enqueueApproval(
   const requestId = await withPgTransaction(async (trx) => {
     await sql`
       UPDATE approval_requests
-      SET status = 'stale', review_note = 'Superseded by a newer request'
+      SET status = 'stale', review_note = ${APPROVAL_SYSTEM_NOTES.superseded}
       WHERE action_type = ${actionType}
         AND target_id   = ${targetId}
         AND status      = 'pending'
@@ -225,10 +226,10 @@ export async function approve(
     const action = APPROVAL_ACTIONS[row.action_type as ApprovalActionType];
     if (!action) {
       await sql`
-        UPDATE approval_requests SET status='failed', review_note='Unknown action_type'
+        UPDATE approval_requests SET status='failed', review_note=${APPROVAL_SYSTEM_NOTES.unknownAction}
         WHERE request_id=${requestId}
       `.execute(trx);
-      return { status: 'missing', row: toListRow({ ...row, status: 'failed', review_note: 'Unknown action_type' }) };
+      return { status: 'missing', row: toListRow({ ...row, status: 'failed', review_note: APPROVAL_SYSTEM_NOTES.unknownAction }) };
     }
 
     const targetId = action.getTargetId(row.payload);
@@ -238,10 +239,10 @@ export async function approve(
     if (!exists) {
       await sql`
         UPDATE approval_requests
-        SET status='failed', review_note='Target no longer exists'
+        SET status='failed', review_note=${APPROVAL_SYSTEM_NOTES.targetMissing}
         WHERE request_id=${requestId}
       `.execute(trx);
-      return { status: 'missing', row: toListRow({ ...row, status: 'failed', review_note: 'Target no longer exists' }) };
+      return { status: 'missing', row: toListRow({ ...row, status: 'failed', review_note: APPROVAL_SYSTEM_NOTES.targetMissing }) };
     }
 
     // 3. Stale check — compare stored version with current row version.
@@ -250,10 +251,10 @@ export async function approve(
       if (current && current !== row.target_version) {
         await sql`
           UPDATE approval_requests
-          SET status='stale', review_note='Target changed since request was submitted'
+          SET status='stale', review_note=${APPROVAL_SYSTEM_NOTES.targetChanged}
           WHERE request_id=${requestId}
         `.execute(trx);
-        return { status: 'stale', row: toListRow({ ...row, status: 'stale', review_note: 'Target changed since request was submitted' }) };
+        return { status: 'stale', row: toListRow({ ...row, status: 'stale', review_note: APPROVAL_SYSTEM_NOTES.targetChanged }) };
       }
     }
 
@@ -283,7 +284,7 @@ export async function approve(
   } catch (err) {
     const message = (err as Error).message;
     log.error('Approval apply() failed', { requestId, error: message });
-    const note = `Apply error: ${message}`;
+    const note = approvalApplyErrorNote(message);
     await sql`
       UPDATE approval_requests
       SET status='failed', review_note=${note}

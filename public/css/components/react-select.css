@@ -9,7 +9,8 @@
  * `classNamePrefix="react-select"` (every instance in the app uses that prefix,
  * so new selects are themed for free).
  *
- * Light mode is left to react-select's defaults (they match our light surfaces).
+ * Light mode is left to react-select's defaults (they match our light surfaces),
+ * bar the placeholder colour.
  * Selectors are scoped with `:root[data-theme="dark"]` (specificity 0,2,x) so
  * they win over react-select's single-class emotion styles AND any per-instance
  * inline `styles` config, without needing `!important`. Flat selectors (no CSS
@@ -18,6 +19,13 @@
  */
 
 @media screen {
+  /* The one light-mode patch: react-select's own placeholder gray (hsl 0 0% 50%)
+     is 3.95:1 on white, under the AA the product commits to. `:root` lifts this
+     over the single emotion class; the dark rule below still outranks it. */
+  :root .react-select__placeholder {
+    color: var(--text-placeholder);
+  }
+
   /* The closed control (the box you click). */
   :root[data-theme='dark'] .react-select__control {
     background-color: var(--background-primary);
@@ -52,7 +60,7 @@
 
   /* The dropdown panel + each option (the white-on-white culprit). */
   :root[data-theme='dark'] .react-select__menu {
-    background-color: var(--surface-elevated, var(--background-primary));
+    background-color: var(--surface-elevated);
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-lg);
   }
@@ -67,12 +75,12 @@
   }
 
   :root[data-theme='dark'] .react-select__option--is-focused {
-    background-color: var(--surface-hover, var(--hover-bg));
+    background-color: var(--surface-hover);
   }
 
   :root[data-theme='dark'] .react-select__option--is-selected {
-    background-color: var(--primary-color);
-    color: var(--color-white, #fff);
+    background-color: var(--primary-fill);
+    color: var(--color-white);
   }
 
   :root[data-theme='dark'] .react-select__option--is-disabled {
@@ -98,8 +106,8 @@
   }
 
   :root[data-theme='dark'] .react-select__multi-value__remove:hover {
-    background-color: var(--primary-color);
-    color: var(--color-white, #fff);
+    background-color: var(--primary-fill);
+    color: var(--color-white);
   }
 
   /* Indicators (chevron, clear, separator). */

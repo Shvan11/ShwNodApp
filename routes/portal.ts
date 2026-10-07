@@ -35,7 +35,7 @@ const photosParamsSchema = z.object({
 });
 
 // Image-file params for the per-patient photo stream. `name` is the bare Dolphin
-// working-dir filename (`{personId}0{tp}.{view}`, e.g. `688201.i12`); the regex
+// working-dir filename (`{personId}{tp:02}.{view}`, e.g. `688201.i12`); the regex
 // forbids path separators so it can never traverse. The real authorization
 // boundary, though, is the getVisiblePhotos membership check in the handler —
 // a name only streams if it's one of THIS patient's non-private photos.

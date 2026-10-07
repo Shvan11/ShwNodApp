@@ -91,7 +91,7 @@
 }
 
 .patientLink {
-    color: var(--primary-blue);
+    color: var(--blue-700);
     text-decoration: none;
     transition: all var(--transition-fast);
     display: flex;
@@ -105,7 +105,7 @@
 
 /* Patient alert icon */
 .alertIcon {
-    color: var(--error-red-light);
+    color: var(--error-700);
     margin-left: var(--spacing-xs);
     font-size: var(--font-size-sm);
     animation: pulseAlert 2s infinite;
@@ -130,7 +130,7 @@
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
     background-color: var(--indigo-50);
-    color: var(--indigo-500);
+    color: var(--indigo-700);
     border: 1px solid var(--indigo-200);
     transition: all var(--transition-fast);
     line-height: 1;
@@ -309,7 +309,7 @@
 }
 
 .statusInactiveClickable i {
-    color: var(--success-600);
+    color: var(--success-700);
 }
 
 .statusInactiveClickable .chairIcon {
@@ -320,15 +320,15 @@
     opacity: 1;
     transform: translateY(-2px) scale(1.05);
     box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.2);
-    border-color: var(--success-600);
+    border-color: var(--success-fill-hover);
     background: linear-gradient(135deg, var(--success-100) 0%, var(--success-200) 100%);
 }
 
 /* Active state - Green (done) */
 .statusActive {
     composes: statusButton;
-    background: linear-gradient(135deg, var(--success-green) 0%, var(--success-green-dark) 100%);
-    border-color: var(--success-600);
+    background: linear-gradient(135deg, var(--success-fill) 0%, var(--success-fill-hover) 100%);
+    border-color: var(--success-fill-hover);
     cursor: pointer;
     box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.3), 0 2px 4px -1px rgba(34, 197, 94, 0.2);
     opacity: 1;
@@ -352,8 +352,8 @@
 /* Waiting state - Light red background */
 .statusWaiting {
     composes: statusButton;
-    background: linear-gradient(135deg, var(--error-400) 0%, var(--error-500) 100%);
-    border-color: var(--error-500);
+    background: linear-gradient(135deg, var(--error-fill) 0%, var(--error-fill) 100%);
+    border-color: var(--error-fill);
     box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -1px rgba(239, 68, 68, 0.2);
 }
 
@@ -362,7 +362,7 @@
 }
 
 .statusWaiting:hover {
-    background: linear-gradient(135deg, var(--error-500) 0%, var(--error-600) 100%);
+    background: linear-gradient(135deg, var(--error-fill) 0%, var(--error-fill-hover) 100%);
     box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4), 0 4px 6px -2px rgba(239, 68, 68, 0.3);
 }
 

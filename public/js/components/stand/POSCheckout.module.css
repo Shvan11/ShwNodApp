@@ -213,7 +213,7 @@
 }
 
 .clearPatientButton:hover {
-  color: var(--error-color);
+  color: var(--error-700);
   background-color: var(--error-50);
 }
 
@@ -267,7 +267,7 @@
   font-weight: var(--font-weight-bold);
   font-family: var(--font-primary);
   color: var(--color-white);
-  background-color: var(--success-color);
+  background-color: var(--success-fill);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -276,7 +276,7 @@
 }
 
 .confirmButton:hover:not(:disabled) {
-  background-color: var(--success-darker);
+  background-color: var(--success-fill-hover);
   box-shadow: var(--shadow-md);
 }
 

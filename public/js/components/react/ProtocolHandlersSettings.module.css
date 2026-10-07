@@ -72,6 +72,12 @@
     font-size: var(--font-size-lg);
 }
 
+/* The text column may shrink below its longest word (a Windows path). */
+.infoNotice > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .tipText {
     margin-top: var(--spacing-sm);
     font-size: 0.9em;

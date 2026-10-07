@@ -536,13 +536,47 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             // outside — which kills typing in the modal's IP / PIN inputs.
             // Disable it; Esc/arrow keys are bound to document and still work,
             // and the modal carries its own Tab focus-trap.
-            // Trade-off (accepted): the lightbox itself loses keyboard
-            // focus-containment (a keyboard user could Tab out to background
-            // controls), and while the share modal is open arrow/Esc keys can
-            // still reach the lightbox underneath. Fine for this mouse-driven
-            // internal tool; the alternative was closing the lightbox on share.
+            // Containment comes from `inert` on the page instead (below), which
+            // keeps Tab inside the viewer without a focusin handler.
             trapFocus: false
         });
+
+        // A dialog opened over the viewer owns the keyboard while it is up.
+        // PhotoSwipe listens on `document`, so its Escape closed the VIEWER under
+        // the dialog and, having preventDefault()ed the key, left the dialog open
+        // (<Modal> ignores an Escape something else already handled); the arrow
+        // keys in the LocalSend IP box paged the photos behind it.
+        lightboxInstance.on('keydown', (e) => {
+            if (document.querySelector('[role="dialog"][aria-modal="true"]:not(.pswp)')) e.preventDefault();
+        });
+
+        // With the viewer open, Tab must not walk the page behind it (it did: 17 of
+        // 25 presses landed on covered controls — audit FE-F25-11). The page is made
+        // inert; the dialogs that open over the viewer live in #modal-root and the
+        // toasts on <body>, both outside it. Skipped in native fullscreen, where the
+        // viewer mounts INSIDE the page. PhotoSwipe only moves and returns focus
+        // when its own trap is on, so both are done here.
+        const appRoot = document.getElementById('single-spa-application');
+        let lightboxOpener: HTMLElement | null = null;
+        const releasePage = () => {
+            if (appRoot?.inert) appRoot.inert = false;
+            if (lightboxOpener?.isConnected) lightboxOpener.focus({ preventScroll: true });
+            lightboxOpener = null;
+        };
+        lightboxInstance.on('afterInit', () => {
+            const viewer = lightboxInstance.pswp?.element;
+            if (!viewer) return;
+            viewer.setAttribute('aria-label', 'Photo viewer');
+            if (!appRoot || appRoot.contains(viewer)) return;
+            lightboxOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            appRoot.inert = true;
+            viewer.tabIndex = -1;
+            viewer.focus({ preventScroll: true });
+        });
+        // `close` (closing starts) AND `destroy` (closing ends): an inert page that
+        // is never released is a frozen app, so neither event is trusted alone.
+        lightboxInstance.on('close', releasePage);
+        lightboxInstance.on('destroy', releasePage);
 
         // Add custom buttons
         lightboxInstance.on('uiRegister', () => {
@@ -818,6 +852,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         // instance it created (on deps change or unmount), so nothing double-frees it.
         return () => {
             lightboxInstance.destroy();
+            releasePage();
             lightboxRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1122,7 +1157,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                     onClick={() => handleTimepointClick(timepoint.tp_code)}
                                 >
                                     <div className={tpStyles.tabIcon}>
-                                        <i className="fas fa-camera"></i>
+                                        <i className="fas fa-camera" aria-hidden="true"></i>
                                     </div>
                                     <div className={tpStyles.tabContent}>
                                         <div className={tpStyles.tabDesc}>{timepoint.tp_description}</div>
@@ -1348,7 +1383,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                     title="Hidden from patient"
                                     aria-hidden="true"
                                 >
-                                    <i className="fas fa-eye-slash"></i>
+                                    <i className="fas fa-eye-slash" aria-hidden="true"></i>
                                 </span>
                             )}
                         </a>

@@ -6,7 +6,7 @@ import Select, { MultiValue } from 'react-select';
 import cn from 'classnames';
 import type { z } from 'zod';
 import { useToast } from '../../contexts/ToastContext';
-import PatientSearchCombobox from './PatientSearchCombobox';
+import PatientSearchCombobox, { type PatientOption } from './PatientSearchCombobox';
 import PhoneDisplay from './PhoneDisplay';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
@@ -15,7 +15,6 @@ import { fetchJSON, postJSON, deleteJSON, httpErrorMessage } from '@/core/http';
 import { formatDate } from '@/core/utils';
 import { qk } from '@/query/keys';
 import {
-    patientPhonesQuery,
     workTypesQuery,
     workKeywordsQuery,
     tagOptionsQuery,
@@ -242,7 +241,6 @@ const PatientManagement = () => {
     // -- Dropdown Data --
     // Read straight from the React Query cache, which `patientManagementLoader`
     // has already filled (so these paint filled on the first render, no flash).
-    const { data: allPatients = [] } = useQuery(patientPhonesQuery());
     const { data: workTypeRows = [] } = useQuery(workTypesQuery());
     const { data: keywordRows = [] } = useQuery(workKeywordsQuery());
     const { data: tagRows = [] } = useQuery(tagOptionsQuery());
@@ -468,9 +466,9 @@ const PatientManagement = () => {
                 return;
             }
             queryClient.invalidateQueries({ queryKey: qk.patient.all(selectedPatient.person_id) });
-            // The jump comboboxes and the message pickers read the phone book; it
-            // kept offering the deleted patient until a stale refetch (FE-F6-9).
-            queryClient.invalidateQueries({ queryKey: qk.lookups.patientPhones() });
+            // The jump comboboxes and the message pickers kept offering the deleted
+            // patient for as long as an answer of theirs stayed fresh (FE-F6-9).
+            queryClient.invalidateQueries({ queryKey: qk.lookups.patientLookupAll() });
             void executeSearch();
             if (data.folderRemoved === false) {
                 toast.warning('Patient deleted, but its photo folder could not be removed.');
@@ -484,7 +482,7 @@ const PatientManagement = () => {
         }
     };
 
-    const handleJumpToPatient = (personId: number) => navigate(`/patient/${personId}/works`);
+    const handleJumpToPatient = (patient: PatientOption) => navigate(`/patient/${patient.id}/works`);
 
     const activeFilterCount = filterCount(criteria);
 
@@ -517,13 +515,13 @@ const PatientManagement = () => {
                 <h2>Patient Management</h2>
                 <div className={styles.headerActions}>
                     <button type="button" onClick={() => navigate('/patient/new/add')} className="btn btn-primary">
-                        <i className={cn('fas fa-plus', styles.iconGap)}></i> Add New Patient
+                        <i className={cn('fas fa-plus', styles.iconGap)} aria-hidden="true"></i> Add New Patient
                     </button>
                 </div>
             </div>
 
             <div className={styles.searchSectionHeader}>
-                <h3><i className="fas fa-search"></i>Search Patients</h3>
+                <h3><i className="fas fa-search" aria-hidden="true"></i>Search Patients</h3>
                 <p>Pick a suggestion to open the patient directly, or press Enter / use filters to build the results list below.</p>
             </div>
 
@@ -534,9 +532,8 @@ const PatientManagement = () => {
                         id="pm-search-name"
                         value={criteria.patientName}
                         onChange={(v) => setCriterion('patientName', v)}
-                        onJump={handleJumpToPatient}
+                        onPick={handleJumpToPatient}
                         onSubmit={() => void executeSearch()}
-                        patients={allPatients}
                         mode="name"
                         nameStartsWith={criteria.nameStartsWith}
                         rtl
@@ -551,9 +548,8 @@ const PatientManagement = () => {
                         id="pm-search-phone-id"
                         value={criteria.term}
                         onChange={(v) => setCriterion('term', v)}
-                        onJump={handleJumpToPatient}
+                        onPick={handleJumpToPatient}
                         onSubmit={() => void executeSearch()}
-                        patients={allPatients}
                         mode="phoneId"
                         placeholder="Phone or ID..."
                     />
@@ -572,15 +568,15 @@ const PatientManagement = () => {
             </div>
 
             <div className={styles.searchForm}>
-                <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className={cn('fas fa-search', styles.iconGap)}></i>Search</button>
-                <button type="button" onClick={handleShowAll} className="btn btn-light" disabled={loading}><i className={cn('fas fa-list', styles.iconGap)}></i>Show All</button>
-                <button type="button" onClick={handleReset} className="btn btn-light" disabled={loading}><i className={cn('fas fa-redo', styles.iconGap)}></i>Reset</button>
+                <button type="button" onClick={handleSearchBtnClick} className="btn btn-primary" disabled={loading}><i className={cn('fas fa-search', styles.iconGap)} aria-hidden="true"></i>Search</button>
+                <button type="button" onClick={handleShowAll} className="btn btn-light" disabled={loading}><i className={cn('fas fa-list', styles.iconGap)} aria-hidden="true"></i>Show All</button>
+                <button type="button" onClick={handleReset} className="btn btn-light" disabled={loading}><i className={cn('fas fa-redo', styles.iconGap)} aria-hidden="true"></i>Reset</button>
             </div>
 
             <div className={styles.advancedFilters}>
                 <div className={styles.advancedFiltersHeader} role="button" tabIndex={0} onClick={() => setShowFilters(!showFilters)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowFilters(!showFilters); } }}>
-                    <h4><i className={cn('fas fa-filter', styles.iconGap)}></i>Filters {activeFilterCount > 0 && <span className={styles.filterBadge}>{activeFilterCount}</span>}</h4>
-                    <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`}></i>
+                    <h4><i className={cn('fas fa-filter', styles.iconGap)} aria-hidden="true"></i>Filters {activeFilterCount > 0 && <span className={styles.filterBadge}>{activeFilterCount}</span>}</h4>
+                    <i className={`fas fa-chevron-${showFilters ? 'up' : 'down'}`} aria-hidden="true"></i>
                 </div>
                 {!showFilters && activeFilterCount > 0 && (
                     <div className={styles.filterChips}>
@@ -772,7 +768,7 @@ const PatientManagement = () => {
                             {patients.length}
                             {totalCount > patients.length && <span className={styles.totalCountLabel}> of {totalCount}</span>}
                         </span>
-                        {loading && <span className={styles.refreshingBadge}><i className="fas fa-spinner fa-spin"></i></span>}
+                        {loading && <span className={styles.refreshingBadge}><i className="fas fa-spinner fa-spin" aria-hidden="true"></i></span>}
                     </div>
                     <div className={styles.sortControls}>
                         <span className={styles.sortLabel}>Sort:</span>
@@ -780,19 +776,19 @@ const PatientManagement = () => {
                             <button className={cn(styles.sortBtn, sortConfig.key === 'name' && styles.sortBtnActive)} onClick={() => handleSortToggle('name')}>
                                 Name
                                 {sortConfig.key === 'name' && (
-                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
+                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)} aria-hidden="true"></i>
                                 )}
                             </button>
                             <button className={cn(styles.sortBtn, sortConfig.key === 'date' && styles.sortBtnActive)} onClick={() => handleSortToggle('date')}>
                                 Date
                                 {sortConfig.key === 'date' && (
-                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
+                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)} aria-hidden="true"></i>
                                 )}
                             </button>
                             <button className={cn(styles.sortBtn, sortConfig.key === 'lastVisit' && styles.sortBtnActive)} onClick={() => handleSortToggle('lastVisit')}>
                                 Last Visit
                                 {sortConfig.key === 'lastVisit' && (
-                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)}></i>
+                                    <i className={cn('fas', sortConfig.direction === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down', styles.sortIcon)} aria-hidden="true"></i>
                                 )}
                             </button>
                         </div>
@@ -800,8 +796,8 @@ const PatientManagement = () => {
                 </div>
             )}
 
-            {!hasSearched && !loading && <div className={styles.emptyState}><i className="fas fa-search"></i><h3>Start Typing to Search</h3></div>}
-            {loading && !hasSearched && <div className={styles.loadingContainer}><i className={cn('fas fa-spinner fa-spin', styles.loadingSpinner)}></i></div>}
+            {!hasSearched && !loading && <div className={styles.emptyState}><i className="fas fa-search" aria-hidden="true"></i><h3>Start Typing to Search</h3></div>}
+            {loading && !hasSearched && <div className={styles.loadingContainer}><i className={cn('fas fa-spinner fa-spin', styles.loadingSpinner)} aria-hidden="true"></i></div>}
 
             {hasSearched && (
                 <div className={cn(styles.tableContainer, loading && styles.tableLoadingOverlay)}>
@@ -863,12 +859,12 @@ const PatientManagement = () => {
                             >
                                 {loadingMore ? (
                                     <>
-                                        <i className="fas fa-spinner fa-spin"></i>
+                                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                                         Loading...
                                     </>
                                 ) : (
                                     <>
-                                        <i className="fas fa-plus"></i>
+                                        <i className="fas fa-plus" aria-hidden="true"></i>
                                         Load More ({totalCount - patients.length} remaining)
                                     </>
                                 )}
@@ -895,7 +891,7 @@ const PatientManagement = () => {
                         <div className={styles.deleteModalContent}>
                             <p>Are you sure you want to delete <strong>{selectedPatient.patient_name}</strong>?</p>
                             <p className={styles.deleteModalWarning}>
-                                <i className="fas fa-exclamation-triangle"></i> This permanently deletes the patient record
+                                <i className="fas fa-exclamation-triangle" aria-hidden="true"></i> This permanently deletes the patient record
                                 <strong> and the patient's entire photo folder on the share</strong> (all photos and files).
                                 This cannot be undone.
                             </p>

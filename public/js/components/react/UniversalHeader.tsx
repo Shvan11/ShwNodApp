@@ -6,6 +6,7 @@ import { useAuthUser } from '../../contexts/GlobalStateContext';
 import { patientInfoQuery, brandingQuery } from '@/query/queries';
 import { ROLES } from '@shared/auth/roles';
 import { appointmentsPath } from '../../utils/appointmentsDate';
+import { composeDocumentTitle, routeTitleKey } from '../../core/routeTitle';
 import TasksBell from './TasksBell';
 import PortalActivityBell from './PortalActivityBell';
 import ApprovalsBell from './ApprovalsBell';
@@ -17,11 +18,6 @@ import UserMenu from './UserMenu';
 // in-app navigation + a refresh, cleared on tab/browser close, never shared to
 // other tabs). Deliberately NOT localStorage, so it stays temporary.
 const STICKY_PATIENT_KEY = 'stickyPatientTab';
-
-// Fallback shown in the logo slot when no clinic name has been configured yet
-// (a JS constant, not JSX — so it's the seed default, never a hardcoded brand in
-// the rendered tree). Each deployment sets its own name/logo in Settings → General.
-const DEFAULT_CLINIC_NAME = 'Shwan Orthodontics';
 
 interface Patient {
     code: string | number;
@@ -66,16 +62,17 @@ const UniversalHeader = () => {
 
     // Clinic branding (logo + display name) — configured in Settings → General,
     // shared by all users. Cached with a long staleTime, so after first paint it
-    // never refetches on navigation. Until it resolves, the name fallback shows.
-    const { data: branding } = useQuery(brandingQuery());
-    const clinicName = branding?.clinicName || DEFAULT_CLINIC_NAME;
+    // never refetches on navigation. The slot stays empty only while the read is in
+    // flight; an install that has set no name (or a read that failed) shows a neutral
+    // product label, so the Home target is never left without a width. The fallback
+    // was the original clinic's name as a literal, on every install and (for a
+    // clinic with a logo) for a moment on every cold load.
+    const { data: branding, isPending: brandingPending } = useQuery(brandingQuery());
+    const clinicName = branding?.clinicName?.trim() || (brandingPending ? '' : t('nav.unnamedClinic'));
     // The browser tab follows the CONFIGURED name only (no built-in fallback):
     // index.html ships a neutral title, which was this clinic's name on every
     // install (audit FE-F23-8).
     const configuredName = branding?.clinicName?.trim() || null;
-    useEffect(() => {
-        if (configuredName) document.title = configuredName;
-    }, [configuredName]);
 
     // Patient code from the URL (/patient/:code/...). Tells us whether we're
     // *currently* on a patient page and drives the last-sub-view persistence.
@@ -128,11 +125,38 @@ const UniversalHeader = () => {
         }
         : null;
 
+    // The tab title names the SCREEN, then the patient, then the clinic — most
+    // specific first, so it survives a narrow tab. It was the clinic's name on every
+    // route: three patient tabs read the same in the tab strip, the history menu and
+    // bookmarks (audit FE-F25-7). A path the map doesn't know leaves the title alone.
+    const titleKey = routeTitleKey(location.pathname, location.search);
+    const pageTitle = titleKey ? t(`titles.${titleKey}`) : null;
+    const documentTitle = composeDocumentTitle([
+        pageTitle,
+        onPatientRoute ? currentPatient?.name : null,
+        configuredName,
+    ]);
+    useEffect(() => {
+        if (documentTitle) document.title = documentTitle;
+    }, [documentTitle]);
+
+    // A route change is silent to a screen reader (no page load), so the new title
+    // is spoken through a polite live region. Not on first paint: the browser reads
+    // the document title itself then. Render-phase keyed guard, the repo's idiom.
+    const [firstPath] = useState(location.pathname);
+    const [hasNavigated, setHasNavigated] = useState(false);
+    if (!hasNavigated && location.pathname !== firstPath) setHasNavigated(true);
+    const routeAnnouncement = hasNavigated
+        ? composeDocumentTitle([pageTitle, onPatientRoute ? currentPatient?.name : null])
+        : '';
+
     // True only while navigating to the patient's page from elsewhere (not when
     // switching sub-tabs already on that patient) — drives the patient tab's
     // pending spinner, mirroring the main nav buttons' blocking-loader feedback.
     const patientTabPending =
         !onPatientRoute && currentPatient != null && String(currentPatient.code) === pendingPatientCode;
+    // The close chip shows once the tab is a backgrounded shortcut.
+    const showPatientClose = !onPatientRoute && !patientTabPending;
 
     // Remember the last patient sub-view (works/photos/diagnosis/visits/payments…)
     // so the header's patient button returns there instead of always jumping to a
@@ -237,6 +261,9 @@ const UniversalHeader = () => {
 
     return (
         <header className="universal-header">
+            <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+                {routeAnnouncement}
+            </div>
             <div className="header-container">
                 {/* Left region — clinic logo (or name fallback), home shortcut */}
                 <div className="header-left">
@@ -251,14 +278,15 @@ const UniversalHeader = () => {
                         {branding?.logo ? (
                             <img className="clinic-logo" src={branding.logo} alt={clinicName} />
                         ) : (
-                            <h1 className="clinic-name">{clinicName}</h1>
+                            // Not a heading: each screen has its own <h1> (see RootLayout).
+                            <span className="clinic-name" title={clinicName || undefined}>{clinicName}</span>
                         )}
                     </div>
                 </div>
 
                 {/* Center region — main navigation tabs (+ the sticky patient tab) */}
                 <div className="header-center">
-                    <nav className="main-navigation">
+                    <nav className="main-navigation" aria-label={t('a11y.mainNav')}>
                         {getNavigationItems().map(item => (
                             <button
                                 key={item.key}
@@ -282,38 +310,28 @@ const UniversalHeader = () => {
                         {currentPatient && (
                             <div className="patient-nav-wrap">
                                 <button
-                                    className={`nav-btn patient-nav ${onPatientRoute ? 'active' : ''} ${patientTabPending ? 'pending' : ''}`}
+                                    className={`nav-btn patient-nav ${onPatientRoute ? 'active' : ''} ${patientTabPending ? 'pending' : ''} ${showPatientClose ? 'has-close' : ''}`}
                                     onClick={patientTabPending ? undefined : () => navigateToPatient(currentPatient.code)}
                                     aria-busy={patientTabPending || undefined}
                                 >
                                     <i className={patientTabPending ? 'fas fa-spinner fa-spin' : 'fas fa-user'} aria-hidden="true" />
                                     <span>{currentPatient.name}</span>
-                                    {/* Close chip lives inside the tab (browser-tab style); can't be a
-                                        nested <button>, so it's a role=button span that stops the click
-                                        from bubbling to the tab's navigate handler. */}
-                                    {!onPatientRoute && !patientTabPending && (
-                                        <span
-                                            role="button"
-                                            tabIndex={0}
-                                            className="patient-nav-close"
-                                            aria-label={t('nav.closePatient')}
-                                            title={t('nav.closePatient')}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                closePatientTab();
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    closePatientTab();
-                                                }
-                                            }}
-                                        >
-                                            <i className="fas fa-times" />
-                                        </span>
-                                    )}
                                 </button>
+                                {/* Close chip, drawn inside the tab's trailing edge (browser-tab
+                                    style) but a SIBLING button, not a child: nested in the tab it
+                                    was hidden from assistive tech and its label was folded into
+                                    the tab's own name ("‹patient› Close patient tab", FE-F25-10). */}
+                                {showPatientClose && (
+                                    <button
+                                        type="button"
+                                        className="patient-nav-close"
+                                        aria-label={t('nav.closePatient')}
+                                        title={t('nav.closePatient')}
+                                        onClick={closePatientTab}
+                                    >
+                                        <i className="fas fa-times" aria-hidden="true" />
+                                    </button>
+                                )}
                             </div>
                         )}
                     </nav>

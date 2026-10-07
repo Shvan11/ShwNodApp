@@ -18,6 +18,8 @@ import winston from 'winston';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { earlyEnv } from '../config/early-env.js';
+import { resolveLogLevel } from './log-level.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,15 +45,21 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Create logs directory if it doesn't exist
-const logsDir = path.join(process.cwd(), 'logs');
+// Create logs directory if it doesn't exist. `LOG_DIR` moves it (default `<cwd>/logs`):
+// any second process started from the deployment's folder — a test server, a one-off
+// script — otherwise writes into the service's own combined.log/error.log, between
+// its lines. Both settings go through `earlyEnv`: this module is evaluated before
+// config.ts loads `.env`, so a plain `process.env.LOG_*` saw only what the shell
+// exported and ignored the file.
+const configuredLogDir = earlyEnv('LOG_DIR')?.trim();
+const logsDir = configuredLogDir ? path.resolve(configuredLogDir) : path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
 // Create the logger
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: resolveLogLevel(earlyEnv('LOG_LEVEL')),
   format: logFormat,
   defaultMeta: { service: 'shwan-orthodontics' },
   transports: [

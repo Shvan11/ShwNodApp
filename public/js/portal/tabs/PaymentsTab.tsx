@@ -4,6 +4,7 @@ import { portalPaymentsResponseSchema } from '../portal.schemas';
 import { portalGet } from '../portalApi';
 import { formatCurrency, formatLocaleDate, formatNumber } from '../../utils/formatters';
 import styles from '../portal.module.css';
+import PortalIcon from '../PortalIcon';
 
 // English, like the rest of the portal's text — never the phone's own locale,
 // which on an Arabic phone renders Arabic-Indic digits (audit FE-F3-3).
@@ -72,7 +73,7 @@ const PaymentsTab = () => {
     return (
       <div className={styles.tabPanel}>
         <div className={styles.emptyState}>
-          <i className={`fas fa-receipt ${styles.emptyIcon}`} aria-hidden="true" />
+          <PortalIcon name="receipt" className={styles.emptyIcon} />
           <p>No payments recorded yet.</p>
         </div>
       </div>

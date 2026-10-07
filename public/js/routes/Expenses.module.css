@@ -57,7 +57,9 @@
   right: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  /* 6%, not 10%: axe cannot see a pseudo-element's sheen, and at 10% the card's
+     white labels sat at 4.5:1 exactly where it is strongest. */
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -158,6 +160,7 @@
 
 .modernInput:focus {
   outline: none;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- theme-independent field on the fixed purple-gradient filter card (pairs with its fixed dark text) */
   background: var(--color-white);
   border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
@@ -185,6 +188,7 @@
 
 .modernSelect:focus {
   outline: none;
+  /* stylelint-disable-next-line declaration-property-value-disallowed-list -- theme-independent field on the fixed purple-gradient filter card (pairs with its fixed dark text) */
   background: var(--color-white);
   border-color: var(--success-color);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
@@ -234,7 +238,7 @@
 }
 
 .btnModernPrimary {
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
+  background: linear-gradient(135deg, var(--success-fill) 0%, var(--palette-green-700) 100%);
   color: var(--color-white);
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
 }
@@ -317,7 +321,7 @@
 }
 
 .summaryCard {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  background: linear-gradient(135deg, var(--primary-fill) 0%, var(--primary-fill-hover) 100%);
   color: var(--color-white);
   padding: var(--spacing-lg);
   border-radius: var(--radius-md);
@@ -348,17 +352,16 @@
 }
 
 .currencyIqd {
-  background: linear-gradient(135deg, var(--info-color) 0%, var(--blue-700) 100%);
+  background: linear-gradient(135deg, var(--info-fill) 0%, var(--palette-blue-700) 100%);
 }
 
 .currencyUsd {
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-600) 100%);
+  background: linear-gradient(135deg, var(--success-fill) 0%, var(--success-fill-hover) 100%);
 }
 
 .summaryLabel {
   font-size: 14px;
   font-weight: var(--font-weight-medium);
-  opacity: 0.9;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
@@ -372,7 +375,6 @@
 
 .currencyLabel {
   font-size: 16px;
-  opacity: 0.9;
 }
 
 /* Table Container */
@@ -545,7 +547,7 @@
 
 .errorBanner p {
   margin: 0;
-  color: var(--error-600);
+  color: var(--error-700);
   font-weight: var(--font-weight-medium);
 }
 
@@ -640,8 +642,8 @@
   border-radius: 12px;
   font-size: 0.75rem;
   font-weight: var(--font-weight-semibold);
-  background-color: rgba(var(--warning-color-rgb, 243, 156, 18), 0.15);
-  color: var(--warning-orange, #f39c12);
+  background-color: color-mix(in srgb, var(--warning-orange) 15%, transparent);
+  color: var(--warning-orange);
   white-space: nowrap;
 }
 
@@ -688,7 +690,7 @@
 
 /* Warning Text */
 .warningText {
-  color: var(--warning-600);
+  color: var(--warning-700);
   font-weight: var(--font-weight-medium);
   margin-bottom: 15px;
   padding: 12px;

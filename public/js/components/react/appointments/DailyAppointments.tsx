@@ -11,6 +11,7 @@ import { useAppointments } from '../../../hooks/useAppointments';
 import { useAppointmentsSync } from '../../../hooks/useAppointmentsSync';
 import { useAppointmentDoctors } from '../../../hooks/useAppointmentDoctors';
 import { toLocalDateString } from '../../../utils/calendarDate';
+import { useToday } from '../../../hooks/useClock';
 import { rememberAppointmentDate } from '../../../utils/appointmentsDate';
 import type { dailyAppointmentsLoader } from '../../../router/loaders';
 
@@ -70,6 +71,12 @@ const DailyAppointments = () => {
     const [mobileView, setMobileView] = useState<ViewType>(() =>
         checkedInAppointments.length > 0 ? 'checked-in' : 'all'
     );
+    // "Today" as state (useClock), for what the board DERIVES from it in render:
+    // a board left on tomorrow's date overnight must become today's board at
+    // midnight (check-in offered, live indicator on), and a `new Date()` read in
+    // render is cached with the block around it (audit FE-F26-8). The handlers and
+    // effects below still read the clock directly: they run when they run.
+    const today = useToday();
     const [showFlash, setShowFlash] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
     // Doctor filter (URL is the source of truth for the initial value).
@@ -205,7 +212,7 @@ const DailyAppointments = () => {
 
     // A day that hasn't come yet: the server refuses check-in / seat / dismiss
     // there (FE-F11-4), so the board doesn't offer them. Undo stays available.
-    const isFutureDay = selectedDate > getTodayDate();
+    const isFutureDay = selectedDate > today;
 
     // Doctor + patient-name predicates, applied together to each list.
     const matchesDoctor = useCallback(
@@ -261,7 +268,7 @@ const DailyAppointments = () => {
                 onDoctorChange={setSelectedDrId}
                 connectionStatus={connectionStatus}
                 freshness={dataFreshness}
-                isViewingToday={selectedDate === getTodayDate()}
+                isViewingToday={selectedDate === today}
                 showFlash={showFlash}
                 stats={stats}
             />

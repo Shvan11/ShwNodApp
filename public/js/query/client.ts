@@ -28,9 +28,23 @@ import {
 // contract drift) to prod error reporting; isReportableHttpError filters the rest
 // (4xx is expected/handled inline; transient network/abort is retried). The report
 // is a raw POST, not a React Query call, so it can't re-enter these caches.
+/**
+ * A read whose screen shows a 5xx as an ordinary state lists it in
+ * `meta.expectedStatuses`, and it is not reported. The Archform matcher's 503 is the
+ * case: "the Archform file is not reachable from the server" is that screen's own
+ * panel, and each visit wrote a line to the server's error.log while the work PC
+ * was off. Anything else that read returns (a 500, a contract mismatch) still reports.
+ */
+export function isExpectedStatus(error: unknown, meta: Record<string, unknown> | undefined): boolean {
+  const expected = meta?.expectedStatuses;
+  const status = (error as HttpError | undefined)?.status;
+  return Array.isArray(expected) && typeof status === 'number' && expected.includes(status);
+}
+
 const queryCache = new QueryCache({
   onError: (error, query) => {
     if (!isReportableHttpError(error)) return;
+    if (isExpectedStatus(error, query.meta)) return;
     reportClientError({
       source: 'query',
       message: (error as Error)?.message ?? 'Query error',

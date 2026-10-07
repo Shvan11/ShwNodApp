@@ -69,7 +69,7 @@ const DoctorPaymentsModal = ({ target, startDate, endDate, onClose }: DoctorPaym
             <ModalHeader
                 variant="info"
                 titleId="doctor-payments-modal-title"
-                icon={<i className="fas fa-file-invoice-dollar" />}
+                icon={<i className="fas fa-file-invoice-dollar" aria-hidden="true" />}
                 title={target.doctorName}
                 subtitle={`Payments collected ${startDate} → ${endDate}`}
                 onClose={onClose}

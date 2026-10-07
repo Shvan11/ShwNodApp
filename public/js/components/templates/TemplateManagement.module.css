@@ -74,24 +74,24 @@
     align-items: center;
     justify-content: center;
     background: var(--bg-light);
-    color: var(--primary-color);
+    color: var(--blue-700);
     font-size: 1.75rem;
     flex-shrink: 0;
 }
 
 .statIconActive {
     background: var(--success-100);
-    color: var(--success-color);
+    color: var(--success-700);
 }
 
 .statIconSystem {
     background: var(--info-100);
-    color: var(--info-color);
+    color: var(--info-700);
 }
 
 .statIconUsage {
     background: var(--warning-100);
-    color: var(--warning-color);
+    color: var(--warning-800);
 }
 
 .statContent h3 {
@@ -144,7 +144,7 @@
 }
 
 .tabActive {
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 
@@ -161,8 +161,10 @@
     font-weight: var(--font-weight-semibold);
 }
 
+/* A DARK chip on the active tab's fill: the white one lifted the blue under the
+   count to 3.0:1. */
 .tabActive .tabBadge {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.2);
 }
 
 /* Templates Container */
@@ -233,7 +235,7 @@
 /* Templates Grid */
 .templatesGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
     gap: 1.5rem;
 }
 
@@ -295,17 +297,17 @@
 
 .badgeDefault {
     background: var(--indigo-100);
-    color: var(--indigo-500);
+    color: var(--indigo-700);
 }
 
 .badgeActive {
     background: var(--success-100);
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 .badgeInactive {
     background: var(--error-50);
-    color: var(--error-500);
+    color: var(--error-700);
 }
 
 .badgeSystem {

@@ -51,7 +51,7 @@ const EditAppointmentForm = ({ personId, appointmentId, onClose, onSuccess }: Ed
         return (
             <div className={styles.page}>
                 <div className={styles.loadingState}>
-                    <i className="fas fa-spinner fa-spin"></i>
+                    <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                     <p>{t('form.loadingData')}</p>
                 </div>
             </div>

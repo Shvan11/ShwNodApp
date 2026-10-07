@@ -88,11 +88,11 @@
 }
 
 .profitPositive {
-  color: var(--success-600);
+  color: var(--success-700);
 }
 
 .profitNegative {
-  color: var(--error-600);
+  color: var(--error-700);
 }
 
 /* Status badges */
@@ -130,7 +130,7 @@
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--primary-color);
+  color: var(--blue-700);
   background: var(--blue-50);
   border: 1px solid var(--blue-300);
   border-radius: var(--radius-md);
@@ -139,9 +139,9 @@
 }
 
 .btnView:hover {
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
-  border-color: var(--primary-color);
+  border-color: var(--primary-fill);
 }
 
 .btnVoid {
@@ -151,7 +151,7 @@
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  color: var(--error-600);
+  color: var(--error-700);
   background: var(--error-50);
   border: 1px solid var(--error-200);
   border-radius: var(--radius-md);
@@ -160,22 +160,22 @@
 }
 
 .btnVoid:hover {
-  background: var(--error-600);
+  background: var(--error-fill);
   color: var(--color-white);
-  border-color: var(--error-600);
+  border-color: var(--error-fill);
 }
 
-/* Voided row */
-.voidedRow {
-  opacity: 0.6;
-}
-
+/* Voided row: struck through and gray, not faded (at 60% opacity its text read
+   under 3:1). The last two cells, the Voided badge and View, keep their colour. */
 .voidedRow td {
+  color: var(--text-secondary);
+  filter: grayscale(1);
   text-decoration: line-through;
   text-decoration-color: var(--gray-400);
 }
 
-.voidedRow td:last-child {
+.voidedRow td:nth-last-child(-n + 2) {
+  filter: none;
   text-decoration: none;
 }
 

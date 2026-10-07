@@ -9,7 +9,12 @@ import { getPatientNoWorkReceiptData } from '../database/queries/patient-queries
 import { promises as fs } from 'fs';
 import { log } from '../../utils/logger.js';
 import { formatDatePattern } from '../../utils/date.js';
-import { resolveTemplateFile, RECEIPT_DOCUMENT_TYPE_ID } from './template-files.js';
+import {
+  resolveTemplateFile,
+  RECEIPT_DOCUMENT_TYPE_ID,
+  DISCOUNT_RECEIPT_TEMPLATE_NAME,
+  NO_WORK_RECEIPT_TEMPLATE_NAME,
+} from './template-files.js';
 import { getClinicDisplayName } from '../settings/clinic-identity.js';
 
 // =============================================================================
@@ -235,8 +240,10 @@ export async function getReceiptData(workId: number): Promise<ReceiptData> {
  * the two layouts live in two flat, fully WYSIWYG templates and the app picks
  * one at render time on work.HasDiscount.
  */
-const DISCOUNT_TEMPLATE_NAME = 'Shwan Orthodontics Default Receipt (With Discount)';
-const NO_WORK_TEMPLATE_NAME = 'No-Work Appointment Receipt';
+// The names themselves live in ./template-files.ts, beside the rule that keeps these
+// rows from being deleted.
+const DISCOUNT_TEMPLATE_NAME = DISCOUNT_RECEIPT_TEMPLATE_NAME;
+const NO_WORK_TEMPLATE_NAME = NO_WORK_RECEIPT_TEMPLATE_NAME;
 
 /** On-disk fallbacks used when a template row isn't present yet. */
 const FALLBACK_TEMPLATE_PATHS = {

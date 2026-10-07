@@ -151,11 +151,11 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                             onClick={() => navigate(`/patient/${personId}/works`)}
                             className="btn btn-secondary"
                         >
-                            <i className="fas fa-arrow-left"></i> Back
+                            <i className="fas fa-arrow-left" aria-hidden="true"></i> Back
                         </button>
                     )}
                     <button onClick={handleAddVisit} className="btn btn-primary">
-                        <i className="fas fa-plus"></i> Add Visit
+                        <i className="fas fa-plus" aria-hidden="true"></i> Add Visit
                     </button>
                 </div>
             </div>
@@ -185,7 +185,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
             )}
 
             <div className={styles.searchBar}>
-                <i className="fas fa-search"></i>
+                <i className="fas fa-search" aria-hidden="true"></i>
                 <input
                     type="search"
                     value={searchTerm}
@@ -223,17 +223,17 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         <div className={styles.cardHeader}>
                             <div>
                                 <h3 className={styles.cardTitle}>
-                                    <i className="fas fa-calendar-check"></i> {formatDate(visit.visit_date) || 'Not set'}
+                                    <i className="fas fa-calendar-check" aria-hidden="true"></i> {formatDate(visit.visit_date) || 'Not set'}
                                 </h3>
                                 <div className={styles.cardMeta}>
                                     {visit.OperatorName && (
-                                        <span><i className="fas fa-user-md"></i> {visit.OperatorName}</span>
+                                        <span><i className="fas fa-user-md" aria-hidden="true"></i> {visit.OperatorName}</span>
                                     )}
                                     {visit.opg && (
-                                        <span className={styles.metaSuccess}><i className="fas fa-x-ray"></i> OPG</span>
+                                        <span className={styles.metaSuccess}><i className="fas fa-x-ray" aria-hidden="true"></i> OPG</span>
                                     )}
                                     {visit.appliance_removed && (
-                                        <span className={styles.metaDanger}><i className="fas fa-times-circle"></i> Removed</span>
+                                        <span className={styles.metaDanger}><i className="fas fa-times-circle" aria-hidden="true"></i> Removed</span>
                                     )}
                                 </div>
                             </div>
@@ -300,16 +300,16 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         {/* Photos */}
                         {(visit.i_photo || visit.p_photo || visit.f_photo) && (
                             <div className={styles.photoBadges}>
-                                {visit.i_photo && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Initial</span>}
-                                {visit.p_photo && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Progress</span>}
-                                {visit.f_photo && <span className={styles.photoBadge}><i className="fas fa-camera"></i> Final</span>}
+                                {visit.i_photo && <span className={styles.photoBadge}><i className="fas fa-camera" aria-hidden="true"></i> Initial</span>}
+                                {visit.p_photo && <span className={styles.photoBadge}><i className="fas fa-camera" aria-hidden="true"></i> Progress</span>}
+                                {visit.f_photo && <span className={styles.photoBadge}><i className="fas fa-camera" aria-hidden="true"></i> Final</span>}
                             </div>
                         )}
 
                         {/* Notes Section */}
                         {visit.others && (
                             <div className={styles.notesSection}>
-                                <strong><i className="fas fa-sticky-note"></i> Notes</strong>
+                                <strong><i className="fas fa-sticky-note" aria-hidden="true"></i> Notes</strong>
                                 <p>{highlight(visit.others, searchTerm, styles.highlight)}</p>
                             </div>
                         )}
@@ -317,7 +317,7 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                         {/* Next Visit Instructions */}
                         {visit.next_visit && (
                             <div className={styles.nextVisitSection}>
-                                <strong><i className="fas fa-arrow-circle-right"></i> Next Visit</strong>
+                                <strong><i className="fas fa-arrow-circle-right" aria-hidden="true"></i> Next Visit</strong>
                                 <p>{highlight(visit.next_visit, searchTerm, styles.highlight)}</p>
                             </div>
                         )}
@@ -325,13 +325,13 @@ const VisitsComponent = ({ workId, personId }: VisitsComponentProps) => {
                 ))}
                 {visits.length === 0 && !loadError && (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-calendar-times"></i>
+                        <i className="fas fa-calendar-times" aria-hidden="true"></i>
                         <p>No visits recorded yet.</p>
                     </div>
                 )}
                 {visits.length > 0 && filteredVisits.length === 0 && (
                     <div className={styles.emptyState}>
-                        <i className="fas fa-search"></i>
+                        <i className="fas fa-search" aria-hidden="true"></i>
                         <p>No visits match your search.</p>
                     </div>
                 )}

@@ -3,13 +3,13 @@
  *
  * The `working/` directory (`clinic1/working/`, beside the per-patient timepoint
  * folders) is a FLAT folder shared by every patient (Dolphin's convention): each
- * rendered view is `{personId}0{tpCode}.{view}`, e.g. `688201.i12`. This module
+ * rendered view is `{personId}{tpCode:02}.{view}`, e.g. `688201.i12`. This module
  * lists/serves ONLY the exact filenames this patient's own timepoints can
  * produce — it never enumerates the directory to the caller and never accepts a
  * path separator, so it cannot traverse out of `working/` or leak another
  * patient's files.
  *
- * EXACT names, never a `{personId}0…` prefix match. Decimal ids prefix each
+ * EXACT names, never a `{personId}…` prefix match. Decimal ids prefix each
  * other, so a prefix pattern is ambiguous ACROSS PATIENTS: patient 5's `^50\d+`
  * also matches patient 50's `5001.i12` and patient 5012's `501201.i12`. Nothing in the
  * filename resolves that ambiguity — only the patient's real set of

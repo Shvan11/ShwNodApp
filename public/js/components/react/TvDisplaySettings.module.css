@@ -23,7 +23,7 @@
 }
 
 .title {
-    color: var(--color-purple-light);
+    color: var(--indigo-600);
     font-size: 1.8rem;
     margin: 0 0 0.5rem;
     display: flex;
@@ -96,7 +96,7 @@
 }
 
 .warningIcon {
-    color: var(--warning-color);
+    color: var(--warning-800);
     font-size: 1.2rem;
     margin-top: 0.15rem;
     flex-shrink: 0;
@@ -133,14 +133,14 @@
     gap: 0.85rem;
     width: 100%;
     padding: 1rem 1.25rem;
-    background: var(--info-50, var(--gray-100));
-    border: 1px solid var(--info-color, var(--primary-color));
-    border-inline-start: 4px solid var(--info-color, var(--primary-color));
+    background: var(--info-50);
+    border: 1px solid var(--info-color);
+    border-inline-start: 4px solid var(--info-color);
     border-radius: var(--radius-lg);
 }
 
 .noticeIcon {
-    color: var(--info-color, var(--primary-color));
+    color: var(--info-color);
     font-size: 1.15rem;
     margin-top: 0.15rem;
     flex-shrink: 0;
@@ -325,7 +325,7 @@
 .primaryBtn {
     padding: 0.6rem 1.2rem;
     border: none;
-    background: var(--primary-color);
+    background: var(--primary-fill);
     color: var(--color-white);
 }
 
@@ -351,7 +351,11 @@
     color: var(--text-primary);
 }
 
-.primaryBtn:hover:not(:disabled),
+/* A deeper fill, not a fade: at 88% the white label dropped under 4.5:1. */
+.primaryBtn:hover:not(:disabled) {
+    background: var(--primary-fill-hover);
+}
+
 .secondaryBtn:hover:not(:disabled),
 .iconBtn:hover:not(:disabled),
 .linkBtn:hover {
@@ -359,7 +363,8 @@
 }
 
 .dangerBtn:hover:not(:disabled) {
-    background: var(--error-light, transparent);
+    background: var(--error-light);
+    color: var(--error-700);
 }
 
 .primaryBtn:disabled,
@@ -428,7 +433,7 @@
     align-items: center;
     justify-content: center;
     background: var(--gray-100);
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     overflow: hidden;
     color: var(--text-secondary);
 }
@@ -472,7 +477,7 @@
     width: 3.5rem;
     padding: 0.35rem 0.4rem;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm, 4px);
+    border-radius: var(--radius-sm);
     background: var(--background-primary);
     color: var(--text-primary);
     font-size: 0.9rem;

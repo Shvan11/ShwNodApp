@@ -116,7 +116,7 @@
 }
 
 .check {
-    color: var(--primary-blue);
+    color: var(--blue-700);
     font-size: var(--font-size-xs);
     flex-shrink: 0;
 }

@@ -675,7 +675,7 @@ const LabelPreviewModal = ({
                     <ModalHeader
                         title="Print Queue"
                         titleId="label-queue-modal-title"
-                        icon={<i className="fas fa-layer-group" />}
+                        icon={<i className="fas fa-layer-group" aria-hidden="true" />}
                         subtitle={<>
                             {queueStats?.patientCount} {queueStats?.patientCount === 1 ? 'patient' : 'patients'} &bull; {queueStats?.batchCount} {queueStats?.batchCount === 1 ? 'batch' : 'batches'} &bull; {queueStats?.totalLabels} labels
                         </>}
@@ -688,12 +688,12 @@ const LabelPreviewModal = ({
                         <div className={styles.queueBatches}>
                             <h3>Batches to Print</h3>
                             <p className={styles.queueHint}>
-                                <i className="fas fa-info-circle"></i>
+                                <i className="fas fa-info-circle" aria-hidden="true"></i>
                                 Click batch to expand and edit labels. Labels are printed in order shown.
                             </p>
                             {labelSettings && !logoAvailable && (
                                 <p className={styles.queueHint}>
-                                    <i className="far fa-image"></i>
+                                    <i className="far fa-image" aria-hidden="true"></i>
                                     {NO_LOGO_HINT}
                                 </p>
                             )}
@@ -702,7 +702,7 @@ const LabelPreviewModal = ({
                                 {groupedQueueBatches.map(group => (
                                     <div key={group.personId} className={styles.queuePatientGroup}>
                                         <div className={styles.queuePatientHeader}>
-                                            <i className="fas fa-user"></i>
+                                            <i className="fas fa-user" aria-hidden="true"></i>
                                             <span className={styles.queuePatientName}>{group.patientName}</span>
                                         </div>
                                         <div className={styles.queuePatientBatches}>
@@ -719,7 +719,7 @@ const LabelPreviewModal = ({
                                                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBatchExpansion(batchItem.id); } }}
                                                         >
                                                             <div className={styles.queueBatchInfo}>
-                                                                <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} ${styles.expandIcon}`}></i>
+                                                                <i className={`fas fa-chevron-${isExpanded ? 'down' : 'right'} ${styles.expandIcon}`} aria-hidden="true"></i>
                                                                 <span className={styles.queueBatchNumber}>Batch #{batchItem.batchNumber}</span>
                                                                 <span className={styles.queueBatchLabels}>{batchItem.labels.length} labels</span>
                                                                 {batchItem.doctorName && (
@@ -736,7 +736,7 @@ const LabelPreviewModal = ({
                                                                         onChange={() => toggleQueueBatchLogo(batchItem.id)}
                                                                     />
                                                                     <span className={styles.checkboxIcon}>
-                                                                        <i className={batchItem.includeLogo && logoAvailable ? 'fas fa-image' : 'far fa-image'}></i>
+                                                                        <i className={batchItem.includeLogo && logoAvailable ? 'fas fa-image' : 'far fa-image'} aria-hidden="true"></i>
                                                                     </span>
                                                                 </label>
                                                                 <button
@@ -744,7 +744,7 @@ const LabelPreviewModal = ({
                                                                     onClick={() => removeQueueBatch(batchItem.id)}
                                                                     title="Remove batch"
                                                                 >
-                                                                    <i className="fas fa-trash"></i>
+                                                                    <i className="fas fa-trash" aria-hidden="true"></i>
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -781,7 +781,7 @@ const LabelPreviewModal = ({
                                                                         disabled={!queueNewLabelText.trim()}
                                                                         title="Add label"
                                                                     >
-                                                                        <i className="fas fa-plus"></i>
+                                                                        <i className="fas fa-plus" aria-hidden="true"></i>
                                                                     </button>
                                                                     <div className={styles.queueEditorActions}>
                                                                         <button
@@ -789,14 +789,14 @@ const LabelPreviewModal = ({
                                                                             onClick={() => resetQueueBatchLabels(batchItem.id)}
                                                                             title="Reset to original"
                                                                         >
-                                                                            <i className="fas fa-undo"></i>
+                                                                            <i className="fas fa-undo" aria-hidden="true"></i>
                                                                         </button>
                                                                         <button
                                                                             className={styles.btnClearLabels}
                                                                             onClick={() => clearQueueBatchLabels(batchItem.id)}
                                                                             title="Clear all"
                                                                         >
-                                                                            <i className="fas fa-trash"></i>
+                                                                            <i className="fas fa-trash" aria-hidden="true"></i>
                                                                         </button>
                                                                     </div>
                                                                 </div>
@@ -805,7 +805,7 @@ const LabelPreviewModal = ({
                                                                 <div className={styles.queueLabelsList}>
                                                                     {batchItem.labels.length === 0 ? (
                                                                         <div className={styles.noLabels}>
-                                                                            <i className="fas fa-inbox"></i>
+                                                                            <i className="fas fa-inbox" aria-hidden="true"></i>
                                                                             <p>No labels</p>
                                                                             <p className={styles.noLabelsHint}>Add labels above or click Reset</p>
                                                                         </div>
@@ -846,7 +846,7 @@ const LabelPreviewModal = ({
                                                                                         onClick={() => removeLabelFromQueueBatch(batchItem.id, idx)}
                                                                                         title="Remove"
                                                                                     >
-                                                                                        <i className="fas fa-times"></i>
+                                                                                        <i className="fas fa-times" aria-hidden="true"></i>
                                                                                     </button>
                                                                                 </div>
                                                                             );
@@ -865,7 +865,7 @@ const LabelPreviewModal = ({
 
                             {queueBatches.length === 0 && (
                                 <div className={styles.queueEmpty}>
-                                    <i className="fas fa-inbox"></i>
+                                    <i className="fas fa-inbox" aria-hidden="true"></i>
                                     <p>No batches in queue</p>
                                 </div>
                             )}
@@ -884,9 +884,9 @@ const LabelPreviewModal = ({
                             disabled={!isValid || currentIsGenerating}
                         >
                             {currentIsGenerating ? (
-                                <><i className="fas fa-spinner fa-spin"></i> Generating...</>
+                                <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Generating...</>
                             ) : (
-                                <><i className="fas fa-file-pdf"></i> Print All Labels ({totalLabels})</>
+                                <><i className="fas fa-file-pdf" aria-hidden="true"></i> Print All Labels ({totalLabels})</>
                             )}
                         </button>
                     </div>
@@ -902,7 +902,7 @@ const LabelPreviewModal = ({
                 <ModalHeader
                     title="Print Aligner Labels"
                     titleId="label-preview-modal-title"
-                    icon={<i className="fas fa-print" />}
+                    icon={<i className="fas fa-print" aria-hidden="true" />}
                     onClose={dismiss}
                 />
 
@@ -948,7 +948,7 @@ const LabelPreviewModal = ({
                         </div>
                         {labelSettings && !logoAvailable && (
                             <p className={styles.labelsHint}>
-                                <i className="far fa-image"></i>
+                                <i className="far fa-image" aria-hidden="true"></i>
                                 {NO_LOGO_HINT}
                             </p>
                         )}
@@ -986,16 +986,16 @@ const LabelPreviewModal = ({
                                 <h3>Labels to Print ({totalLabels})</h3>
                                 <div className={styles.labelsEditorActions}>
                                     <button className={styles.btnResetLabels} onClick={resetToDefault} title="Reset">
-                                        <i className="fas fa-undo"></i> Reset
+                                        <i className="fas fa-undo" aria-hidden="true"></i> Reset
                                     </button>
                                     <button className={styles.btnClearLabels} onClick={() => setLabels([])} title="Clear">
-                                        <i className="fas fa-trash"></i> Clear
+                                        <i className="fas fa-trash" aria-hidden="true"></i> Clear
                                     </button>
                                 </div>
                             </div>
 
                             <p className={styles.labelsHint}>
-                                <i className="fas fa-info-circle"></i>
+                                <i className="fas fa-info-circle" aria-hidden="true"></i>
                                 Click to edit, x to remove. Use U#/L# format
                             </p>
 
@@ -1008,15 +1008,15 @@ const LabelPreviewModal = ({
                                     placeholder="Add label (e.g., U7, L5, U3/L3)"
                                     className={styles.addLabelInput}
                                 />
-                                <button className={styles.btnAddLabel} onClick={addLabel} disabled={!newLabelText.trim()}>
-                                    <i className="fas fa-plus"></i>
+                                <button className={styles.btnAddLabel} onClick={addLabel} disabled={!newLabelText.trim()} aria-label="Add label">
+                                    <i className="fas fa-plus" aria-hidden="true"></i>
                                 </button>
                             </div>
 
                             <div className={styles.labelsList}>
                                 {labels.length === 0 ? (
                                     <div className={styles.noLabels}>
-                                        <i className="fas fa-inbox"></i>
+                                        <i className="fas fa-inbox" aria-hidden="true"></i>
                                         <p>No labels to print</p>
                                         <p className={styles.noLabelsHint}>Add labels above or click Reset</p>
                                     </div>
@@ -1044,7 +1044,7 @@ const LabelPreviewModal = ({
                                                 </span>
                                             )}
                                             <button className={styles.btnRemoveLabel} onClick={() => removeLabel(label.id)} title="Remove">
-                                                <i className="fas fa-times"></i>
+                                                <i className="fas fa-times" aria-hidden="true"></i>
                                             </button>
                                         </div>
                                     ))
@@ -1066,9 +1066,9 @@ const LabelPreviewModal = ({
                         disabled={!isValid || currentIsGenerating}
                     >
                         {currentIsGenerating ? (
-                            <><i className="fas fa-spinner fa-spin"></i> Generating...</>
+                            <><i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Generating...</>
                         ) : (
-                            <><i className="fas fa-file-pdf"></i> Prepare PDF</>
+                            <><i className="fas fa-file-pdf" aria-hidden="true"></i> Prepare PDF</>
                         )}
                     </button>
                 </div>

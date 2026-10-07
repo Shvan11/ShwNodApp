@@ -320,10 +320,15 @@ export type AddWorkWithInvoiceBody = z.infer<typeof addWorkWithInvoice.body>;
 // silently stripped while the user gets "Work updated" — which is what happened
 // to `estimated_duration` from 2026-06-05 until FE-F7-4. Keep this list in step
 // with the form's payload.
+//
+// Every field but `workId` is optional for the same reason: the form sends only what
+// the user changed (`utils/workUpdatePayload.ts`), so a column nobody touched is not
+// rewritten with the value the form opened with. `dr_id` was required until
+// 2026-10-06, which re-sent the doctor on every save.
 export const updateWork = {
   body: z.object({
     workId: intId,
-    dr_id: intId,
+    dr_id: intId.optional(),
     person_id: optInt,
     total_required: optMoney,
     currency: optCurrency,

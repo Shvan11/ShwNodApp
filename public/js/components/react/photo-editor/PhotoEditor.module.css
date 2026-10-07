@@ -113,7 +113,7 @@
 }
 
 .saveBtn {
-  background: var(--primary-color);
+  background: var(--primary-fill);
   color: var(--color-white);
   border: none;
   border-radius: var(--radius-md);
@@ -124,7 +124,7 @@
 }
 
 .saveBtn:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: var(--primary-fill-hover);
 }
 
 .saveBtn:disabled {

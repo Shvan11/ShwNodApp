@@ -19,8 +19,12 @@ export interface GoogleContactAccount {
   label: string;
 }
 
+// The ids are historical (`shw` was the original clinic's doctor) and stay: a grant is
+// stored under its id. The LABELS are what staff read, so they name the slot's role,
+// never a person: `shw` read "Dr. Shwan Phone" on every install. Which Google account
+// a slot is connected to shows on its Settings card (`account_email`).
 export const GOOGLE_CONTACT_ACCOUNTS: readonly GoogleContactAccount[] = [
-  { id: 'shw', label: 'Dr. Shwan Phone' },
+  { id: 'shw', label: "Doctor's Phone" },
   { id: 'cli', label: 'Clinic Phone' },
 ] as const;
 

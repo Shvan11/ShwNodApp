@@ -24,6 +24,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PATIENT_TYPE_IDS, WORK_STATUS, WORK_TYPE_IDS } from '../../shared/treatment-taxonomy.js';
 import { EMPLOYEE_EXPENSE_CATEGORY, LAB_EXPENSE_CATEGORY } from '../../shared/expense-categories.js';
+import { DEFAULT_TIME_POINT_NAMES } from '../../shared/time-point-names.js';
+import { CODE_NAMED_TEMPLATE_NAMES } from '../templates/template-files.js';
 
 const DIR = fileURLToPath(new URL('../../migrations/pg/', import.meta.url));
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
@@ -120,6 +122,19 @@ describe('fresh install', () => {
     expect(existsSync(`${REPO}${tpl![1]}`), tpl![1]).toBe(true);
   });
 
+  it('every receipt layout the code finds by name is flagged a system template', () => {
+    // receipt-service looks these rows up by `template_name`. Without `is_system` the
+    // Templates screen offers Delete on them (the original clinic's discount receipt had it).
+    const flagging = files
+      .map(upSql)
+      .join('\n')
+      .match(/UPDATE public\.document_templates\s+SET is_system = true[\s\S]*?;/g);
+    expect(flagging, 'a migration that sets is_system on the code-named templates').not.toBeNull();
+    const sql = flagging!.join('\n');
+    expect(CODE_NAMED_TEMPLATE_NAMES.length).toBeGreaterThan(0);
+    for (const name of CODE_NAMED_TEMPLATE_NAMES) expect(sql, name).toContain(`'${name}'`);
+  });
+
   it("the names the code matches on are seeded: the 'Doctor' position and the 'Clinic' pseudo-doctor", () => {
     const all = files.map(upSql).join('\n');
     expect(all).toMatch(/INSERT INTO public\.positions[\s\S]*?'Doctor'/);
@@ -130,6 +145,16 @@ describe('fresh install', () => {
     const { ids, statements } = seeded('expense_categories');
     expect(ids).toContain(EMPLOYEE_EXPENSE_CATEGORY);
     expect(ids).toContain(LAB_EXPENSE_CATEGORY);
+    for (const s of statements) expect(s).toMatch(/ON CONFLICT[\s\S]*DO NOTHING/);
+  });
+
+  it('the photo-session names the product ships with are seeded, idempotently', () => {
+    // 'Initial' and 'Final' are names the code matches on (the works' photo dates follow a
+    // session so named), and the whole list is the Name select's fallback — the lookup a
+    // new install starts with must be that same list.
+    const { statements } = seeded('time_point_names');
+    const sql = statements.join('\n');
+    for (const name of DEFAULT_TIME_POINT_NAMES) expect(sql, name).toContain(`'${name}'`);
     for (const s of statements) expect(s).toMatch(/ON CONFLICT[\s\S]*DO NOTHING/);
   });
 

@@ -141,7 +141,7 @@ const CostPresetsSettings = () => {
     if (loading) {
         return (
             <div className={`${styles.costPresetsSettings} ${styles.loading}`}>
-                <i className="fas fa-spinner fa-spin fa-2x"></i>
+                <i className="fas fa-spinner fa-spin fa-2x" aria-hidden="true"></i>
                 <p>Loading cost presets...</p>
             </div>
         );
@@ -159,7 +159,7 @@ const CostPresetsSettings = () => {
                         aria-pressed={activeCurrency === value}
                         onClick={() => switchCurrency(value)}
                     >
-                        <i className={icon}></i> {value}
+                        <i className={icon} aria-hidden="true"></i> {value}
                     </button>
                 ))}
             </div>
@@ -205,15 +205,15 @@ const CostPresetsSettings = () => {
                                 {editingPreset ? (
                                     <>
                                         <button type="submit" className="btn btn-primary" disabled={writing}>
-                                            <i className="fas fa-save"></i> Update
+                                            <i className="fas fa-save" aria-hidden="true"></i> Update
                                         </button>
                                         <button type="button" className="btn btn-secondary" onClick={resetForm} disabled={writing}>
-                                            <i className="fas fa-times"></i> Cancel
+                                            <i className="fas fa-times" aria-hidden="true"></i> Cancel
                                         </button>
                                     </>
                                 ) : (
                                     <button type="submit" className="btn btn-primary" disabled={writing}>
-                                        <i className="fas fa-plus"></i> Add Preset
+                                        <i className="fas fa-plus" aria-hidden="true"></i> Add Preset
                                     </button>
                                 )}
                             </div>
@@ -269,7 +269,7 @@ const CostPresetsSettings = () => {
                         </table>
                     ) : (
                         <div className={styles.emptyState}>
-                            <i className="fas fa-inbox fa-3x"></i>
+                            <i className="fas fa-inbox fa-3x" aria-hidden="true"></i>
                             <p>No presets found for {activeCurrency}</p>
                             {canEdit && <p className={styles.hint}>Add a preset using the form above</p>}
                         </div>

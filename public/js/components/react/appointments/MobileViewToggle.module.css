@@ -35,8 +35,8 @@
 
 .buttonActive {
     composes: button;
-    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
-    border-color: var(--primary-blue);
+    background: linear-gradient(135deg, var(--primary-fill) 0%, var(--palette-blue-700) 100%);
+    border-color: var(--primary-fill);
     color: var(--color-white);
 }
 

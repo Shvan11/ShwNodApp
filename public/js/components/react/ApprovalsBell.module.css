@@ -19,12 +19,12 @@
 
 /* Hold (pending approval) → red + pulse; notice (FYI) → blue */
 .badgeHold {
-    background: var(--error-500);
+    background: var(--error-fill);
     animation: holdPulse 2s ease-in-out infinite;
 }
 
 .badgeNotice {
-    background: var(--info-500, #0ea5e9);
+    background: var(--info-fill);
 }
 
 @keyframes holdPulse {
@@ -87,7 +87,7 @@
 
 .empty i {
     font-size: 1.75rem;
-    color: var(--success-500);
+    color: var(--success-700);
 }
 
 /* Section divider (Holds / Notices) */
@@ -105,7 +105,7 @@
     gap: var(--spacing-xs);
     padding: var(--spacing-xs) var(--spacing-md);
     background: var(--surface-muted);
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
@@ -153,8 +153,8 @@
     border-radius: var(--radius-full);
 }
 
-.kindHold   { background: var(--warning-500); }
-.kindNotice { background: var(--info-500, #0ea5e9); }
+.kindHold   { background: var(--warning-fill); }
+.kindNotice { background: var(--info-fill); }
 
 .itemBody {
     flex: 1;
@@ -236,7 +236,7 @@
 .confirmRejectBtn {
     border: 1px solid var(--error-500);
     background: transparent;
-    color: var(--error-500);
+    color: var(--error-700);
     border-radius: var(--radius-sm);
     padding: 2px var(--spacing-sm);
     font-size: var(--font-size-xs);
@@ -244,7 +244,7 @@
 }
 
 .confirmRejectBtn:hover {
-    background: var(--error-500);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 
@@ -282,22 +282,22 @@
 }
 
 .approveBtn {
-    background: var(--success-50, #f0fdf4);
-    color: var(--success-600, #16a34a);
+    background: var(--success-50);
+    color: var(--success-700);
 }
 
 .approveBtn:hover {
-    background: var(--success-500);
+    background: var(--success-fill);
     color: var(--color-white);
 }
 
 .rejectBtn {
-    background: var(--error-50, #fef2f2);
-    color: var(--error-600, #dc2626);
+    background: var(--error-50);
+    color: var(--error-700);
 }
 
 .rejectBtn:hover {
-    background: var(--error-500);
+    background: var(--error-fill);
     color: var(--color-white);
 }
 

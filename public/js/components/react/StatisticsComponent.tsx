@@ -527,7 +527,7 @@ const StatisticsComponent = () => {
         return (
             <div className={styles.statisticsContainer}>
                 <div className={styles.errorState}>
-                    <i className="fas fa-lock"></i>
+                    <i className="fas fa-lock" aria-hidden="true"></i>
                     <p>Financial statistics are restricted to admin and front-desk staff.</p>
                 </div>
             </div>
@@ -543,7 +543,7 @@ const StatisticsComponent = () => {
                 <div className={styles.pageHeader}>
                     <div className={styles.pageTitle}>
                         <h1>
-                            <i className="fas fa-chart-bar"></i>
+                            <i className="fas fa-chart-bar" aria-hidden="true"></i>
                             Financial Statistics
                         </h1>
                     </div>
@@ -583,13 +583,14 @@ const StatisticsComponent = () => {
             <div className={styles.controlsSection}>
                 <div className={styles.dateSelector}>
                     <button onClick={handlePrevMonth} className={styles.btnNav} title="Previous Month">
-                        <i className="fas fa-chevron-left"></i>
+                        <i className="fas fa-chevron-left" aria-hidden="true"></i>
                     </button>
                     <div className={styles.dateDisplay}>
                         <select
                             value={month}
                             onChange={(e: ChangeEvent<HTMLSelectElement>) => setMonth(parseInt(e.target.value, 10))}
                             className={styles.formSelect}
+                            aria-label="Month"
                         >
                             {monthNames.map((name, index) => (
                                 <option key={index + 1} value={index + 1}>{name}</option>
@@ -605,15 +606,15 @@ const StatisticsComponent = () => {
                         />
                     </div>
                     <button onClick={handleNextMonth} className={styles.btnNav} title="Next Month">
-                        <i className="fas fa-chevron-right"></i>
+                        <i className="fas fa-chevron-right" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div className={styles.actions}>
                     <button onClick={refreshAll} className={styles.btnAction} disabled={loading}>
-                        <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`}></i> Refresh
+                        <i className={`fas fa-sync-alt ${loading ? 'fa-spin' : ''}`} aria-hidden="true"></i> Refresh
                     </button>
                     <button onClick={handlePrint} className={styles.btnAction}>
-                        <i className="fas fa-print"></i> Print
+                        <i className="fas fa-print" aria-hidden="true"></i> Print
                     </button>
                 </div>
             </div>
@@ -625,7 +626,7 @@ const StatisticsComponent = () => {
                 </div>
             ) : error && !statistics ? (
                 <div className={styles.errorState}>
-                    <i className="fas fa-exclamation-triangle"></i>
+                    <i className="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <p>{error}</p>
                     <button className={styles.btnRetry} onClick={() => refetchStatistics()}>Try Again</button>
                 </div>
@@ -636,7 +637,7 @@ const StatisticsComponent = () => {
                     <div className={styles.summaryCards}>
                         <div className={`${styles.summaryCard} ${styles.revenue}`}>
                             <div className={styles.cardHeader}>
-                                <i className="fas fa-money-bill-wave"></i>
+                                <i className="fas fa-money-bill-wave" aria-hidden="true"></i>
                                 <h3>Total Revenue (Month)</h3>
                             </div>
                             <div className={styles.cardContent}>
@@ -653,7 +654,7 @@ const StatisticsComponent = () => {
 
                         <div className={`${styles.summaryCard} ${styles.expenses}`}>
                             <div className={styles.cardHeader}>
-                                <i className="fas fa-receipt"></i>
+                                <i className="fas fa-receipt" aria-hidden="true"></i>
                                 <h3>Total Expenses (Month)</h3>
                             </div>
                             <div className={styles.cardContent}>
@@ -670,7 +671,7 @@ const StatisticsComponent = () => {
 
                         <div className={`${styles.summaryCard} ${styles.profit}`}>
                             <div className={styles.cardHeader}>
-                                <i className="fas fa-chart-line"></i>
+                                <i className="fas fa-chart-line" aria-hidden="true"></i>
                                 <h3>Net Profit (Month)</h3>
                             </div>
                             <div className={styles.cardContent}>
@@ -694,7 +695,7 @@ const StatisticsComponent = () => {
                             {effectiveViewMode === VIEW_MODES.MONTHLY && (
                                 <div className={styles.periodSelector}>
                                     <div className={styles.periodSelectorLabel}>
-                                        <i className="fas fa-calendar-alt"></i>
+                                        <i className="fas fa-calendar-alt" aria-hidden="true"></i>
                                         <span>12-Month Period:</span>
                                     </div>
                                     <div className={styles.periodSelectorControls}>
@@ -720,7 +721,7 @@ const StatisticsComponent = () => {
                                             />
                                         </div>
                                         <div className={styles.periodSelectorArrow}>
-                                            <i className="fas fa-arrow-right"></i>
+                                            <i className="fas fa-arrow-right" aria-hidden="true"></i>
                                         </div>
                                         <div className={styles.periodSelectorField}>
                                             <span>To</span>
@@ -731,7 +732,7 @@ const StatisticsComponent = () => {
                                     </div>
                                     {loadingYearly && (
                                         <div className={styles.periodSelectorLoading}>
-                                            <i className="fas fa-spinner fa-spin"></i> Loading...
+                                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading...
                                         </div>
                                     )}
                                 </div>
@@ -741,7 +742,7 @@ const StatisticsComponent = () => {
                             {effectiveViewMode === VIEW_MODES.YEARLY && (
                                 <div className={styles.periodSelector}>
                                     <div className={styles.periodSelectorLabel}>
-                                        <i className="fas fa-calendar-alt"></i>
+                                        <i className="fas fa-calendar-alt" aria-hidden="true"></i>
                                         <span>Year Range:</span>
                                     </div>
                                     <div className={styles.periodSelectorControls}>
@@ -757,7 +758,7 @@ const StatisticsComponent = () => {
                                             />
                                         </div>
                                         <div className={styles.periodSelectorArrow}>
-                                            <i className="fas fa-arrow-right"></i>
+                                            <i className="fas fa-arrow-right" aria-hidden="true"></i>
                                         </div>
                                         <div className={styles.periodSelectorField}>
                                             <label htmlFor="year-range-end">To</label>
@@ -773,7 +774,7 @@ const StatisticsComponent = () => {
                                     </div>
                                     {loadingMultiYear && (
                                         <div className={styles.periodSelectorLoading}>
-                                            <i className="fas fa-spinner fa-spin"></i> Loading...
+                                            <i className="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading...
                                         </div>
                                     )}
                                 </div>
@@ -803,7 +804,8 @@ const StatisticsComponent = () => {
                                 No exchange rate has been recorded yet, so IQD and USD can&apos;t be combined — the Grand Total columns show &quot;—&quot;. Every IQD and USD figure below is exact. Add a rate in Settings → Exchange Rates.
                             </p>
                         )}
-                        <div className={styles.tableWrapper}>
+                        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls sideways must be focusable, or a keyboard user cannot reach its right-hand columns */}
+                        <div className={styles.tableWrapper} role="region" aria-label="Daily breakdown" tabIndex={0}>
                             <table className={styles.dataTable}>
                                 <thead>
                                     <tr>
@@ -827,7 +829,19 @@ const StatisticsComponent = () => {
                                             onClick={() => openDayModal(day)}
                                             title="Click to view daily invoices"
                                         >
-                                            <td data-label="Date">{formatDate(day.Day)}</td>
+                                            {/* The row's click is a mouse shortcut; this button is the
+                                                keyboard and screen-reader way in. A bare <tr onClick>
+                                                has no tab stop and no key handler (FE-F25-6). */}
+                                            <td data-label="Date">
+                                                <button
+                                                    type="button"
+                                                    className={styles.dayButton}
+                                                    onClick={(e) => { e.stopPropagation(); openDayModal(day); }}
+                                                    aria-label={`View invoices for ${formatDate(day.Day)}`}
+                                                >
+                                                    {formatDate(day.Day)}
+                                                </button>
+                                            </td>
                                             <td data-label="IQD Revenue" className={styles.amountCell}>{formatCurrency(day.SumIQD)}</td>
                                             <td data-label="IQD Expenses" className={`${styles.amountCell} ${styles.negative}`}>{formatCurrency(Math.abs(day.ExpensesIQD || 0))}</td>
                                             <td data-label="IQD Net" className={styles.amountCell}>{formatCurrency(day.FinalIQDSum)}</td>

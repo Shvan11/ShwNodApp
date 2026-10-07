@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import type { PortalPatient } from './PortalApp';
 import { loginResponseSchema } from './portal.schemas';
 import styles from './portal.module.css';
+import PortalIcon from './PortalIcon';
 
 interface Props {
   onLogin: (patient: PortalPatient) => void;
@@ -64,10 +65,10 @@ const PortalLogin = ({ onLogin, clinicName, notice }: Props) => {
   };
 
   return (
-    <div className={styles.loginPage}>
+    <main className={styles.loginPage}>
       <form className={styles.loginCard} onSubmit={handleSubmit}>
         <div className={styles.loginHeader}>
-          <i className={`fas fa-tooth ${styles.loginIcon}`} aria-hidden="true" />
+          <PortalIcon name="tooth" className={styles.loginIcon} />
           <h1 className={styles.loginTitle}>Patient Portal</h1>
           {clinicName && <p className={styles.loginSubtitle}>{clinicName}</p>}
         </div>
@@ -116,7 +117,7 @@ const PortalLogin = ({ onLogin, clinicName, notice }: Props) => {
           work, ask the reception desk to reset it.
         </p>
       </form>
-    </div>
+    </main>
   );
 };
 

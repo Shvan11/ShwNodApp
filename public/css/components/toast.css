@@ -14,7 +14,7 @@
      out-stack that at 100010 (see LocalSend/Telegram ShareModal). A toast can fire
      from any of those (e.g. the lightbox visibility toggle), so it must sit above
      them all — otherwise it renders behind the fullscreen image. */
-  z-index: 100020;
+  z-index: var(--z-index-toast);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
@@ -92,7 +92,7 @@
 }
 
 .toast-warning .toast-icon {
-  color: var(--warning-color);
+  color: var(--warning-800);
 }
 
 .toast-info .toast-icon {
@@ -116,7 +116,7 @@
   background: none;
   border: none;
   font-size: var(--font-size-xl);
-  color: var(--gray-400);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0;
   width: 24px;

@@ -237,7 +237,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
             <div dir="ltr" className={styles.ltrScope}>
             <ModalHeader
                 titleId="webceph-modal-title"
-                icon={<i className="fas fa-brain" />}
+                icon={<i className="fas fa-brain" aria-hidden="true" />}
                 title="WebCeph AI X-Ray Analysis"
                 onClose={onClose}
             />
@@ -251,14 +251,14 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
 
                 {webcephError && (
                     <div className={styles.errorBanner}>
-                        <span><i className="fas fa-exclamation-circle" /> {webcephError}</span>
+                        <span><i className="fas fa-exclamation-circle" aria-hidden="true" /> {webcephError}</span>
                         <button type="button" onClick={() => setWebcephError(null)} className={styles.bannerClose} aria-label="Dismiss error">×</button>
                     </div>
                 )}
 
                 {webcephSuccess && (
                     <div className={styles.successBanner}>
-                        <i className="fas fa-check-circle" /> {webcephSuccess}
+                        <i className="fas fa-check-circle" aria-hidden="true" /> {webcephSuccess}
                     </div>
                 )}
 
@@ -279,7 +279,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                     </div>
                 ) : !webcephData ? (
                     <div className={styles.createCard}>
-                        <i className={`fas fa-user-plus ${styles.createIcon}`} />
+                        <i className={`fas fa-user-plus ${styles.createIcon}`} aria-hidden="true" />
                         <h4 className={styles.createTitle}>Create Patient in WebCeph</h4>
                         <p className={styles.createDesc}>
                             Get AI-powered cephalometric analysis by creating this patient in WebCeph.
@@ -325,14 +325,14 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                             disabled={webcephLoading || webcephMissingFields.length > 0}
                         >
                             {webcephLoading ? (
-                                <><i className="fas fa-spinner fa-spin" /> Creating…</>
+                                <><i className="fas fa-spinner fa-spin" aria-hidden="true" /> Creating…</>
                             ) : (
-                                <><i className="fas fa-plus-circle" /> Create in WebCeph</>
+                                <><i className="fas fa-plus-circle" aria-hidden="true" /> Create in WebCeph</>
                             )}
                         </button>
                         {webcephMissingFields.length > 0 && (
                             <p className={styles.createWarn}>
-                                <i className="fas fa-exclamation-triangle" />{' '}
+                                <i className="fas fa-exclamation-triangle" aria-hidden="true" />{' '}
                                 Requires {webcephMissingList} — set {webcephMissingFields.length > 1 ? 'them' : 'it'} in Edit Patient first.
                             </p>
                         )}
@@ -342,7 +342,7 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                         <div className={styles.linkCard}>
                             <div className={styles.linkHeader}>
                                 <span className={styles.linkTitle}>
-                                    <i className="fas fa-check-circle" /> Patient Created in WebCeph
+                                    <i className="fas fa-check-circle" aria-hidden="true" /> Patient Created in WebCeph
                                 </span>
                                 <span className={styles.linkDate}>
                                     {formatDate(webcephData.createdAt)}
@@ -359,14 +359,14 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                                     rel="noopener noreferrer"
                                     className={styles.openLink}
                                 >
-                                    <i className="fas fa-external-link-alt" /> Open in WebCeph
+                                    <i className="fas fa-external-link-alt" aria-hidden="true" /> Open in WebCeph
                                 </a>
                             )}
                         </div>
 
                         <div className={styles.uploadCard}>
                             <h4 className={styles.cardTitle}>
-                                <i className="fas fa-upload" /> Upload X-Ray Image
+                                <i className="fas fa-upload" aria-hidden="true" /> Upload X-Ray Image
                             </h4>
 
                             <div className={styles.formRow}>
@@ -414,12 +414,12 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                                             onClick={() => setUploadData({ ...uploadData, selectedFile: null })}
                                             title="Clear selection"
                                         >
-                                            <i className="fas fa-times" />
+                                            <i className="fas fa-times" aria-hidden="true" />
                                         </button>
                                     </div>
                                 ) : (
                                     <button type="button" className={styles.chooseBtn} onClick={() => setShowPicker((s) => !s)}>
-                                        <i className="fas fa-folder-open" /> {showPicker ? 'Hide patient folder' : 'Browse patient folder'}
+                                        <i className="fas fa-folder-open" aria-hidden="true" /> {showPicker ? 'Hide patient folder' : 'Browse patient folder'}
                                     </button>
                                 )}
                                 {showPicker && !uploadData.selectedFile && (
@@ -455,9 +455,9 @@ const WebCephModal = ({ isOpen, onClose, personId, patientInfo }: Props) => {
                                 disabled={webcephLoading || (!uploadData.selectedFile && !uploadData.imageFile)}
                             >
                                 {webcephLoading ? (
-                                    <><i className="fas fa-spinner fa-spin" /> Uploading…</>
+                                    <><i className="fas fa-spinner fa-spin" aria-hidden="true" /> Uploading…</>
                                 ) : (
-                                    <><i className="fas fa-cloud-upload-alt" /> Upload to WebCeph</>
+                                    <><i className="fas fa-cloud-upload-alt" aria-hidden="true" /> Upload to WebCeph</>
                                 )}
                             </button>
                         </div>

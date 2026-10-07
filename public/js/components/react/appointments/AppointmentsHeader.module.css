@@ -96,7 +96,7 @@
 }
 
 .datePillIcon {
-    color: var(--color-purple-dark);
+    color: var(--indigo-600);
     font-size: var(--font-size-base);
 }
 
@@ -131,7 +131,8 @@
 }
 
 .datePill:focus-within {
-    box-shadow: 0 0 0 2px var(--color-white), var(--shadow-md);
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
 }
 
 /* Refresh Button */
@@ -140,7 +141,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--spacing-xs) var(--spacing-sm);
-    background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+    background: linear-gradient(135deg, var(--primary-fill) 0%, var(--palette-blue-700) 100%);
     color: var(--color-white);
     border: none;
     border-radius: var(--radius-sm);
@@ -154,7 +155,7 @@
 .refreshButton:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
-    background: linear-gradient(135deg, var(--primary-blue-dark) 0%, var(--info-700) 100%);
+    background: linear-gradient(135deg, var(--primary-fill-hover) 0%, var(--info-fill-hover) 100%);
 }
 
 .refreshButton:active {

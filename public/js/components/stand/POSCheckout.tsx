@@ -1,8 +1,7 @@
 import { useState, type ChangeEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { formatNumber, parseMoneyInput } from '../../utils/formatters';
-import { patientPhonesQuery } from '@/query/queries';
-import PatientSearchCombobox from '../react/PatientSearchCombobox';
+import { patientLookupModeFor } from '../../utils/patientSearch';
+import PatientSearchCombobox, { type PatientOption } from '../react/PatientSearchCombobox';
 import styles from './POSCheckout.module.css';
 
 export interface CheckoutDetails {
@@ -41,11 +40,11 @@ export default function POSCheckout({ total, onConfirm, disabled = false, busy =
 
   const [patientQuery, setPatientQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<{ id: number; name: string } | null>(null);
-  // The app's patient picker over the shared phone book (as the Transfer dialog):
-  // names, phones and IDs all match. The box sent `?q=`, which the server matches
-  // against phone and ID only, so no name ever found anyone (FE-F19-3).
-  const { data: patients = [] } = useQuery(patientPhonesQuery());
-  const pickerMode = /^\s*\d/.test(patientQuery) ? 'phoneId' : 'name';
+  // The app's patient picker (as the Transfer dialog): names, phones and IDs all
+  // match, in one box — a leading digit means phone/ID. The box sent `?q=`, which
+  // the server matches against phone and ID only, so no name ever found anyone
+  // (FE-F19-3).
+  const typingName = patientLookupModeFor(patientQuery) === 'name' && patientQuery.trim() !== '';
 
   const amountPaid = parseMoneyInput(amountPaidRaw);
   const change = amountPaid - total;
@@ -82,10 +81,9 @@ export default function POSCheckout({ total, onConfirm, disabled = false, busy =
     setSelectedPatient(null);
   };
 
-  const handlePatientPick = (personId: number) => {
-    const name = patients.find((p) => p.id === personId)?.name ?? `#${personId}`;
-    setSelectedPatient({ id: personId, name });
-    setPatientQuery(name);
+  const handlePatientPick = (patient: PatientOption) => {
+    setSelectedPatient({ id: patient.id, name: patient.name });
+    setPatientQuery(patient.name);
   };
 
   const handleConfirm = () => {
@@ -169,10 +167,9 @@ export default function POSCheckout({ total, onConfirm, disabled = false, busy =
             id="pos-patient-search"
             value={patientQuery}
             onChange={handlePatientQueryChange}
-            onJump={handlePatientPick}
-            patients={patients}
-            mode={pickerMode}
-            rtl={pickerMode === 'name' && patientQuery.trim() !== ''}
+            onPick={handlePatientPick}
+            mode="auto"
+            rtl={typingName}
             placeholder="Patient name, phone or ID..."
             hint="Pick a patient to link this sale"
           />

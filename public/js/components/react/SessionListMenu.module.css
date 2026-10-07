@@ -47,7 +47,7 @@
 .current,
 .current:hover {
     background: var(--indigo-50);
-    color: var(--indigo-600);
+    color: var(--indigo-700);
 }
 
 /* Reserves its width on every row so descriptions line up; shown on the current one. */

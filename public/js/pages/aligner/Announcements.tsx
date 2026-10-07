@@ -32,6 +32,7 @@ import {
 } from '@shared/contracts/announcement.contract';
 import { formatLocaleDate, formatLocaleDateTime } from '@/utils/formatters';
 import { parseLocalDate, toLocalDateString } from '@/utils/calendarDate';
+import { useToday, useNowMinute } from '@/hooks/useClock';
 import { doctorLabel } from '@/utils/aligner-labels';
 import styles from './Announcements.module.css';
 
@@ -77,8 +78,9 @@ const EMPTY_FORM: FormState = {
 
 type DoctorOption = { value: number | null; label: string; isDisabled?: boolean };
 
-function isExpired(a: AnnouncementRow): boolean {
-    return a.expires_at != null && new Date(a.expires_at).getTime() <= Date.now();
+/** `now` comes from useClock: a clock read in render is cached and goes stale (FE-F26-8). */
+function isExpired(a: AnnouncementRow, now: number): boolean {
+    return a.expires_at != null && new Date(a.expires_at).getTime() <= now;
 }
 
 /** 'YYYY-MM-DD' plus `days`, as a local day. */
@@ -174,7 +176,8 @@ const Announcements: React.FC = () => {
             isDisabled: !d.doctor_email,
         })),
     ];
-    const today = toLocalDateString(new Date());
+    const today = useToday();
+    const nowMinute = useNowMinute();
     // Without a doctor portal there is no one to announce to (owner decision,
     // FE-F18-12): the entry point is hidden, and a direct link says why.
     const features = useQuery(alignerFeaturesQuery()).data;
@@ -323,7 +326,7 @@ const Announcements: React.FC = () => {
             ) : (
                 <div className={styles.list}>
                     {announcements.map((a) => {
-                        const expired = isExpired(a);
+                        const expired = isExpired(a, nowMinute);
                         const isAuto = a.auto_event != null;
                         return (
                             <div key={a.announcement_id} className={`${styles.card} ${expired ? styles.cardExpired : ''}`}>
@@ -410,7 +413,7 @@ const Announcements: React.FC = () => {
                 <ModalHeader
                     title={editId == null ? 'New announcement' : 'Edit announcement'}
                     titleId={modalTitleId}
-                    icon={<i className="fas fa-bullhorn" />}
+                    icon={<i className="fas fa-bullhorn" aria-hidden="true" />}
                     variant="info"
                     onClose={dismiss}
                 />

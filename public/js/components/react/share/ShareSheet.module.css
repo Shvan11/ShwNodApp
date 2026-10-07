@@ -6,7 +6,7 @@
  * out-stack it or the chooser renders behind the images.
  */
 .overlay {
-  z-index: 100010;
+  z-index: var(--z-index-over-lightbox);
 }
 
 .modal {

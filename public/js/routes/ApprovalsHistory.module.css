@@ -83,6 +83,12 @@
     outline: none;
 }
 
+/* The input is borderless inside the bordered wrapper, so the wrapper shows focus. */
+.search:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
+}
+
 .state {
     display: flex;
     flex-direction: column;
@@ -177,8 +183,8 @@
     vertical-align: middle;
 }
 
-.kindHold { background: var(--warning-500); }
-.kindNotice { background: var(--info-500); }
+.kindHold { background: var(--warning-fill); }
+.kindNotice { background: var(--info-fill); }
 
 .statusBadge {
     display: inline-block;
@@ -193,7 +199,7 @@
 .stApproved { background: var(--success-100); color: var(--success-700); }
 .stRejected { background: var(--error-50); color: var(--error-700); }
 .stAcknowledged { background: var(--surface-muted); color: var(--text-secondary); }
-.stStale { background: var(--surface-muted); color: var(--text-muted); font-style: italic; }
+.stStale { background: var(--surface-muted); color: var(--text-secondary); font-style: italic; }
 .stFailed { background: var(--error-50); color: var(--error-700); }
 
 .limitNote {

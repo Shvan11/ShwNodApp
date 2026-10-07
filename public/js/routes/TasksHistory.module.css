@@ -75,6 +75,12 @@
     outline: none;
 }
 
+/* The input is borderless inside the bordered wrapper, so the wrapper shows focus. */
+.search:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
+}
+
 .state {
     display: flex;
     flex-direction: column;
@@ -93,6 +99,9 @@
     border-radius: var(--radius-lg);
     background: var(--surface);
     overflow-x: auto;
+    /* Containing block for the visually-hidden header text: without one it is laid
+       out against the page, outside this scroller, and widens a phone-width page. */
+    position: relative;
 }
 
 .table {
@@ -157,9 +166,9 @@
     vertical-align: middle;
 }
 
-.sev1 { background: var(--success-500); }
-.sev2 { background: var(--warning-500); }
-.sev3 { background: var(--error-500); }
+.sev1 { background: var(--success-fill); }
+.sev2 { background: var(--warning-fill); }
+.sev3 { background: var(--error-fill); }
 
 /* Status badge */
 .statusBadge {
@@ -175,7 +184,7 @@
 .stSnoozed { background: var(--warning-100); color: var(--warning-700); }
 .stDone { background: var(--success-100); color: var(--success-700); }
 .stDismissed { background: var(--surface-muted); color: var(--text-secondary); }
-.stExpired { background: var(--surface-muted); color: var(--text-muted); font-style: italic; }
+.stExpired { background: var(--surface-muted); color: var(--text-secondary); font-style: italic; }
 
 .actionCell {
     white-space: nowrap;
@@ -213,20 +222,20 @@
 }
 
 .doneBtn:hover:not(:disabled) {
-    background: var(--success-500);
+    background: var(--success-fill);
     color: var(--color-white);
-    border-color: var(--success-500);
+    border-color: var(--success-fill);
 }
 
 .deleteBtn {
-    color: var(--error-600);
+    color: var(--error-700);
     border-color: var(--error-200);
 }
 
 .deleteBtn:hover:not(:disabled) {
-    background: var(--error-500);
+    background: var(--error-fill);
     color: var(--color-white);
-    border-color: var(--error-500);
+    border-color: var(--error-fill);
 }
 
 .doneBtn:disabled,

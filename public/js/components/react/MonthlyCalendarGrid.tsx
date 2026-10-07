@@ -121,6 +121,9 @@ const MonthlyCalendarGrid = ({
                             data-month-cell
                             role="button"
                             tabIndex={currentMonth ? 0 : -1}
+                            // A day of the neighbouring month is a dimmed placeholder: no
+                            // click, no tab stop. Say so, or it is announced as a live button.
+                            aria-disabled={!currentMonth || undefined}
                             aria-expanded={isExpanded}
                             onClick={togglePanel}
                             onKeyDown={(e) => {
@@ -139,7 +142,7 @@ const MonthlyCalendarGrid = ({
                             {/* Holiday badge */}
                             {currentMonth && isHoliday && (
                                 <div className={styles.holidayBadge} title={day.holidayName ?? undefined}>
-                                    <i className="fas fa-calendar-times"></i>
+                                    <i className="fas fa-calendar-times" aria-hidden="true"></i>
                                 </div>
                             )}
 

@@ -83,7 +83,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         {
             name: 'Clinical',
             icon: 'fas fa-stethoscope',
-            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer', 'tblShadeVitaClassic', 'tblShade3dMaster', 'tblLabs']
+            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer', 'tblShadeVitaClassic', 'tblShade3dMaster', 'tblLabs', 'tblTimePointNames']
         },
         {
             name: 'Patient Information',
@@ -115,11 +115,11 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
             <div className={styles.lookupsSettings}>
                 <div className="settings-section">
                     <h3>
-                        <i className="fas fa-list"></i>
+                        <i className="fas fa-list" aria-hidden="true"></i>
                         Lookup Table Management
                     </h3>
                     <div className="lookup-loading">
-                        <i className="fas fa-spinner fa-spin"></i>
+                        <i className="fas fa-spinner fa-spin" aria-hidden="true"></i>
                         <span>Loading lookup tables...</span>
                     </div>
                 </div>
@@ -141,10 +141,10 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                 type="button"
             >
                 <span className={styles.title}>
-                    <i className={table.icon}></i>
+                    <i className={table.icon} aria-hidden="true"></i>
                     <span className={styles.titleText}>{table.displayName}</span>
                 </span>
-                <i className={cn(`fas fa-chevron-${expandedTable === table.key ? 'up' : 'down'}`, styles.chevron)}></i>
+                <i className={cn(`fas fa-chevron-${expandedTable === table.key ? 'up' : 'down'}`, styles.chevron)} aria-hidden="true"></i>
             </button>
 
             {expandedTable === table.key && (
@@ -178,7 +178,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         <div className={styles.lookupsSettings}>
             <div className="settings-section">
                 <h3>
-                    <i className="fas fa-list"></i>
+                    <i className="fas fa-list" aria-hidden="true"></i>
                     Lookup Table Management
                 </h3>
                 <p className="section-description">
@@ -197,7 +197,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                     return (
                         <div key={group.name} className={styles.group}>
                             <h4 className={styles.groupHeader}>
-                                <i className={group.icon}></i>
+                                <i className={group.icon} aria-hidden="true"></i>
                                 {group.name}
                             </h4>
 
@@ -218,7 +218,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                     return (
                         <div className={styles.group}>
                             <h4 className={styles.groupHeader}>
-                                <i className="fas fa-folder"></i>
+                                <i className="fas fa-folder" aria-hidden="true"></i>
                                 Other
                             </h4>
 

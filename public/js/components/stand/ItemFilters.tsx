@@ -39,7 +39,7 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
     <div className={styles.filterCard}>
       <div className={styles.filterHeader}>
         <div className={styles.filterHeaderContent}>
-          <i className="fas fa-filter"></i>
+          <i className="fas fa-filter" aria-hidden="true"></i>
           <h3>Filter Items</h3>
         </div>
         <button
@@ -48,14 +48,14 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
           onClick={onReset}
           title="Reset all filters"
         >
-          <i className="fas fa-redo"></i>
+          <i className="fas fa-redo" aria-hidden="true"></i>
         </button>
       </div>
 
       <div className={styles.filterGrid}>
         <div className={styles.filterGroup}>
           <label htmlFor="filter-search">
-            <i className="fas fa-search"></i>
+            <i className="fas fa-search" aria-hidden="true"></i>
             Search
           </label>
           <input
@@ -70,7 +70,7 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
 
         <div className={styles.filterGroup}>
           <label htmlFor="filter-category">
-            <i className="fas fa-folder"></i>
+            <i className="fas fa-folder" aria-hidden="true"></i>
             Category
           </label>
           <div className={styles.selectWrapper}>
@@ -87,13 +87,13 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
                 </option>
               ))}
             </select>
-            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+            <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
           </div>
         </div>
 
         <div className={styles.filterGroup}>
           <label htmlFor="filter-stock-status">
-            <i className="fas fa-boxes"></i>
+            <i className="fas fa-boxes" aria-hidden="true"></i>
             Stock Status
           </label>
           <div className={styles.selectWrapper}>
@@ -108,13 +108,13 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
               <option value="low-stock">Low Stock</option>
               <option value="out-of-stock">Out of Stock</option>
             </select>
-            <i className={`fas fa-chevron-down ${styles.selectIcon}`}></i>
+            <i className={`fas fa-chevron-down ${styles.selectIcon}`} aria-hidden="true"></i>
           </div>
         </div>
 
         <div className={styles.filterGroup}>
           <span>
-            <i className="fas fa-eye"></i>
+            <i className="fas fa-eye" aria-hidden="true"></i>
             Visibility
           </span>
           <div className={styles.checkboxGroup}>
@@ -136,7 +136,7 @@ export default function ItemFilters({ filters, onFilterChange, onApply, onReset 
             className={styles.btnApply}
             onClick={onApply}
           >
-            <i className="fas fa-check"></i>
+            <i className="fas fa-check" aria-hidden="true"></i>
             Apply Filters
           </button>
         </div>

@@ -10,8 +10,9 @@
  * dark-mode regression into a CI failure.
  *
  * Deliberately NOT flagged (theme-agnostic by design, would be false positives):
- *   • `var(--token)` — incl. `var(--color-white)`, the correct way to put white
- *     text/icons on a saturated colored button or chip.
+ *   • `var(--token)` as a TEXT/border colour — incl. `color: var(--color-white)`, the
+ *     correct way to put white text/icons on a saturated colored button or chip.
+ *     (As a whole BACKGROUND, `var(--color-white)` is flagged — see the rule.)
  *   • Translucent white glints (alpha < 0.6) on fixed brand gradients, and
  *     `rgba(0,0,0,…)` shadows/scrims — these layer over a fixed/themed surface.
  *   • Fixed colored backgrounds and self-consistent status-badge color pairs
@@ -26,7 +27,9 @@ export default {
   rules: {},
   overrides: [
     {
-      files: ['public/js/**/*.module.css'],
+      // The global sheets (public/css/**) are held to the same rule: aligner-common.css
+      // alone is 55 KB of themed screens, and until 2026-10-05 nothing linted it.
+      files: ['public/js/**/*.module.css', 'public/css/**/*.css'],
       rules: {
         'declaration-property-value-disallowed-list': {
           '/^(background|background-color)$/': [
@@ -34,6 +37,11 @@ export default {
             '/(?<![-\\w])white(?![-\\w])/',
             // hex white (#fff / #ffffff)
             '/#fff(?:fff)?\\b/i',
+            // the token form of the same thing: `--color-white` is FIXED white in both themes
+            // (it exists for text/icons on a coloured fill), so as a whole background it is
+            // the white-on-white bug again — the aligner label dialog shipped exactly that.
+            // Only the bare value is matched; a gradient stop or color-mix() is left alone.
+            '/^var\\(--color-white\\)$/',
             // opaque or >=0.6-alpha white — light enough to read white-on-white in dark mode
             '/rgba?\\(\\s*255\\s*,\\s*255\\s*,\\s*255\\s*(?:,\\s*(?:0?\\.[6-9]\\d*|1(?:\\.0+)?))?\\s*\\)/',
           ],

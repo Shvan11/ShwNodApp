@@ -17,30 +17,16 @@
 }
 
 .text-success {
-    color: var(--success-color);
+    color: var(--success-700);
 }
-
-.text-warning {
-    color: var(--warning-color);
-}
-
 .text-error {
-    color: var(--error-color);
+    color: var(--error-700);
 }
 
 .text-rtl {
     direction: rtl;
     text-align: right;
 }
-
-.icon-xs {
-    font-size: 0.5rem;
-}
-
-.mt-4 {
-    margin-top: var(--spacing-xl);
-}
-
 /* --- Loading fallback (used by Suspense fallbacks) --- */
 
 .loading-fallback {
@@ -73,4 +59,44 @@
     100% {
         transform: rotate(360deg);
     }
+}
+
+/* Read by a screen reader, drawn for nobody. The one copy: two modules used to
+   carry their own (FE-F25-13). */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* "Skip to content": the first tab stop on every page, off-screen until focused.
+   It sits over the header, whose own controls are nine tab stops (FE-F25-9). */
+.skip-link {
+    position: fixed;
+    top: var(--spacing-sm);
+    inset-inline-start: var(--spacing-sm);
+    z-index: var(--z-index-toast);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-weight: var(--font-weight-semibold);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-200%);
+}
+
+.skip-link:focus {
+    transform: none;
+    text-decoration: none;
+}
+
+/* The skip link's target takes focus without a ring around the whole page. */
+#app-container:focus {
+    outline: none;
 }

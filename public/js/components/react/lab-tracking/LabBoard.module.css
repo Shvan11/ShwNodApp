@@ -12,7 +12,7 @@
     flex-direction: column;
     border: var(--border-width-thin) solid var(--border);
     border-radius: var(--radius-md);
-    background: var(--surface-elevated, var(--background-light));
+    background: var(--surface-elevated);
     max-height: calc(100vh - 260px);
 }
 
@@ -30,7 +30,7 @@
 }
 
 .columnHeader[data-location='lab'] {
-    border-bottom-color: var(--warning-orange, var(--warning-color));
+    border-bottom-color: var(--warning-orange);
 }
 
 .columnHeader[data-location='clinic'] {
@@ -63,11 +63,11 @@
 }
 
 .columnBodyAtLab {
-    background: color-mix(in srgb, var(--warning-orange, var(--warning-color)) 4%, transparent);
+    background: color-mix(in srgb, var(--warning-orange) 4%, transparent);
 }
 
 .empty {
-    padding: var(--spacing-xl, 2rem);
+    padding: var(--spacing-xl);
     text-align: center;
     color: var(--text-secondary);
 }

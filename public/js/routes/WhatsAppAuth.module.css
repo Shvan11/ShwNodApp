@@ -20,7 +20,7 @@
 .authHeader {
     text-align: center;
     padding: 2rem 1rem;
-    background: linear-gradient(135deg, var(--success-color) 0%, var(--success-darker) 100%);
+    background: linear-gradient(135deg, var(--success-fill) 0%, var(--palette-green-700) 100%);
     color: var(--color-white);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -33,7 +33,6 @@
 
 .authSubtitle {
     margin: 0;
-    opacity: 0.9;
     font-size: 0.95rem;
 }
 
@@ -353,12 +352,15 @@
     .authContainer {
         /* stylelint-disable-next-line declaration-property-value-disallowed-list -- forced-light a11y override under prefers-contrast: high */
         background: white;
+        /* A forced-white panel needs fixed ink: the themed text is near-white in dark. */
+        color: var(--palette-gray-900);
     }
 
     .qrPlaceholder {
         border-color: var(--black);
         /* stylelint-disable-next-line declaration-property-value-disallowed-list -- forced-light a11y override under prefers-contrast: high */
         background: white;
+        color: var(--palette-gray-900);
     }
 
     .connectionIndicator {

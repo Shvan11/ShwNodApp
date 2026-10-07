@@ -39,7 +39,7 @@ const DoctorsList: React.FC = () => {
         <>
             <div className={styles.sectionHeader}>
                 <h2>
-                    <i className="fas fa-user-md"></i>
+                    <i className="fas fa-user-md" aria-hidden="true"></i>
                     Select a Doctor
                 </h2>
                 <div className={styles.sectionInfo}>
@@ -59,7 +59,7 @@ const DoctorsList: React.FC = () => {
                         className={styles.btnManageDoctors}
                         title="Manage aligner doctors and portal access"
                     >
-                        <i className="fas fa-cog"></i>
+                        <i className="fas fa-cog" aria-hidden="true"></i>
                         Manage Doctors
                     </Link>
                 </div>
@@ -74,10 +74,10 @@ const DoctorsList: React.FC = () => {
                     onClick={() => selectDoctor({ dr_id: 'all', doctor_name: 'All Doctors' })}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectDoctor({ dr_id: 'all', doctor_name: 'All Doctors' }); } }}
                 >
-                    <i className={`fas fa-users ${styles.doctorIcon}`}></i>
+                    <i className={`fas fa-users ${styles.doctorIcon}`} aria-hidden="true"></i>
                     <h3>All Doctors</h3>
                     <span className={styles.doctorSubtitle}>View all patients</span>
-                    <i className={`fas fa-chevron-right ${styles.arrowIcon}`}></i>
+                    <i className={`fas fa-chevron-right ${styles.arrowIcon}`} aria-hidden="true"></i>
                 </div>
 
                 {/* Individual Doctor Cards */}
