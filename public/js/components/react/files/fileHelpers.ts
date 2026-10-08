@@ -55,6 +55,17 @@ export function encodeRelPath(relPath: string): string {
     .join('/');
 }
 
+/** The folder a listed entry sits in ('' = the patient folder itself). */
+export function folderOf(relPath: string): string {
+  const i = relPath.lastIndexOf('/');
+  return i < 0 ? '' : relPath.slice(0, i);
+}
+
+/** `relPath` is `folder` itself or somewhere under it. */
+export function isSameOrInside(relPath: string, folder: string): boolean {
+  return relPath === folder || relPath.startsWith(`${folder}/`);
+}
+
 /** FontAwesome icon name for an entry. */
 export function categoryIcon(entry: FileEntry): string {
   if (entry.type === 'dir') return 'fa-folder';

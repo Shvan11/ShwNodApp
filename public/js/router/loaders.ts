@@ -36,6 +36,7 @@ import {
   hasAppointmentQuery,
   galleryQuery,
   photoVisibilityQuery,
+  workingFilesQuery,
   patientAlertsQuery,
   alertTypesQuery,
   costPresetsQuery,
@@ -165,7 +166,9 @@ const PAGE_READS: Record<string, (personId: string, at: { workId: string | null;
   photos: (id, { tp }) => {
     warm(galleryQuery(id, tp));
     warm(photoVisibilityQuery(id));
+    warm(workingFilesQuery(id));
   },
+  'working-files': (id) => warm(workingFilesQuery(id)),
   'patient-info': (id) => {
     warm(patientAlertsQuery(id));
     warm(alertTypesQuery());

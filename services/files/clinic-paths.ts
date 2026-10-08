@@ -54,7 +54,12 @@ export function workingDir(): string {
 
 // The file NAMES (Dolphin's `{personId}{tpCode as two digits}.{view}` rule) live in
 // the import-free working-file-names.ts, so they can be tested without the boot config.
-export { workingFileName, dolphinImageFileName, workingFileNameVariants } from './working-file-names.js';
+export {
+  workingFileName,
+  workingFileStem,
+  dolphinImageFileName,
+  workingFileNameVariants,
+} from './working-file-names.js';
 
 /**
  * Absolute path of a single file inside the working dir, addressed by its bare

@@ -19,7 +19,11 @@
  * and the delete path (photo-cleanup.service.ts) take tpCodes and enumerate names.
  */
 
-function stem(personId: string | number, tpCode: string | number): string {
+/**
+ * The part of a working-file name before the dot (`88802` in `88802.i21`): one per
+ * (patient, timepoint), shared by the 8 views and every other Dolphin slot of the session.
+ */
+export function workingFileStem(personId: string | number, tpCode: string | number): string {
   return `${personId}${String(tpCode).padStart(2, '0')}`;
 }
 
@@ -32,7 +36,7 @@ export function workingFileName(
   tpCode: string | number,
   view: string
 ): string {
-  return `${stem(personId, tpCode)}.${view}`;
+  return `${workingFileStem(personId, tpCode)}.${view}`;
 }
 
 /**
@@ -45,7 +49,7 @@ export function dolphinImageFileName(
   tpCode: string | number,
   view: string
 ): string {
-  return `${stem(personId, tpCode)}.${view.toUpperCase()}`;
+  return `${workingFileStem(personId, tpCode)}.${view.toUpperCase()}`;
 }
 
 /**

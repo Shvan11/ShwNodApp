@@ -6,7 +6,14 @@ import { fetchJSON, postJSON, putJSON, deleteJSON, postFormData, httpErrorMessag
 import { invalidatePatientPhotos } from '@/query/photos';
 import { reportClientError, describeHttpError } from '@/core/error-reporter';
 import { qk } from '@/query/keys';
-import { timepointsQuery, galleryQuery, photoVisibilityQuery, brandingQuery, takenDatesQuery } from '@/query/queries';
+import {
+    timepointsQuery,
+    galleryQuery,
+    photoVisibilityQuery,
+    brandingQuery,
+    takenDatesQuery,
+    workingFilesQuery,
+} from '@/query/queries';
 import * as patientContract from '@shared/contracts/patient.contract';
 import * as utilityContract from '@shared/contracts/utility.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
@@ -22,6 +29,7 @@ import ShareSheet from './share/ShareSheet';
 import SlotContextMenu, { type SlotMenuItem } from './photo-editor/SlotContextMenu';
 import type { ShareSource } from './localsend/LocalSendShareModal';
 import { encodeRelPath, buildWorkingContentUrl } from './files/fileHelpers';
+import { extrasBySession, hasXray, summarizeExtras } from './files/workingImages';
 import { parseViewTag, VIEW_CODES, type PhotoViewCode } from '@shared/photo-views';
 import { sessionFolderName } from '@shared/photo-session-folder';
 import { formatPhotoTakenAt } from '@/utils/formatters';
@@ -117,6 +125,13 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         placeholderData: keepPreviousData,
     });
     const visibilityQ = useQuery({ ...photoVisibilityQuery(personId ?? ''), enabled: !!personId });
+    // Images a session holds beyond the 8 views (a Dolphin OPG, a ceph, …): the grid has
+    // no cell for them, so a tab with any carries a small mark, and the open session gets
+    // a chip that opens all of its images on the working-files page. One read for every
+    // session, the same listing that page shows.
+    const workingQ = useQuery({ ...workingFilesQuery(personId ?? ''), enabled: !!personId });
+    const extrasByTp = extrasBySession(workingQ.data?.entries ?? []);
+    const currentExtras = extrasByTp.get(tpCode) ?? [];
     const { data: branding } = useQuery(brandingQuery());
     const clinicName = branding?.clinicName?.trim() || '';
     // Gallery keyed by view code ({ i10: {...}|null, … }); null = unrendered slot.
@@ -948,11 +963,19 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         setMenuFor(null);
     };
 
-    // Open the read-only working-files view (this patient's rendered .iNN images,
-    // filtered out of the shared working/ dir). Patient-wide, not per-timepoint.
-    const handleOpenWorking = () => {
+    // The read-only working-files view, on one session: its 8 views and whatever else
+    // Dolphin keeps for it (OPG, ceph, …). The page widens to every session from there.
+    const openSessionImages = (tp: string) => {
+        if (!personId) return;
+        navigate(`/patient/${personId}/working-files?tp=${tp}`);
+    };
+    const openAllImages = () => {
         if (!personId) return;
         navigate(`/patient/${personId}/working-files`);
+    };
+    const handleOpenWorking = () => {
+        if (!menuFor) return;
+        openSessionImages(menuFor.tp.tp_code);
         setMenuFor(null);
     };
 
@@ -1145,7 +1168,9 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                         </button>
                     )}
                     <div ref={tabStripRef} className={tpStyles.selector} {...tabStripDrag}>
-                        {timepoints.map((timepoint, index) => (
+                        {timepoints.map((timepoint, index) => {
+                            const tabExtras = extrasByTp.get(timepoint.tp_code);
+                            return (
                             <div
                                 key={`tp-${timepoint.tp_code}-${index}`}
                                 className={`${tpStyles.tab} ${tpCode === timepoint.tp_code ? tpStyles.tabActive : ''}`}
@@ -1163,6 +1188,18 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                         <div className={tpStyles.tabDesc}>{timepoint.tp_description}</div>
                                         <div className={tpStyles.tabDate}>{formatDate(timepoint.tp_date_time)}</div>
                                     </div>
+                                    {tabExtras && (
+                                        <span
+                                            className={tpStyles.extrasMark}
+                                            title={`Also in Dolphin: ${summarizeExtras(tabExtras)}`}
+                                        >
+                                            <i
+                                                className={`fas ${hasXray(tabExtras) ? 'fa-x-ray' : 'fa-images'}`}
+                                                aria-hidden="true"
+                                            ></i>
+                                            <span className="sr-only">, also {summarizeExtras(tabExtras)}</span>
+                                        </span>
+                                    )}
                                 </button>
                                 <button
                                     type="button"
@@ -1175,7 +1212,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                                     <i className="fas fa-ellipsis-v" aria-hidden="true"></i>
                                 </button>
                             </div>
-                        ))}
+                            );
+                        })}
                         <button
                             type="button"
                             className={tpStyles.addTab}
@@ -1184,6 +1222,18 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                             <i className="fas fa-plus" aria-hidden="true"></i>
                             <span>New session</span>
                         </button>
+                        {/* Every session's images on one page; only once there are some. */}
+                        {(workingQ.data?.entries ?? []).length > 0 && (
+                            <button
+                                type="button"
+                                className={`${tpStyles.addTab} ${tpStyles.allImagesTab}`}
+                                onClick={openAllImages}
+                                title="Every session's cropped photo views and X-rays, on one page"
+                            >
+                                <i className="fas fa-images" aria-hidden="true"></i>
+                                <span>All images</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -1197,6 +1247,21 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                     <p>Couldn't load this session's photos: {error}</p>
                     <button type="button" className="btn btn-secondary" onClick={() => void galleryQ.refetch()}>
                         <i className="fas fa-redo" aria-hidden="true"></i> Retry
+                    </button>
+                </div>
+            ) : !hasRealPhotos && selectedTpExists && currentExtras.length > 0 ? (
+                // Nothing for the grid, but the session is not empty: Dolphin holds an
+                // OPG, a ceph, … for it (a session of only an X-ray is common).
+                <div className={styles.emptyState}>
+                    <i className={`fas ${hasXray(currentExtras) ? 'fa-x-ray' : 'fa-images'}`} aria-hidden="true"></i>
+                    <h3>No grid photos in this session</h3>
+                    <p>
+                        Dolphin has {summarizeExtras(currentExtras)} for this session, which the photo grid
+                        doesn't show.
+                    </p>
+                    {/* No icon: the empty state's `i` rule would draw it at 3rem. */}
+                    <button type="button" className="btn btn-primary" onClick={() => openSessionImages(tpCode)}>
+                        {currentExtras.length === 1 ? 'View it' : `View all ${currentExtras.length}`}
                     </button>
                 </div>
             ) : !hasRealPhotos ? (
@@ -1236,6 +1301,18 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 ].filter(Boolean).join(' ')}
             >
             <div className={styles.layoutControls}>
+                {/* What else this session holds that the grid can't show (OPG, ceph, …). */}
+                {!fsActive && currentExtras.length > 0 && (
+                    <button
+                        type="button"
+                        className={styles.extrasChip}
+                        onClick={() => openSessionImages(tpCode)}
+                        title={`Also in this session, outside the grid: ${summarizeExtras(currentExtras)}. Click to see all of its images.`}
+                    >
+                        <i className={`fas ${hasXray(currentExtras) ? 'fa-x-ray' : 'fa-images'}`} aria-hidden="true"></i>
+                        <span>+ {summarizeExtras(currentExtras)}</span>
+                    </button>
+                )}
                 {/* Not while presenting: fullscreen shows the layout, nothing to export. */}
                 {!fsActive && (
                     <button

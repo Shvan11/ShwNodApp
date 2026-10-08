@@ -71,12 +71,14 @@ export const photoDates = {
 // original's EXIF capture time ('YYYY-MM-DDTHH:MM:SS', zone-less local wall clock —
 // see services/imaging/exif-taken-at.ts), keyed by file name; null = the file carries
 // none. `scope=views` reads only the view-tagged originals (the photo grid's caption),
-// `all` every image (the editor's Sequence Files list). A missing folder is `{}`.
+// `all` every image (the editor's Sequence Files list, the Files page). A missing
+// folder is `{}`; `folder=` (empty) is the patient folder itself, as the Files page
+// names it.
 export const takenDatesScope = z.enum(['views', 'all']);
 export const takenDates = {
   params: personIdParams,
   query: z.object({
-    folder: z.string().min(1, 'folder is required').max(260),
+    folder: z.string().max(260),
     scope: takenDatesScope.default('all'),
   }),
   response: z.object({

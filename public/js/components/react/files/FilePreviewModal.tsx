@@ -17,10 +17,19 @@ interface Props {
   startIndex: number;
   /** Override how content/download URLs are built (default: patient files). */
   buildUrl?: UrlBuilder;
+  /** The header's title for a file (default: its name). */
+  titleFor?: (entry: FileEntry) => string;
   onClose: () => void;
 }
 
-const FilePreviewModal = ({ personId, files, startIndex, buildUrl = buildContentUrl, onClose }: Props) => {
+const FilePreviewModal = ({
+  personId,
+  files,
+  startIndex,
+  buildUrl = buildContentUrl,
+  titleFor = (e) => e.name,
+  onClose,
+}: Props) => {
   const [index, setIndex] = useState(startIndex);
   const entry = files[index];
 
@@ -55,7 +64,7 @@ const FilePreviewModal = ({ personId, files, startIndex, buildUrl = buildContent
           text file's content stays selectable (see Modal.tsx#handleDragPointerDown). */}
       <div className={styles.previewHeader} data-modal-drag-handle>
         <span id="file-preview-title" className={styles.previewTitle} title={entry.name}>
-          {entry.name}
+          {titleFor(entry)}
         </span>
         <div className={styles.previewHeaderActions}>
           <a className={styles.iconButton} href={downloadUrl} title="Download" aria-label="Download">

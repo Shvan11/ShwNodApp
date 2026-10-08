@@ -43,6 +43,45 @@ export function viewLabel(view: string): string {
 }
 
 /**
+ * Dolphin's OTHER image slots. A Dolphin session can hold more than the 8 views above
+ * (an OPG, a ceph, model photos, cut/paste images), each named like a view
+ * (`{personId}{tp:02}.iNN`, e.g. `2700.I51`) in the same working gallery. The 8-cell
+ * grid has no place for them; the working-files page shows them beside the views.
+ *
+ * Only the X-ray slots get a name here, because only they say what is in them. A clinic
+ * can put any picture in Dolphin's other slots (this one keeps smile close-ups in
+ * "Ceph Front", `i02`), so naming those after the slot would mislabel them: they are
+ * shown as "Image". Codes and meanings are Dolphin's own (its image-type table,
+ * mirrored in `image_types`).
+ */
+export const XRAY_SLOT_LABELS: Readonly<Record<string, string>> = {
+  i01: 'Ceph', // Ceph Right X-Ray
+  i03: 'PA ceph', // Ceph Front X-Ray
+  i50: 'Ceph', // X-ray Lateral
+  i51: 'OPG', // X-ray Panoramic
+  i52: 'Frontal X-ray',
+  i53: 'Upper occlusal X-ray',
+  i54: 'Lower occlusal X-ray',
+  i55: 'Periapicals (right)',
+  i56: 'Periapicals (center)',
+  i57: 'Periapicals (left)',
+};
+
+/** Any Dolphin image slot code, in either case (`i12`, `I51`). */
+export const DOLPHIN_SLOT_RE = /^i\d{2}$/i;
+
+/** Whether a slot holds an X-ray, by Dolphin's definition of the slot. */
+export function isXraySlot(code: string): boolean {
+  return code.toLowerCase() in XRAY_SLOT_LABELS;
+}
+
+/** Label for any Dolphin slot: a grid view's, an X-ray's, otherwise "Image". */
+export function slotLabel(code: string): string {
+  const c = code.toLowerCase();
+  return (VIEW_LABELS as Record<string, string>)[c] ?? XRAY_SLOT_LABELS[c] ?? 'Image';
+}
+
+/**
  * Longest edge a rendered view may have, in pixels. A view keeps its crop's NATIVE
  * resolution; only a pathological zoom-out (a frame far larger than the photo) is
  * scaled down to this. Shared so the editor's resolution readout predicts the render

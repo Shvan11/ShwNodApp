@@ -13,3 +13,27 @@
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
+
+/* One photo session's images, under its name + date (all-sessions view only). */
+.session + .session {
+  border-top: 1px solid var(--border-color);
+}
+
+.sessionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: var(--spacing-sm) 12px 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.sessionCount {
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-muted);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-secondary);
+}

@@ -13,6 +13,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { clinicPath, patientDir } from './clinic-paths.js';
 import { getFileCategory, type FileCategory } from '../../utils/file-mime.js';
+import { log } from '../../utils/logger.js';
 
 // ===========================================
 // TYPES
@@ -543,6 +544,156 @@ export async function softDeleteBatch(
   if (succeeded === 0) {
     await fs.rm(trashDir, { recursive: true, force: true }).catch(() => {});
   }
+  return { results, succeeded, failed: results.length - succeeded };
+}
+
+// ===========================================
+// MOVE / COPY  (batch, into one destination folder)
+// ===========================================
+
+export type TransferMode = 'move' | 'copy';
+
+/** One entry's outcome in a {@link transferEntries}. */
+export interface TransferItemResult {
+  relPath: string;
+  ok: boolean;
+  /** Where it landed, relative to the patient root. Present when ok and not skipped. */
+  newPath?: string;
+  /** The destination already had that name, so it was given a ` (n)` suffix. */
+  renamed?: boolean;
+  /** Move only: it was already in the destination folder, so nothing was done. */
+  skipped?: boolean;
+  /** Present when ok === false. */
+  error?: string;
+}
+
+export interface TransferResult {
+  results: TransferItemResult[];
+  succeeded: number;
+  failed: number;
+}
+
+/**
+ * The first free name for `base` in `dirAbs`: `base` itself, else `stem (1).ext`,
+ * `stem (2).ext`, … — the same suffix rule as an upload and the trash. Never
+ * clobbers: a move or copy keeps both rather than overwrite (an overwrite would
+ * destroy a file without passing through `.trash`).
+ */
+async function freeName(dirAbs: string, base: string): Promise<string> {
+  if (!(await exists(path.join(dirAbs, base)))) return base;
+  const ext = path.extname(base);
+  const stem = base.slice(0, base.length - ext.length);
+  let i = 1;
+  while (await exists(path.join(dirAbs, `${stem} (${i})${ext}`))) i += 1;
+  return `${stem} (${i})${ext}`;
+}
+
+/** Drop duplicates and any path whose ancestor is also listed (it travels with it). */
+function topmostPaths(relPaths: string[]): string[] {
+  const norm = [...new Set(relPaths.map(normalizeRel).filter(Boolean))];
+  const set = new Set(norm);
+  return norm.filter((p) => {
+    for (let i = p.lastIndexOf('/'); i > 0; i = p.lastIndexOf('/', i - 1)) {
+      if (set.has(p.slice(0, i))) return false;
+    }
+    return true;
+  });
+}
+
+/**
+ * Move or copy entries (files and folders) into one existing destination folder,
+ * all inside the same patient folder.
+ *
+ * - **Never overwrites.** A name the destination already has gets a ` (n)` suffix
+ *   (`renamed: true`) — copying into the folder the item came from makes `x (1).jpg`.
+ * - **Move is a rename** (same volume, atomic, one call per entry however big the
+ *   folder). An entry already in the destination is reported `skipped`.
+ * - **Copy stages** the whole tree in `clinic1/.uploads/{personId}` (same volume) and
+ *   renames it into place, so a copy that fails part-way never leaves half a folder
+ *   in the listing. Links are not followed or copied — a link to a folder outside
+ *   the patient would otherwise pull that folder's contents in.
+ * - A folder cannot go into itself or one of its own subfolders.
+ *
+ * Every entry rides `resolveSafe` + `realpathGuard`, like delete; a per-entry
+ * failure is reported rather than aborting the rest. Whole-request problems (the
+ * destination missing, outside the patient, or not a folder) throw. Entries run one
+ * at a time so each name check sees the previous entry already in place.
+ *
+ * The photo-session / X-ray folder guard is the route's (it needs the database).
+ */
+export async function transferEntries(
+  personId: string | number,
+  relPaths: string[],
+  destRelPath: string,
+  mode: TransferMode
+): Promise<TransferResult> {
+  const dest = resolveSafe(personId, destRelPath);
+  const destReal = await realpathGuard(dest.abs, dest.root);
+  if (!(await fs.stat(destReal)).isDirectory()) {
+    throw new FileExplorerError('Destination is not a folder', 400);
+  }
+  const destRel = normalizeRel(destRelPath);
+
+  const results: TransferItemResult[] = [];
+  for (const relPath of topmostPaths(relPaths)) {
+    try {
+      const src = resolveSafe(personId, relPath);
+      if (src.abs === src.root) {
+        throw new FileExplorerError(`Cannot ${mode} the patient folder itself`, 400);
+      }
+      const srcReal = await realpathGuard(src.abs, src.root);
+      const st = await fs.lstat(src.abs);
+
+      if (st.isDirectory() && (destReal === srcReal || destReal.startsWith(withSep(srcReal)))) {
+        throw new FileExplorerError(`Cannot ${mode} a folder into itself`, 400);
+      }
+      if (mode === 'move' && path.dirname(srcReal) === destReal) {
+        results.push({ relPath, ok: true, skipped: true });
+        continue;
+      }
+      if (mode === 'copy' && st.isSymbolicLink()) {
+        throw new FileExplorerError('Links cannot be copied', 400);
+      }
+
+      const base = path.basename(src.abs);
+      const name = await freeName(destReal, base);
+      const target = path.join(destReal, name);
+
+      if (mode === 'move') {
+        await fs.rename(src.abs, target);
+      } else {
+        const staging = path.join(
+          await getUploadStagingDir(personId),
+          `.copy-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        );
+        try {
+          await fs.cp(srcReal, staging, {
+            recursive: true,
+            errorOnExist: true,
+            force: false,
+            preserveTimestamps: true,
+            filter: async (p) => !(await fs.lstat(p)).isSymbolicLink(),
+          });
+          await fs.rename(staging, target);
+        } catch (err) {
+          await fs.rm(staging, { recursive: true, force: true }).catch(() => {});
+          throw err;
+        }
+      }
+      results.push({ relPath, ok: true, newPath: joinRel(destRel, name), renamed: name !== base });
+    } catch (err) {
+      if (!(err instanceof FileExplorerError)) {
+        log.error(`[Files] ${mode} failed`, { personId, relPath, error: (err as Error).message });
+      }
+      results.push({
+        relPath,
+        ok: false,
+        error: err instanceof FileExplorerError ? err.message : `${mode === 'move' ? 'Move' : 'Copy'} failed`,
+      });
+    }
+  }
+
+  const succeeded = results.filter((r) => r.ok).length;
   return { results, succeeded, failed: results.length - succeeded };
 }
 

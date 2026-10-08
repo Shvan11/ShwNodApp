@@ -113,6 +113,8 @@ POST    /api/patients/:personId/files/folder  [authorize(admin|front_desk|clinic
 POST    /api/patients/:personId/files/rename  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 DELETE  /api/patients/:personId/files  [authorize(admin|front_desk|clinical) -> validate(params)]
 POST    /api/patients/:personId/files/delete-batch  [authorize(admin|front_desk|clinical) -> validate(params) -> timeout(120000ms)]
+POST    /api/patients/:personId/files/move  [authorize(admin|front_desk|clinical) -> validate(params,body) -> timeout(120000ms)]
+POST    /api/patients/:personId/files/copy  [authorize(admin|front_desk|clinical) -> validate(params,body) -> timeout(600000ms)]
 MOUNT   /api
 GET     /api/slideshow-configs  [validate(query)]
 POST    /api/slideshow-configs  [authorize(admin|front_desk|clinical) -> validate(body)]

@@ -10,9 +10,14 @@
  * mode); the tile's own click is a mouse convenience. The tile used to be a
  * `role="button"` wrapping its own Download/Share/Rename/Delete buttons — nested
  * interactive controls whose accessible name ran them all together (FE-F12-13a).
+ *
+ * With `onMenu` the tile behaves like one in a desktop file manager: a right-click
+ * (long-press on a phone) or its ⋯ button opens the actions menu (Rename, Delete,
+ * Cut, Copy, Move to… live there), it can be dragged, and a folder takes drops.
  */
-import { useState, type MouseEvent } from 'react';
+import { useState, type DragEvent, type MouseEvent } from 'react';
 import type { FileEntry } from '@/types/api.types';
+import { anchorFrom, type MenuAnchor } from '@/hooks/useFloatingMenu';
 import {
   buildContentUrl,
   categoryIcon,
@@ -20,6 +25,7 @@ import {
   formatDate,
   type ContentUrlOptions,
 } from './fileHelpers';
+import { formatLocaleDate, formatLocaleTime, formatPhotoTakenAt } from '@/utils/formatters';
 import styles from './FileExplorer.module.css';
 
 type UrlBuilder = (personId: number, relPath: string, opts?: ContentUrlOptions) => string;
@@ -30,6 +36,10 @@ interface Props {
   view: 'grid' | 'list';
   /** Flat mode: show the full relative subpath instead of just the name. */
   showFullPath?: boolean;
+  /** Shown instead of the name/path (the working-files view names a tile by its slot, "OPG"). */
+  displayName?: string;
+  /** When the photo was taken (EXIF, 'YYYY-MM-DDTHH:MM:SS'), shown under the name. */
+  takenAt?: string | null;
   /** Selection mode: tile toggles selection instead of opening. */
   selectMode?: boolean;
   selected?: boolean;
@@ -38,11 +48,30 @@ interface Props {
   /** Override how content/thumbnail/download URLs are built (default: patient files). */
   buildUrl?: UrlBuilder;
   onOpen: (entry: FileEntry) => void;
-  onRename: (entry: FileEntry) => void;
-  onDelete: (entry: FileEntry) => void;
+  /** Rename / Delete buttons on the tile — only without `onMenu`, which holds them instead. */
+  onRename?: (entry: FileEntry) => void;
+  onDelete?: (entry: FileEntry) => void;
   onToggleSelect: (entry: FileEntry) => void;
   /** Share this file (opens the share sheet: LocalSend / Telegram). Omitted → no share button. */
   onShare?: (entry: FileEntry) => void;
+  /**
+   * Open the actions menu at `anchor` (right-click, long-press, the ⋯ button). When
+   * set, Rename/Delete move into that menu instead of being buttons on the tile.
+   */
+  onMenu?: (entry: FileEntry, anchor: MenuAnchor) => void;
+  /** On the clipboard as cut, waiting for Paste. */
+  cut?: boolean;
+  /** Makes the tile draggable (onto a folder: move, or copy with Ctrl held). */
+  onDragStart?: (entry: FileEntry, e: DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
+  /**
+   * A folder's drop target. `onDragOver` returns whether this drag can land here
+   * (and has then called preventDefault); the tile only shows its highlight then.
+   */
+  drop?: {
+    onDragOver: (entry: FileEntry, e: DragEvent<HTMLDivElement>) => boolean;
+    onDrop: (entry: FileEntry, e: DragEvent<HTMLDivElement>) => void;
+  };
 }
 
 const FileEntryTile = ({
@@ -50,6 +79,8 @@ const FileEntryTile = ({
   entry,
   view,
   showFullPath,
+  displayName,
+  takenAt,
   selectMode,
   selected,
   readOnly,
@@ -59,11 +90,17 @@ const FileEntryTile = ({
   onDelete,
   onToggleSelect,
   onShare,
+  onMenu,
+  cut,
+  onDragStart,
+  onDragEnd,
+  drop,
 }: Props) => {
   const [thumbFailed, setThumbFailed] = useState(false);
+  const [dropOver, setDropOver] = useState(false);
   const isDir = entry.type === 'dir';
   const showThumb = entry.category === 'image' && !thumbFailed;
-  const label = showFullPath ? entry.relPath : entry.name;
+  const label = displayName ?? (showFullPath ? entry.relPath : entry.name);
 
   const stop = (e: MouseEvent): void => {
     e.stopPropagation();
@@ -93,13 +130,56 @@ const FileEntryTile = ({
 
   const selectedClass =
     selectMode && selected ? (view === 'grid' ? styles.tileSelected : styles.rowSelected) : '';
+  const dropHandlers = isDir ? drop : undefined;
 
   return (
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- mouse convenience: the whole tile is a click target; the name button below is the keyboard/AT control
     <div
-      className={`${view === 'grid' ? styles.tile : styles.row} ${selectedClass}`.trim()}
+      className={[
+        view === 'grid' ? styles.tile : styles.row,
+        selectedClass,
+        cut ? styles.entryCut : '',
+        dropOver ? styles.dropTarget : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       onClick={activate}
       onDoubleClick={selectMode ? undefined : () => onOpen(entry)}
+      onContextMenu={
+        onMenu
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onMenu(entry, anchorFrom(e));
+            }
+          : undefined
+      }
+      draggable={onDragStart ? true : undefined}
+      onDragStart={onDragStart ? (e) => onDragStart(entry, e) : undefined}
+      onDragEnd={onDragEnd}
+      onDragOver={
+        dropHandlers
+          ? (e) => {
+              const ok = dropHandlers.onDragOver(entry, e);
+              if (ok !== dropOver) setDropOver(ok);
+            }
+          : undefined
+      }
+      onDragLeave={
+        dropHandlers
+          ? (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOver(false);
+            }
+          : undefined
+      }
+      onDrop={
+        dropHandlers
+          ? (e) => {
+              setDropOver(false);
+              dropHandlers.onDrop(entry, e);
+            }
+          : undefined
+      }
       title={label}
     >
       {selectMode && (
@@ -127,6 +207,14 @@ const FileEntryTile = ({
         >
           {label}
         </button>
+        {takenAt && (
+          <span className={styles.entryTaken} title={`Taken ${formatPhotoTakenAt(takenAt)}`}>
+            <i className="fas fa-camera" aria-hidden="true" />
+            <span className="sr-only">Taken </span>
+            {formatLocaleDate(takenAt, { year: 'numeric', month: 'short', day: 'numeric' })}{' '}
+            {formatLocaleTime(takenAt, { hour: 'numeric', minute: '2-digit' })}
+          </span>
+        )}
         {meta && <span className={styles.entryMeta}>{meta}</span>}
       </div>
 
@@ -154,7 +242,19 @@ const FileEntryTile = ({
               <i className="fas fa-share-nodes" aria-hidden="true" />
             </button>
           )}
-          {!readOnly && (
+          {onMenu && (
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={(e) => onMenu(entry, anchorFrom(e))}
+              title="More actions"
+              aria-label={`More actions for ${entry.name}`}
+              aria-haspopup="menu"
+            >
+              <i className="fas fa-ellipsis" aria-hidden="true" />
+            </button>
+          )}
+          {!readOnly && !onMenu && onRename && onDelete && (
             <>
               <button
                 type="button"

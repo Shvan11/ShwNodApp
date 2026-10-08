@@ -83,7 +83,7 @@ const TimepointActionsMenu = ({
                 <i className="fas fa-images" aria-hidden="true"></i>
                 <span className={styles.itemText}>
                     Open working files
-                    <small className={styles.hint}>Rendered photos for this patient</small>
+                    <small className={styles.hint}>All of this session's images, X-rays included</small>
                 </span>
             </button>
 

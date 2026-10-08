@@ -161,6 +161,12 @@
     transform: translateY(-2px);
 }
 
+/* "All images", beside "New session" (on top of .addTab): solid, not dashed, since
+   it opens a page rather than adding a session. */
+.allImagesTab {
+    border-style: solid;
+}
+
 .tabIcon {
     display: flex;
     align-items: center;
@@ -216,6 +222,20 @@
 
 .tabActive .tabDate::before {
     color: rgba(255, 255, 255, 0.5);
+}
+
+/* The session holds images the 8-cell grid can't show (a Dolphin OPG, a ceph, …).
+   A quiet glyph after the date; the tooltip names them. */
+.extrasMark {
+    display: flex;
+    align-items: center;
+    margin-inline-start: 0.125rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.tabActive .extrasMark {
+    color: var(--color-white);
 }
 
 /* Burger before the first tab: opens the vertical list of every session

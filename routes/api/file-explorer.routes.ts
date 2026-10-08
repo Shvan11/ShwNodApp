@@ -2,8 +2,8 @@
  * Patient File Explorer routes.
  *
  * Per-patient filesystem browser: list/flat-walk, content (inline preview +
- * download + thumbnail), and full management (upload, mkdir, rename, soft
- * delete). All path safety lives in services/files/file-explorer.service.ts.
+ * download + thumbnail), and full management (upload, mkdir, rename, move,
+ * copy, soft delete). All path safety lives in services/files/file-explorer.service.ts.
  *
  * Reads ride the global `/api` `authenticate` gate (index.ts). Writes add
  * `authorize(CLINICAL_ROLES)` — all three staff roles: doctors and assistants
@@ -35,6 +35,7 @@ import {
   renameEntry,
   softDelete,
   softDeleteBatch,
+  transferEntries,
   validateUploadTargetDir,
   getUploadStagingDir,
   finalizeUpload,
@@ -82,6 +83,45 @@ function handleError(res: Response, err: unknown, op: string): void {
   }
   log.error(`[Files] ${op} failed`, { error: (err as Error).message });
   ErrorResponses.serverError(res, 'File operation failed', err as Error);
+}
+
+/**
+ * Refuse (409) a write that would detach a top-level folder from its owner — a photo
+ * session's originals or a folder the X-ray card reads by name (FE-F14-5) — unless
+ * the caller confirmed with `force`. Returns true when it answered the request.
+ * `verb` names the write in the message ("Renaming", "Moving").
+ */
+async function refuseOwnedFolders(
+  res: Response,
+  personId: string,
+  relPaths: string[],
+  verb: string
+): Promise<boolean> {
+  const tops = relPaths
+    .map((p) => p.replace(/^[\\/]+|[\\/]+$/g, ''))
+    .filter((p) => p && !/[\\/]/.test(p));
+  if (tops.length === 0) return false;
+  const sessions = await getTimePoints(personId);
+  for (const top of tops) {
+    const owner = folderOwner(top, sessions);
+    if (owner?.kind === 'session') {
+      ErrorResponses.conflict(
+        res,
+        `"${top}" holds the originals of the photo session "${owner.name}" (${owner.date}). ${verb} it detaches them from that session.`,
+        { code: 'SESSION_FOLDER', tpCode: owner.tpCode }
+      );
+      return true;
+    }
+    if (owner?.kind === 'reserved') {
+      ErrorResponses.conflict(
+        res,
+        `"${top}" is read by the app under that exact name (X-rays). ${verb} it empties that view.`,
+        { code: 'RESERVED_FOLDER' }
+      );
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -247,7 +287,8 @@ router.get(
 );
 
 // ===========================================
-// WORKING FILES  (read-only — this patient's rendered .iNN views in the shared working/ dir)
+// WORKING FILES  (read-only — this patient's .iNN images in the shared working/ dir:
+//                 the 8 grid views and every other Dolphin slot, e.g. OPG/ceph)
 // ===========================================
 
 router.get(
@@ -468,26 +509,7 @@ router.post(
       // A top-level folder that a photo session or the X-ray card reads by name is
       // refused unless the caller confirmed (FE-F14-5): renaming it detaches it from
       // its owner without a word.
-      const top = relPath.replace(/^[\\/]+|[\\/]+$/g, '');
-      if (!force && top && !/[\\/]/.test(top)) {
-        const owner = folderOwner(top, await getTimePoints(String(personId)));
-        if (owner?.kind === 'session') {
-          ErrorResponses.conflict(
-            res,
-            `"${top}" holds the originals of the photo session "${owner.name}" (${owner.date}). Renaming it detaches them from that session.`,
-            { code: 'SESSION_FOLDER', tpCode: owner.tpCode }
-          );
-          return;
-        }
-        if (owner?.kind === 'reserved') {
-          ErrorResponses.conflict(
-            res,
-            `"${top}" is read by the app under that exact name (X-rays). Renaming it empties that view.`,
-            { code: 'RESERVED_FOLDER' }
-          );
-          return;
-        }
-      }
+      if (!force && (await refuseOwnedFolders(res, String(personId), [relPath], 'Renaming'))) return;
       const entry = await renameEntry(personId, relPath, newName);
       log.info('[Files] rename', { userId: req.session?.userId, personId, relPath, newName: entry.name });
       sendData(res, fileExplorer.rename.response, entry, 'Renamed');
@@ -574,6 +596,71 @@ router.post(
       );
     } catch (err) {
       handleError(res, err, 'delete-batch');
+    }
+  }
+);
+
+// ===========================================
+// MOVE / COPY  (write — batch, into one existing folder of the same patient)
+// ===========================================
+
+/** The response message shared by move and copy, e.g. "Moved 3, 1 failed". */
+function transferMessage(verb: string, succeeded: number, failed: number): string {
+  return failed === 0 ? `${verb} ${succeeded} item(s)` : `${verb} ${succeeded}, ${failed} failed`;
+}
+
+router.post(
+  '/patients/:personId/files/move',
+  authorize(CLINICAL_ROLES),
+  validate({ params: fileExplorer.move.params, body: fileExplorer.move.body }),
+  timeouts.long, // one rename per entry, but a select-all can be thousands
+  async (req: Request<PersonIdParams, unknown, fileExplorer.MoveBody>, res: Response): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const { paths, dest, force = false } = req.body;
+      // Moving a session's originals folder (or OPG/CBCT) detaches it exactly as a
+      // rename does — same guard, same confirm-then-force round trip on the client.
+      if (!force && (await refuseOwnedFolders(res, String(personId), paths, 'Moving'))) return;
+
+      const result = await transferEntries(personId, paths, dest, 'move');
+      log.info('[Files] move', {
+        userId: req.session?.userId,
+        personId,
+        dest,
+        requested: paths.length,
+        succeeded: result.succeeded,
+        failed: result.failed,
+      });
+      sendData(res, fileExplorer.move.response, result, transferMessage('Moved', result.succeeded, result.failed));
+    } catch (err) {
+      handleError(res, err, 'move');
+    }
+  }
+);
+
+router.post(
+  '/patients/:personId/files/copy',
+  authorize(CLINICAL_ROLES),
+  validate({ params: fileExplorer.copy.params, body: fileExplorer.copy.body }),
+  // A copy writes every byte again, and a CBCT study is gigabytes: the upload preset
+  // (10 min), matched by the client call's own timeout.
+  timeouts.upload,
+  async (req: Request<PersonIdParams, unknown, fileExplorer.CopyBody>, res: Response): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const { paths, dest } = req.body;
+      const result = await transferEntries(personId, paths, dest, 'copy');
+      log.info('[Files] copy', {
+        userId: req.session?.userId,
+        personId,
+        dest,
+        requested: paths.length,
+        succeeded: result.succeeded,
+        failed: result.failed,
+      });
+      sendData(res, fileExplorer.copy.response, result, transferMessage('Copied', result.succeeded, result.failed));
+    } catch (err) {
+      handleError(res, err, 'copy');
     }
   }
 );

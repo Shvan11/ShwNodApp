@@ -216,6 +216,19 @@
   font-size: var(--font-size-xs);
   color: var(--text-muted);
 }
+/* When a photo was taken (EXIF), a line between the name and the size/modified meta.
+   One line, always: the tiles are fixed-height (virtualized); the title has it whole. */
+.entryTaken {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.entryTaken i {
+  margin-inline-end: var(--spacing-xs);
+}
 .entryActions {
   display: flex;
   gap: 2px;
@@ -325,6 +338,15 @@
   flex: 0 0 auto;
 }
 
+/* A listing with photos makes room for the date-taken line, in every tile so the
+   rows stay even. Keep in step with ROW_WITH_TAKEN_PX in FileExplorer.tsx. */
+.withTaken .tile {
+  height: 198px;
+}
+.withTaken .row {
+  height: 64px;
+}
+
 /* ── Selection (bulk delete) ── */
 .selectBar {
   display: flex;
@@ -387,6 +409,224 @@
 .rowSelected:hover {
   background: var(--hover-bg);
   box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+/* ── Move / copy ── */
+/* Cut, waiting for Paste: desaturated with a dashed edge. Never dimmed with opacity,
+   which takes the name under AA contrast. */
+.entryCut .entryVisual {
+  filter: grayscale(1);
+}
+.tile.entryCut {
+  border-style: dashed;
+  border-color: var(--text-secondary);
+}
+.row.entryCut {
+  outline: 1px dashed var(--text-secondary);
+  outline-offset: -2px;
+}
+/* A folder (tile or breadcrumb) a drag would land in. */
+.tile.dropTarget,
+.row.dropTarget,
+.crumbDrop {
+  background: var(--primary-alpha);
+  box-shadow: inset 0 0 0 2px var(--primary-color);
+}
+
+.clipboardBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px dashed var(--primary-color);
+  border-radius: var(--radius-md);
+  background: var(--info-50);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.clipboardText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.busyNotice {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* Actions menu (right-click / ⋯). Portaled to <body>, fixed at the pointer. */
+.menu {
+  position: fixed;
+  z-index: var(--z-index-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 220px;
+  padding: var(--spacing-xs);
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.menuItem i {
+  width: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background: var(--hover-bg);
+  outline: none;
+}
+.menuItem:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.menuLabel {
+  flex: 1 1 auto;
+}
+.menuHint {
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+.menuDanger,
+.menuDanger i {
+  color: var(--error-700);
+}
+.menuDivider {
+  height: 1px;
+  margin: var(--spacing-xs) 0;
+  background: var(--border-color);
+}
+
+/* Move to… / Copy to… folder picker */
+.pickerModal {
+  width: min(480px, 94vw);
+  display: flex;
+  flex-direction: column;
+}
+.pickerCrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--font-size-sm);
+}
+.pickerCrumbs .crumb:disabled {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  cursor: default;
+  text-decoration: none;
+  background: none;
+}
+.pickerList {
+  display: flex;
+  flex-direction: column;
+  height: min(320px, 50vh);
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+}
+.pickerFolder {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  text-align: start;
+  cursor: pointer;
+}
+.pickerFolder:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+.pickerFolder:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.pickerFolder > i {
+  color: var(--text-secondary);
+}
+.pickerFolder > i:last-child {
+  font-size: var(--font-size-xs);
+}
+.pickerFolderName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pickerFolder.pickerPicked {
+  background: var(--primary-alpha);
+  box-shadow: inset 3px 0 0 var(--primary-color);
+}
+.pickerSub {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+/* The folder name a timepoint row renames to (or why it can't be picked). */
+.pickerTarget {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+.pickerLead {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+.pickerNew {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 10px;
+}
+.pickerNew .promptInput {
+  margin-bottom: 0;
+}
+.pickerFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+.pickerReason {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
 }
 
 /* ── Preview modal ── */

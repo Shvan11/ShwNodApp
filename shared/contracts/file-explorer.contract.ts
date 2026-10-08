@@ -69,8 +69,19 @@ export const list = {
 } as const;
 
 // GET /api/patients/:personId/working-files → FileListing (working/ dir, flat=false).
+// GET /api/patients/:personId/working-files → the patient's images in Dolphin's
+// working gallery: every slot of every session, the 8 grid views and the rest
+// (OPG, ceph, …). Each entry carries the session and the slot its name encodes,
+// so the client groups and labels without parsing filenames.
+export const workingFileEntry = fileEntry.extend({
+  tpCode: z.number(),
+  /** Dolphin slot code, lower-case: `i12` (a grid view), `i51` (an OPG), … */
+  view: z.string(),
+});
+export type WorkingFileEntry = z.infer<typeof workingFileEntry>;
+
 export const workingFiles = {
-  response: fileListing,
+  response: fileListing.extend({ entries: z.array(workingFileEntry) }),
 } as const;
 
 // POST /api/patients/:personId/files/upload → { files: FileEntry[] }.
@@ -109,3 +120,48 @@ export const deleteBatch = {
   params: personIdParams,
   response: batchDeleteResult,
 } as const;
+
+/** Matches the listing cap — a "select all" can't exceed it. */
+export const MAX_TRANSFER_ITEMS = 5000;
+
+const transferItemResult = z.object({
+  relPath: z.string(),
+  ok: z.boolean(),
+  newPath: z.string().optional(),
+  renamed: z.boolean().optional(),
+  skipped: z.boolean().optional(),
+  error: z.string().optional(),
+});
+export type FileTransferItemResult = z.infer<typeof transferItemResult>;
+
+const transferResult = z.object({
+  results: z.array(transferItemResult),
+  succeeded: z.number(),
+  failed: z.number(),
+});
+export type FileTransferResult = z.infer<typeof transferResult>;
+
+// `paths` are entries under the patient folder; `dest` is an existing folder there
+// ('' = the patient folder itself). Path safety stays in the service.
+const transferBody = z.object({
+  paths: z.array(z.string().min(1)).min(1).max(MAX_TRANSFER_ITEMS),
+  dest: z.string(),
+});
+
+// POST /api/patients/:personId/files/move → TransferResult. Like rename, moving a
+// top-level folder that a photo session or the X-ray card owns is refused with a 409
+// (`details.code` 'SESSION_FOLDER' | 'RESERVED_FOLDER') unless `force` is set.
+export const move = {
+  params: personIdParams,
+  body: transferBody.extend({ force: z.boolean().optional() }),
+  response: transferResult,
+} as const;
+export type MoveBody = z.infer<typeof move.body>;
+
+// POST /api/patients/:personId/files/copy → TransferResult.
+export const copy = {
+  params: personIdParams,
+  body: transferBody,
+  response: transferResult,
+} as const;
+export type CopyBody = z.infer<typeof copy.body>;
