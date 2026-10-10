@@ -1593,6 +1593,17 @@ export const databaseConfigQuery = () =>
       }),
   });
 
+/** GET /api/config/database/backup/drive — the Drive backup folder, its backup, the latest run. */
+export const driveBackupStatusQuery = () =>
+  queryOptions({
+    queryKey: qk.settings.driveBackup(),
+    queryFn: ({ signal }) =>
+      fetchJSON<settingsContract.DriveBackupStatusResponse>('/api/config/database/backup/drive', {
+        signal,
+        schema: settingsContract.driveBackupStatus.response,
+      }),
+  });
+
 /** GET /api/telegram/status — Telegram bot status. */
 export const telegramStatusQuery = () =>
   queryOptions({

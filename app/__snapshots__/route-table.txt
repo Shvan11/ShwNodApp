@@ -280,6 +280,8 @@ POST    /api/config/database/test  [authorize(admin) -> validate(body)]
 PUT     /api/config/database  [authorize(admin) -> validate(body)]
 GET     /api/config/database/export  [authorize(admin)]
 GET     /api/config/database/backup  [authorize(admin)]
+GET     /api/config/database/backup/drive  [authorize(admin)]
+POST    /api/config/database/backup/drive  [authorize(admin)]
 POST    /api/system/restart  [authorize(admin) -> validate(body)]
 MOUNT   /api
 GET     /api/doctors

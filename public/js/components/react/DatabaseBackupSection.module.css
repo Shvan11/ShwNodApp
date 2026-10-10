@@ -1,0 +1,241 @@
+/* Database Backup — Settings → Database, top section: download, or back up to Google Drive.
+   The section card and its title match DatabaseSettings.module.css, the section below it. */
+
+.section {
+    background: var(--background-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.sectionTitle {
+    font-size: var(--font-size-xl);
+    color: var(--text-primary);
+    margin: 0 0 var(--spacing-sm) 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.sectionTitle i {
+    color: var(--primary-color);
+}
+
+.sectionDescription {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0 0 var(--spacing-lg) 0;
+}
+
+.warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    background: var(--warning-50);
+    border: 1px solid var(--warning-200);
+    color: var(--warning-800);
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+}
+
+.warning i {
+    font-size: var(--font-size-lg);
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
+
+/* The two ways, side by side when there is room. */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: var(--spacing-lg);
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    background: var(--gray-50);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    min-width: 0;
+}
+
+.cardTitle {
+    width: 100%;
+    margin: 0;
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid var(--border-color);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.cardTitle i {
+    color: var(--primary-color);
+}
+
+.text,
+.muted,
+.hint {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.text {
+    color: var(--text-primary);
+}
+
+.muted,
+.hint {
+    color: var(--text-secondary);
+}
+
+.facts {
+    margin: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+}
+
+.fact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--spacing-sm);
+}
+
+.fact dt {
+    color: var(--text-secondary);
+    min-width: 7.5rem;
+}
+
+.fact dd {
+    margin: 0;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.link {
+    color: var(--primary-color);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.link i {
+    font-size: var(--font-size-xs);
+}
+
+.progress {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+}
+
+.notice {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    border: 1px solid;
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.notice i {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+
+.notice.success {
+    background: var(--success-50);
+    border-color: var(--success-200);
+    color: var(--success-800);
+}
+
+.notice.error {
+    background: var(--error-50);
+    border-color: var(--error-200);
+    color: var(--error-700);
+}
+
+.notice.warn {
+    background: var(--warning-50);
+    border-color: var(--warning-200);
+    color: var(--warning-800);
+}
+
+.primaryBtn,
+.secondaryBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: var(--transition-base);
+}
+
+.primaryBtn {
+    border: none;
+    background: var(--primary-fill);
+    color: var(--color-white);
+}
+
+.primaryBtn:hover:not(:disabled) {
+    background: var(--primary-fill-hover);
+}
+
+.secondaryBtn {
+    border: 1px solid var(--secondary-fill);
+    background: var(--secondary-fill);
+    color: var(--color-white);
+}
+
+.secondaryBtn:hover:not(:disabled) {
+    background: var(--secondary-fill-hover);
+    border-color: var(--secondary-fill-hover);
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+}
+
+@media (max-width: 768px) {
+    .section {
+        padding: var(--spacing-md);
+    }
+
+    .card {
+        padding: var(--spacing-md);
+    }
+
+    .primaryBtn,
+    .secondaryBtn {
+        width: 100%;
+        justify-content: center;
+    }
+}

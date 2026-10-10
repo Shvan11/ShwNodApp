@@ -136,6 +136,11 @@ class GoogleDriveClient {
     return this.initialized;
   }
 
+  /** Does the live client hold a grant (Settings → Integrations, or the env refresh token)? */
+  hasCredentials(): boolean {
+    return Boolean(this.oauth2Client?.credentials.refresh_token);
+  }
+
   /**
    * Re-sync the live client's credentials with the token store, in BOTH directions.
    *

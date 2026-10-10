@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useToast } from '../../contexts/ToastContext';
 import styles from './DatabaseSettings.module.css';
+import DatabaseBackupSection from './DatabaseBackupSection';
 import { formatISODate } from '../../core/utils';
 import { fetchJSON, postJSON, putJSON, httpErrorMessage } from '@/core/http';
 import { waitForServerRestart } from '@/core/serverHealth';
@@ -238,6 +239,9 @@ const DatabaseSettings = ({ onChangesUpdate }: DatabaseSettingsProps) => {
 
     return (
         <div className={styles.container}>
+            {/* First: backing up is the everyday job here, editing the connection the rare one. */}
+            <DatabaseBackupSection />
+
             <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
                     <i className="fas fa-database" aria-hidden="true"></i>

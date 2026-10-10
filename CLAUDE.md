@@ -177,7 +177,7 @@ Validate **untrusted input crossing into the app**, nowhere else: request body/p
 - Bulk loads/reloads are user-run and must carry `app.cdc_origin='failover'`; web writes to the mirror use the `mirror_rw` role, never the owner URL. Small additive DDL may go directly via `SUPABASE_FAILOVER_DB_URL`.
 - **Don't reintroduce** the retired portal projection (`portal-sink.ts`/`sync-fetch.ts`) or old reverse path (`sync-engine.ts`/`reverse-sync-poller.ts`/`POST /api/sync/webhook`). Not logical replication, not nightly reloads.
 
-Sink status UI: `SupabaseStatusSettings.tsx` → `GET /api/sync/supabase-status` (sink flags, backlog + its AGE, `drift`, and the `clock` alignment check).
+Sink status UI: Settings → Sync (`SyncSettings.tsx` → `SupabaseSyncStatus.tsx`) → `GET /api/sync/supabase-status` (sink flags, backlog + its AGE, `drift`, and the `clock` alignment check).
 
 **Divergence detection + repair** — CDC guarantees a *recorded* change reaches the mirror and nothing about a change that was never recorded (capture off ⇒ gone, no catch-up scan). So two pieces cover that hole: `services/sync/cdc/drift-check.ts` compares row counts per captured table against the mirror on a timer (5 min after boot, then `FAILOVER_DRIFT_CHECK_HOURS`, default 24; `FAILOVER_DRIFT_DEEP=true` adds a pk-set fingerprint), logs at `error` and shows on the Settings card; `scripts/reconcile-mirror.mjs` (`npm run sync:reconcile[:apply]`) is the repair — it re-enqueues the missing pks as `change_log` pointer rows, which the sink resolves by re-reading the live local row, so **a pointer row IS a complete repair** (no bulk push). Detection is automatic, repair is deliberately not: auto-healing on a timer would paper over the capture fault that caused it.
 

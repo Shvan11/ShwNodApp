@@ -1,0 +1,7 @@
+/* Settings → Sync — one status panel per sink, stacked. */
+
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+}

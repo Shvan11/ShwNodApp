@@ -375,11 +375,13 @@ export const qk = {
     emailConfig: () => ['settings', 'email-config'] as const,
     /** GET /api/settings/database — the active database connection config. */
     databaseConfig: () => ['settings', 'database-config'] as const,
+    /** GET /api/config/database/backup/drive — the Drive backup folder, its backup, the latest run. */
+    driveBackup: () => ['settings', 'drive-backup'] as const,
     /** GET /api/sync/supabase-status — failover/reverse sink health (polled). */
     supabaseStatus: () => ['settings', 'supabase-status'] as const,
     /** GET /api/sync/dolphin-status — Dolphin sink health (polled). */
     dolphinStatus: () => ['settings', 'dolphin-status'] as const,
-    /** GET /api/sync/features — which CDC sinks this install has (gates the two status tabs). */
+    /** GET /api/sync/features — which CDC sinks this install has (gates the Sync tab and its panels). */
     syncFeatures: () => ['settings', 'sync-features'] as const,
     /** GET /api/telegram/status — Telegram bot status. */
     telegramStatus: () => ['settings', 'telegram-status'] as const,

@@ -72,6 +72,7 @@ const MANAGED_PREFIXES = ['clinic_', 'email_', 'calendar_', 'gemini_', 'whatsapp
 const MANAGED_NAMES = new Set([
     'alignerlabelnextposition', // AlignerLabelNextPosition — the label dialog's sheet position
     'demo_seed_manifest', // DEMO_SEED_MANIFEST — the demo seeder's undo record
+    'drive_backup_folder_id', // DRIVE_BACKUP_FOLDER_ID — the Google Drive backup folder (Settings → Database)
 ]);
 
 const KNOWN = new Map(SYSTEM_OPTIONS.map(o => [o.name.toLowerCase(), o]));

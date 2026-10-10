@@ -102,3 +102,46 @@ export const exportDatabaseConfig = {
 
 // `:optionName` path param, shared by the option read/update routes.
 export type OptionNameParams = z.infer<typeof getOptionByName.params>;
+
+// ===== Database backup to Google Drive =====
+// (`services/google-drive/drive-backup.ts`; the download itself, GET /config/database/backup, is a
+// raw stream with no contract.)
+
+const driveBackupJob = z.object({
+  state: z.enum(['running', 'succeeded', 'failed']),
+  phase: z.enum(['preparing', 'uploading', 'verifying', 'replacing']).nullable(),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+  bytes: z.number(),
+  fileName: z.string(),
+  replaced: z.number(),
+  error: z.string().nullable(),
+  warning: z.string().nullable(),
+});
+export type DriveBackupJob = z.infer<typeof driveBackupJob>;
+
+// GET /api/config/database/backup/drive → the connection, the folder, the backup in it, the latest run.
+export const driveBackupStatus = {
+  response: z.object({
+    configured: z.boolean(),
+    connected: z.boolean(),
+    folder: z.object({ id: z.string(), name: z.string(), url: z.string().nullable() }).nullable(),
+    latest: z
+      .object({
+        name: z.string(),
+        size: z.number().nullable(),
+        createdTime: z.string().nullable(),
+        url: z.string().nullable(),
+      })
+      .nullable(),
+    driveError: z.string().nullable(),
+    job: driveBackupJob.nullable(),
+  }),
+} as const;
+export type DriveBackupStatusResponse = z.infer<typeof driveBackupStatus.response>;
+
+// POST /api/config/database/backup/drive → { job } (starts in the background; 409 while one runs).
+export const startDriveBackup = {
+  response: z.object({ job: driveBackupJob }),
+} as const;
+export type StartDriveBackupResponse = z.infer<typeof startDriveBackup.response>;

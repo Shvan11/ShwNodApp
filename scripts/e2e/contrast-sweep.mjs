@@ -25,7 +25,7 @@ const P = process.env.E2E_PATIENT || '1';
 const W = process.env.E2E_WORK || '1';
 const AW = process.env.E2E_ALIGNER_WORK || '1';
 
-const SETTINGS = ['general', 'database', 'databaseBackup', 'protocolHandlers', 'alignerDoctors', 'email', 'employees', 'exchangeRates', 'lookups', 'calendarTimes', 'supabaseStatus', 'dolphinStatus', 'tvDisplay', 'integrations', 'security', 'users'];
+const SETTINGS = ['general', 'database', 'protocolHandlers', 'alignerDoctors', 'email', 'employees', 'exchangeRates', 'lookups', 'calendarTimes', 'sync', 'tvDisplay', 'integrations', 'security', 'users'];
 export const ROUTES = [
   '/dashboard', '/appointments', '/calendar', '/patient-management', '/expenses', '/statistics', '/videos', '/lab-tracking',
   '/tasks/history', '/approvals/history', '/templates', '/send', '/send-message',

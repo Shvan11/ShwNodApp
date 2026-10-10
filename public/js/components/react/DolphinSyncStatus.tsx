@@ -3,7 +3,7 @@ import { dolphinStatusQuery } from '@/query/queries';
 import SyncStatusPanel, { SYNC_STATUS_POLL_MS } from './SyncStatusPanel';
 
 /**
- * Read-only Settings tab: live status of the one-way 'dolphin' CDC sink (native
+ * Settings → Sync, one panel: live status of the one-way 'dolphin' CDC sink (native
  * timepoints/images → the legacy Dolphin Imaging SQL Server). Its feed is local;
  * the reachability ping targets the mssql server. The card, poll cadence and
  * health rules live in the shared SyncStatusPanel.
@@ -17,11 +17,7 @@ const SINK_META = {
     },
 };
 
-interface DolphinStatusSettingsProps {
-    onChangesUpdate?: (hasChanges: boolean) => void;
-}
-
-const DolphinStatusSettings = ({ onChangesUpdate }: DolphinStatusSettingsProps) => {
+const DolphinSyncStatus = () => {
     const result = useQuery({ ...dolphinStatusQuery(), refetchInterval: SYNC_STATUS_POLL_MS });
     return (
         <SyncStatusPanel
@@ -32,9 +28,8 @@ const DolphinStatusSettings = ({ onChangesUpdate }: DolphinStatusSettingsProps) 
             description="Live reachability of the legacy Dolphin Imaging SQL Server sink."
             sinkMeta={SINK_META}
             notConfiguredHint="DB_* vars missing"
-            onChangesUpdate={onChangesUpdate}
         />
     );
 };
 
-export default DolphinStatusSettings;
+export default DolphinSyncStatus;

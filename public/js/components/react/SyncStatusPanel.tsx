@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { httpErrorMessage } from '@/core/http';
 import { formatLocaleDateTime, formatNumber } from '@/utils/formatters';
@@ -6,19 +5,17 @@ import type { SyncClockReport, SyncDriftReport, SyncSinkStatus, SyncSinkStatusRe
 import styles from './SyncStatusPanel.module.css';
 
 /**
- * The read-only CDC sink-health panel, shared by the two Settings tabs that show
- * one: Supabase (`SupabaseStatusSettings`, sinks 'failover' + 'reverse') and
- * Dolphin (`DolphinStatusSettings`, sink 'dolphin'). Both endpoints answer the
+ * The read-only CDC sink-health panel, shown twice on Settings → Sync
+ * (`SyncSettings`): Supabase (`SupabaseSyncStatus`, sinks 'failover' + 'reverse')
+ * and Dolphin (`DolphinSyncStatus`, sink 'dolphin'). Both endpoints answer the
  * same shape (routes/sync-webhook.ts), so the card, the health rules and the
- * poll live here once and each tab supplies only its own copy.
- *
- * Neither tab ever reports unsaved changes, so no Save badge is ever shown.
+ * poll live here once and each panel supplies only its own copy.
  */
 
 /**
- * How often a sink-status tab re-checks. Owned here so both tabs poll alike;
+ * How often a sink-status panel re-checks. Owned here so both panels poll alike;
  * they pass it to their own `useQuery` (see the note on `result` below). Polling
- * stops when the tab is closed.
+ * stops when the Sync tab is closed.
  */
 export const SYNC_STATUS_POLL_MS = 10_000;
 
@@ -214,7 +211,6 @@ export interface SyncStatusPanelProps {
     sinkMeta: Record<string, { label: string; description: string }>;
     /** What "not configured" means for this feed, e.g. 'env vars missing'. */
     notConfiguredHint: string;
-    onChangesUpdate?: (hasChanges: boolean) => void;
 }
 
 const SyncStatusPanel = ({
@@ -225,7 +221,6 @@ const SyncStatusPanel = ({
     subject,
     sinkMeta,
     notConfiguredHint,
-    onChangesUpdate,
 }: SyncStatusPanelProps) => {
     const { data: status, isLoading, isError, error: queryError, refetch } = result;
     const sinks = status?.sinks ?? null;
@@ -243,11 +238,6 @@ const SyncStatusPanel = ({
         : status && (!status.success || !status.sinks)
           ? status.error || fallback
           : null;
-
-    // Read-only: explicitly declare no unsaved changes so no Save badge shows.
-    useEffect(() => {
-        onChangesUpdate?.(false);
-    }, [onChangesUpdate]);
 
     return (
         <div className={styles.container}>

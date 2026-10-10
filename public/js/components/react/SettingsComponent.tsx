@@ -20,10 +20,8 @@ import ExchangeRatesSettings from './ExchangeRatesSettings';
 import LookupsSettings from './LookupsSettings';
 import ProtocolHandlersSettings from './ProtocolHandlersSettings';
 import CalendarTimesSettings from './CalendarTimesSettings';
-import SupabaseStatusSettings from './SupabaseStatusSettings';
-import DolphinStatusSettings from './DolphinStatusSettings';
+import SyncSettings from './SyncSettings';
 import IntegrationsSettings from './IntegrationsSettings';
-import DatabaseBackupSettings from './DatabaseBackupSettings';
 import TvDisplaySettings from './TvDisplaySettings';
 
 // Types
@@ -39,17 +37,28 @@ interface TabConfig {
     description: string;
     /**
      * The capability a role needs to see the tab — the same line the tab's endpoints
-     * draw on the server. Absent = every staff role. Database, Database Backup and
+     * draw on the server. Absent = every staff role. Database (with its backups) and
      * Email were offered to everyone and opened on "Insufficient permissions"; Lookups
      * and Calendar Times on a clinical 403 (audit FE-F21-3).
      */
     requires?: keyof RoleCapabilities;
     /**
-     * The CDC sink the tab reports on. The tab shows only on an install that has that sink
-     * (`GET /api/sync/features`) — for every role (audit FE-F22-7; owner, 2026-10-05).
+     * The CDC sinks the tab reports on. The tab shows only on an install that has at least
+     * one of them (`GET /api/sync/features`) — for every role (audit FE-F22-7; owner, 2026-10-05).
      */
-    feature?: 'supabase' | 'dolphin';
+    features?: readonly ('supabase' | 'dolphin')[];
 }
+
+/**
+ * Tab ids that were merged into another tab (2026-10-10), so an old bookmark or link
+ * still lands on the right one: the backup moved into Database, and the two sink-status
+ * tabs became Sync.
+ */
+const MERGED_TAB_IDS: Record<string, string> = {
+    databaseBackup: 'database',
+    supabaseStatus: 'sync',
+    dolphinStatus: 'sync',
+};
 
 // Tab configuration defined statically outside the component to avoid recreation on render.
 const tabs: TabConfig[] = [
@@ -65,15 +74,7 @@ const tabs: TabConfig[] = [
         label: 'Database',
         icon: 'fas fa-database',
         component: DatabaseSettings,
-        description: 'Database connection and configuration',
-        requires: 'manageSettings'
-    },
-    {
-        id: 'databaseBackup',
-        label: 'Database Backup',
-        icon: 'fas fa-download',
-        component: DatabaseBackupSettings,
-        description: 'Download a full backup of this clinic\'s database',
+        description: 'Backups (download or Google Drive), connection and configuration',
         requires: 'manageSettings'
     },
     {
@@ -132,20 +133,12 @@ const tabs: TabConfig[] = [
         requires: 'manageLookups'
     },
     {
-        id: 'supabaseStatus',
-        label: 'Supabase Status',
+        id: 'sync',
+        label: 'Sync',
         icon: 'fas fa-cloud',
-        component: SupabaseStatusSettings,
-        description: 'Live status of Supabase portal & failover sync',
-        feature: 'supabase'
-    },
-    {
-        id: 'dolphinStatus',
-        label: 'Dolphin Status',
-        icon: 'fas fa-database',
-        component: DolphinStatusSettings,
-        description: 'Live status of the legacy Dolphin Imaging SQL Server sink',
-        feature: 'dolphin'
+        component: SyncSettings,
+        description: 'Live status of the Supabase mirror and the Dolphin Imaging sink',
+        features: ['supabase', 'dolphin']
     },
     {
         id: 'tvDisplay',
@@ -183,7 +176,8 @@ const tabs: TabConfig[] = [
 ];
 
 const SettingsComponent: React.FC = () => {
-    const { tab } = useParams<{ tab?: string }>();
+    const { tab: urlTab } = useParams<{ tab?: string }>();
+    const tab = urlTab ? (MERGED_TAB_IDS[urlTab] ?? urlTab) : undefined;
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<string>(tab || 'general');
 
@@ -210,7 +204,7 @@ const SettingsComponent: React.FC = () => {
         const caps = roleCaps((userRole ?? undefined) as UserRole | undefined);
         return tabs.filter(tabItem =>
             (!tabItem.requires || caps[tabItem.requires]) &&
-            (!tabItem.feature || !features || features[tabItem.feature])
+            (!tabItem.features || !features || tabItem.features.some(f => features[f]))
         );
     }, [userRole, features]);
 
@@ -230,6 +224,11 @@ const SettingsComponent: React.FC = () => {
             setDirtyTab(null);
         }
     }
+
+    // An old tab id: show its new home under its own address.
+    useEffect(() => {
+        if (urlTab && tab !== urlTab) navigate(`/settings/${tab}`, { replace: true });
+    }, [urlTab, tab, navigate]);
 
     // Redirect to the fallback tab if the active one is unknown or unauthorized.
     useEffect(() => {

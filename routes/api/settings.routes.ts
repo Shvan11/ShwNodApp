@@ -29,6 +29,12 @@ import { authorize } from '../../middleware/auth.js';
 import { ADMIN_ROLES } from '../../shared/auth/roles.js';
 import { log } from '../../utils/logger.js';
 import { spawnPgDump, backupFilename } from '../../services/database/backup.js';
+import {
+  BackupAlreadyRunningError,
+  DriveBackupUnavailableError,
+  getDriveBackupStatus,
+  startBackupToDrive
+} from '../../services/google-drive/drive-backup.js';
 import * as settings from '../../shared/contracts/settings.contract.js';
 
 const router = Router();
@@ -437,6 +443,52 @@ router.get('/config/database/backup', adminOnly, (req: Request, res: Response): 
     if (child.exitCode === null && !child.killed) child.kill();
   });
 });
+
+/**
+ * Google Drive backup — the folder, the backup in it, and the latest run.
+ * GET /api/config/database/backup/drive
+ *
+ * Same tier as the download (a backup is the whole clinic). Reads Drive live, so a backup made
+ * from another server or before a restart still shows; a Drive failure comes back as
+ * `driveError` rather than failing the read.
+ */
+router.get(
+  '/config/database/backup/drive',
+  adminOnly,
+  async (_req: Request, res: Response): Promise<void> => {
+    try {
+      sendData(res, settings.driveBackupStatus.response, await getDriveBackupStatus());
+    } catch (error) {
+      log.error('Error reading the Google Drive backup status:', error);
+      ErrorResponses.internalError(res, 'Could not read the Google Drive backup status', error as Error);
+    }
+  }
+);
+
+/**
+ * Back up to Google Drive, replacing the previous backup there.
+ * POST /api/config/database/backup/drive
+ *
+ * Answers at once with the run's record; the run goes on in the background (an upload at the
+ * clinic's uplink speed outlasts the 30s request timeout) and the screen polls the GET above.
+ * 409 when Drive is not connected or a run is already going.
+ */
+router.post(
+  '/config/database/backup/drive',
+  adminOnly,
+  (_req: Request, res: Response): void => {
+    try {
+      sendData(res, settings.startDriveBackup.response, { job: startBackupToDrive() });
+    } catch (error) {
+      if (error instanceof DriveBackupUnavailableError || error instanceof BackupAlreadyRunningError) {
+        ErrorResponses.conflict(res, error.message);
+        return;
+      }
+      log.error('Error starting the Google Drive backup:', error);
+      ErrorResponses.internalError(res, 'Could not start the Google Drive backup', error as Error);
+    }
+  }
+);
 
 // ===== SYSTEM MANAGEMENT ENDPOINTS =====
 
