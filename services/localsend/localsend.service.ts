@@ -2,14 +2,27 @@
  * LocalSend sender service — pushes patient files/images to LAN devices.
  *
  * The clinic server acts as a LocalSend SENDER (protocol v2): it discovers
- * receivers over UDP multicast, then uploads a file straight to the chosen
+ * receivers on the LAN, then uploads a file straight to the chosen
  * device, which shows its native Accept prompt. The browser can't do either of
  * those (no multicast, no POST to self-signed-HTTPS LAN hosts), so all of it
  * lives here and the React UI just drives it over our HTTP funnel.
  *
- * The server is an HTTPS *client* only — it accepts the receivers' self-signed
+ * To send, the server is an HTTPS *client*. It accepts the receivers' self-signed
  * certs (`rejectUnauthorized:false`, the protocol's LAN-internal design) and
- * needs no cert of its own. It does NOT host a `:53317` HTTP listener.
+ * presents its own as the TLS client certificate, which receivers on LocalSend
+ * 1.18+ refuse to talk without (see identity.ts). It receives no files.
+ *
+ * Discovery runs ON DEMAND. While the picker is in use (`wake`, which every read
+ * of the device list calls) the server announces itself every few seconds and
+ * takes the answers: UDP replies from older apps, and the HTTPS `register`
+ * request that is the only answer a 1.18+ device gives (register-listener.ts).
+ * `AWAKE_MS` after the picker was last read it stops announcing, closes that
+ * listener and answers no one, so the rest of the day the server is not on any
+ * phone's device list. Asleep it still HEARS a device that announces itself,
+ * which is how one opened a moment before the picker is already in it.
+ * Until 2026-10-10 it announced every 5 s around the clock with nothing
+ * listening: every 1.18 phone on the LAN knocked on a closed port each time,
+ * and entered the picker only when Rescan asked its address directly (see `scan`).
  *
  * Gated by `config.localsend.enabled` (off by default). To stay reliable on a
  * multi-homed host (extra/disconnected NICs, a VPN adapter), discovery binds a
@@ -26,11 +39,19 @@ import crypto from 'crypto';
 import { createReadStream } from 'fs';
 import { PassThrough } from 'stream';
 import https from 'https';
+import tls from 'tls';
 import fetch from 'node-fetch';
 import config from '../../config/config.js';
 import { log } from '../../utils/logger.js';
 import { describeFetchError, isAbortError } from '../../utils/fetch-timeout.js';
 import { resolveShareRef } from '../files/share-ref.js';
+import { IDENTITY_FILE, loadOrCreateIdentity, type LocalSendIdentity } from './identity.js';
+import {
+  openRegisterListener,
+  type PeerInfo,
+  type RegisterListener,
+  type Registration,
+} from './register-listener.js';
 import type {
   LocalSendDevice,
   SendFileRef,
@@ -43,14 +64,24 @@ const LOCALSEND_VERSION = '2.0';
 const DEFAULT_PEER_PORT = 53317;
 // How long a discovered/probed device stays in the picker without being re-seen.
 const DEVICE_TTL_MS = 5 * 60 * 1000;
-// We solicit announcements this often while running.
+// We solicit announcements this often while awake.
 const ANNOUNCE_INTERVAL_MS = 5 * 1000;
+// Discovery stays awake this long after the picker was last read (opened, or Rescan).
+const AWAKE_MS = 5 * 60 * 1000;
+// A read that finds discovery asleep waits this long for the answers to the announcement it
+// causes. A device on the LAN answers well inside a second.
+const SETTLE_MS = 1200;
 // Re-scan local interfaces this often so a NIC/VPN/cable coming up or down is
 // picked up without a restart (one cheap os.networkInterfaces() read + diff).
 const INTERFACE_SYNC_MS = 20 * 1000;
 // Bounds the prepare-upload wait — the receiver's Accept dialog can sit open.
 const PREPARE_TIMEOUT_MS = 90 * 1000;
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+// "Add by IP": one address the user typed, so it is given time to wake up.
+const PROBE_TIMEOUT_MS = 8 * 1000;
+// One address's share of a subnet scan. A LocalSend device answers in well under a second; this
+// only bounds the wait on an address with nothing behind it.
+const SCAN_TIMEOUT_MS = 3 * 1000;
 
 /**
  * User copy for a request to a LocalSend device that never got an HTTP answer (FE-F14-7).
@@ -71,6 +102,12 @@ function describeUnreachable(err: unknown, who: string, timeoutMs: number, waiti
   if (code === 'ECONNREFUSED') return `${who} refused the connection. Is LocalSend open on it?`;
   if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH' || code === 'ETIMEDOUT') {
     return `${who} can't be reached. Is it switched on and on the clinic network?`;
+  }
+  // A TLS failure means the device DID answer and the two sides disagreed about the secure
+  // connection. "Is LocalSend open on it?" was the answer given to the 1.18 client-certificate
+  // rejection, and it sent the search to the network.
+  if (typeof code === 'string' && (/^ERR_(SSL|TLS)_/.test(code) || code === 'EPROTO')) {
+    return `${who} answered but refused the secure connection (${code}). Try again; if it keeps failing, LocalSend on it or this server needs an update.`;
   }
   return `Couldn't reach ${who}${typeof code === 'string' ? ` (${code})` : ''}. Is LocalSend open on it?`;
 }
@@ -131,43 +168,145 @@ class LocalSendService {
   private interfaceTimer: NodeJS.Timeout | null = null;
   private readonly devices = new Map<string, TrackedDevice>();
   private readonly transfers = new Map<string, Transfer>();
-  private readonly fingerprint = crypto.randomUUID();
-  private readonly httpsAgent = new https.Agent({ rejectUnauthorized: false });
+  private loadedIdentity: LocalSendIdentity | null = null;
+  private agent: https.Agent | null = null;
   private started = false;
+  private scanning = false;
+  // On-demand discovery. `announceTimer` is set exactly while awake.
+  private listener: RegisterListener | null = null;
+  private awakeUntil = 0;
+  private settled: Promise<void> = Promise.resolve();
 
   private get cfg() {
     return config.localsend;
   }
 
-  /** Our own identity, sent in announcements and prepare-upload `info`. */
-  private selfInfo(): AnnouncePayload {
+  /**
+   * Our certificate, key and the fingerprint they give us. Read on first use rather than at
+   * import: the first run generates an RSA key, and this module is imported with LocalSend off.
+   */
+  private get identity(): LocalSendIdentity {
+    return (this.loadedIdentity ??= loadOrCreateIdentity(IDENTITY_FILE));
+  }
+
+  /**
+   * Every HTTPS request presents the identity: receivers on 1.18+ end the handshake without it.
+   *
+   * It is given as ONE TLS context. Handed the PEMs instead, Node parses the key again for each
+   * connection, and a subnet scan opens some 250 per interface: measured on the clinic's server,
+   * that was a second of event-loop time where the shared context takes a tenth of one.
+   */
+  private get httpsAgent(): https.Agent {
+    return (this.agent ??= new https.Agent({
+      rejectUnauthorized: false,
+      secureContext: tls.createSecureContext({ cert: this.identity.certPem, key: this.identity.keyPem }),
+    }));
+  }
+
+  /** What we tell a device about ourselves: the answer to its `register` and `info`. */
+  private peerInfo(): PeerInfo {
     return {
       alias: this.cfg.alias,
       version: LOCALSEND_VERSION,
       deviceModel: 'Server',
       deviceType: 'server',
-      fingerprint: this.fingerprint,
-      port: this.cfg.port,
-      protocol: 'https',
+      fingerprint: this.identity.fingerprint,
       download: false,
     };
+  }
+
+  /** Our own identity, sent in announcements and prepare-upload `info`. */
+  private selfInfo(): AnnouncePayload {
+    return { ...this.peerInfo(), port: this.cfg.port, protocol: 'https' };
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
   start(): void {
     if (this.started) return;
+    // Before anything announces it. The first run generates the identity here, at boot,
+    // rather than under the first send.
+    log.info('[LocalSend] Device identity ready', { fingerprint: this.identity.fingerprint });
     this.started = true;
 
-    this.syncInterfaces();   // bind every usable interface that exists right now
-    this.announce();         // solicit immediately so the picker fills fast
+    // Bind every usable interface that exists right now, to hear the devices that announce
+    // themselves. Nothing is sent: announcing begins when the picker is first read (`wake`).
+    this.syncInterfaces();
 
-    this.announceTimer = setInterval(() => this.announce(), ANNOUNCE_INTERVAL_MS);
-    this.announceTimer.unref();
     this.pruneTimer = setInterval(() => this.prune(), DEVICE_TTL_MS);
     this.pruneTimer.unref();
     this.interfaceTimer = setInterval(() => this.syncInterfaces(), INTERFACE_SYNC_MS);
     this.interfaceTimer.unref();
+  }
+
+  // ── On-demand discovery ──────────────────────────────────────────────────
+
+  /**
+   * The picker is in use. Asleep, this starts discovery: the `register` listener opens, an
+   * announcement goes out of every interface, and both keep going until `AWAKE_MS` after the
+   * last call. Awake, it only moves that deadline.
+   *
+   * The promise is for the caller that is about to read the device list. An announcement's
+   * answers arrive after it, so a list read at once on waking would be empty and the picker
+   * would open on "No devices found". It resolves `SETTLE_MS` after the wake, and at once for a
+   * call that finds discovery already settled.
+   */
+  wake(): Promise<void> {
+    if (!this.started) return Promise.resolve();
+    this.awakeUntil = Date.now() + AWAKE_MS;
+    if (this.announceTimer) return this.settled;
+
+    // The listener before the announcement: a device answers within milliseconds.
+    this.listener = openRegisterListener({
+      identity: this.identity,
+      port: this.cfg.port,
+      selfInfo: () => this.peerInfo(),
+      onRegister: (registration) => this.onRegister(registration),
+    });
+    this.announce();
+    this.announceTimer = setInterval(() => this.beat(), ANNOUNCE_INTERVAL_MS);
+    this.announceTimer.unref();
+    this.settled = new Promise((resolve) => {
+      setTimeout(resolve, SETTLE_MS).unref();
+    });
+    log.info('[LocalSend] Discovery awake', { port: this.cfg.port });
+    return this.settled;
+  }
+
+  /**
+   * Every `ANNOUNCE_INTERVAL_MS` while awake: announce again, or go to sleep once the picker
+   * has not been read for `AWAKE_MS`.
+   */
+  private beat(): void {
+    if (Date.now() < this.awakeUntil) {
+      this.announce();
+      return;
+    }
+    log.info('[LocalSend] Discovery asleep — the picker has not been used for a while');
+    void this.sleep();
+  }
+
+  /** Stop announcing and close the listener. Resolves when its port is free. */
+  private sleep(): Promise<void> {
+    if (this.announceTimer) clearInterval(this.announceTimer);
+    this.announceTimer = null;
+    const listener = this.listener;
+    this.listener = null;
+    return listener ? listener.close() : Promise.resolve();
+  }
+
+  /** A device answered an announcement the way 1.18+ does, or found us by asking our address. */
+  private onRegister(registration: Registration): void {
+    if (registration.fingerprint === this.identity.fingerprint) return;
+    this.upsertDevice({
+      fingerprint: registration.fingerprint,
+      alias: registration.alias,
+      deviceModel: registration.deviceModel,
+      deviceType: registration.deviceType,
+      ip: registration.ip,
+      port: registration.port || DEFAULT_PEER_PORT,
+      protocol: registration.protocol === 'http' ? 'http' : 'https',
+    });
   }
 
   /**
@@ -264,19 +403,19 @@ class LocalSendService {
         port: this.cfg.port,
         multicast: this.cfg.multicast,
       });
-      this.announceFrom(socket);   // greet immediately on a freshly-bound interface
+      // An interface that came up while the picker is in use is announced on at once.
+      if (this.announceTimer) this.announceFrom(socket);
     });
   }
 
   async gracefulShutdown(): Promise<void> {
     if (!this.started) return;
     log.info('[LocalSend] Shutting down…');
-    if (this.announceTimer) clearInterval(this.announceTimer);
     if (this.pruneTimer) clearInterval(this.pruneTimer);
     if (this.interfaceTimer) clearInterval(this.interfaceTimer);
-    this.announceTimer = null;
     this.pruneTimer = null;
     this.interfaceTimer = null;
+    await this.sleep();
 
     const closing = [...this.sockets.values()].map(
       (sock) =>
@@ -321,7 +460,7 @@ class LocalSendService {
     } catch {
       return;
     }
-    if (!data.fingerprint || data.fingerprint === this.fingerprint) return;
+    if (!data.fingerprint || data.fingerprint === this.identity.fingerprint) return;
 
     this.upsertDevice({
       fingerprint: data.fingerprint,
@@ -333,8 +472,10 @@ class LocalSendService {
       protocol: data.protocol === 'http' ? 'http' : 'https',
     });
 
-    // Reply to a solicitation on the SAME interface it arrived on (announce:false).
-    if (data.announce) {
+    // Reply to a solicitation on the SAME interface it arrived on (announce:false), while
+    // awake. Asleep, the device above is remembered and nothing is said: a reply is what puts
+    // this server on that device's list.
+    if (data.announce && this.announceTimer) {
       const reply = JSON.stringify({ ...this.selfInfo(), announce: false });
       socket.send(reply, rinfo.port, rinfo.address);
     }
@@ -362,16 +503,63 @@ class LocalSendService {
       .map(({ lastSeen: _lastSeen, ...d }) => d);
   }
 
-  /** Re-solicit announcements (the picker's Rescan button). */
+  /**
+   * The picker's Rescan: solicit announcements, and ask the addresses on our own subnets directly.
+   *
+   * The second half finds a device our announcement does not reach (an access point that keeps
+   * multicast from its Wi-Fi clients, a device whose answer was refused): it cannot answer what
+   * it never heard. Until the `register` listener existed it was the only way a 1.18+ device
+   * entered the picker, and on 2026-10-10 a 1.18 phone was open and reachable for two minutes
+   * without one of its own announcements arriving here. LocalSend's apps fall back to the same
+   * sweep when multicast brings them nothing.
+   */
   scan(): void {
-    this.announce();
+    // Rescan is a use of the picker like any other. Waking from sleep announces by itself.
+    const wasAwake = this.announceTimer !== null;
+    void this.wake();
+    if (wasAwake) this.announce();
+    void this.scanSubnets();
+  }
+
+  /**
+   * Probe every other address on the /24 of each usable interface, without waiting for one before
+   * asking the next. The ones running LocalSend enter the picker as they answer; the rest refuse
+   * or time out. One scan at a time, however often Rescan is pressed.
+   */
+  private async scanSubnets(): Promise<void> {
+    if (this.scanning) return;
+    this.scanning = true;
+    try {
+      const own = this.usableInterfaceIps();
+      const addresses = new Set<string>();
+      for (const ip of own) {
+        const subnet = ip.slice(0, ip.lastIndexOf('.') + 1);
+        for (let host = 1; host <= 254; host++) addresses.add(subnet + host);
+      }
+      for (const ip of own) addresses.delete(ip);
+
+      const answers: Promise<boolean>[] = [];
+      for (const ip of addresses) {
+        // Settled where it is made: a refusal can arrive before the last probe has been sent.
+        answers.push(this.probe(ip, SCAN_TIMEOUT_MS).then(() => true, () => false));
+        // Opening a connection is synchronous work. Let other requests in between batches rather
+        // than hold the event loop for all of them.
+        if (answers.length % 50 === 0) await new Promise((resolve) => setImmediate(resolve));
+      }
+      log.info('[LocalSend] Subnet scan finished', {
+        addresses: addresses.size,
+        found: (await Promise.all(answers)).filter(Boolean).length,
+      });
+    } finally {
+      this.scanning = false;
+    }
   }
 
   /**
    * Probe a device directly by IP via `GET …/v2/info`. Covers segmented LANs
    * and WSL2 dev, where multicast can't reach the physical network.
    */
-  async probe(ip: string): Promise<LocalSendDevice> {
+  async probe(ip: string, timeoutMs = PROBE_TIMEOUT_MS): Promise<LocalSendDevice> {
     // Defense-in-depth behind the contract's IP validation: the value is
     // interpolated into a URL, so a host/port/path here would be an SSRF.
     if (net.isIP(ip) === 0) throw new Error('Not a valid IP address');
@@ -382,10 +570,9 @@ class LocalSendService {
     // probe-by-IP silently hit a dead port — and probe-by-IP is the fallback that exists precisely
     // for the segmented LANs and WSL2 dev boxes multicast can't reach.
     const url = `https://${host}:${this.cfg.port}/api/localsend/v2/info`;
-    const PROBE_TIMEOUT_MS = 8000;
     let info: AnnouncePayload;
     try {
-      const res = await this.timedFetch(url, { agent: this.httpsAgent }, PROBE_TIMEOUT_MS);
+      const res = await this.timedFetch(url, { agent: this.httpsAgent }, timeoutMs);
       if (!res.ok) {
         throw new Error(`The device at ${ip} answered, but not as LocalSend (HTTP ${res.status})`);
       }
@@ -395,9 +582,14 @@ class LocalSendService {
       if (err instanceof SyntaxError || (err as { type?: unknown })?.type === 'invalid-json') {
         throw new Error(`The device at ${ip} answered, but not as LocalSend`, { cause: err });
       }
-      throw new Error(describeUnreachable(err, `The device at ${ip}`, PROBE_TIMEOUT_MS, "didn't answer"), {
+      throw new Error(describeUnreachable(err, `The device at ${ip}`, timeoutMs, "didn't answer"), {
         cause: err,
       });
+    }
+    // While awake our own listener answers on every address this machine has. The sweep leaves
+    // those out; an address typed into "Add by IP" can still be one of them.
+    if (info.fingerprint === this.identity.fingerprint) {
+      throw new Error(`The device at ${ip} is this server itself`);
     }
     const dev: LocalSendDevice = {
       fingerprint: info.fingerprint || `ip:${ip}`,
@@ -405,7 +597,9 @@ class LocalSendService {
       deviceModel: info.deviceModel,
       deviceType: info.deviceType,
       ip,
-      port: info.port || DEFAULT_PEER_PORT,
+      // `/info` carries no port, so the device's port is the one it just answered on. This fell
+      // back to the protocol default, which sent every later upload to a port nobody had probed.
+      port: info.port || this.cfg.port,
       protocol: info.protocol === 'http' ? 'http' : 'https',
     };
     this.upsertDevice(dev);

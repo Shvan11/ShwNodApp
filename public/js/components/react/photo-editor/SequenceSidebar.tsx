@@ -26,7 +26,7 @@ import { patientFilesQuery, takenDatesQuery } from '@/query/queries';
 import { qk } from '@/query/keys';
 import type { FileEntry } from '@/types/api.types';
 import type { TimepointRow } from '@shared/contracts/patient.contract';
-import { ensurePermission, showFilePicker } from '@/core/fileSystemAccess';
+import { ensurePermission, locateWithin, removeEntryAt, showFilePicker } from '@/core/fileSystemAccess';
 import { useImportFolder } from '@/hooks/useImportFolder';
 import { formatLocaleDate, formatLocaleTime, formatPhotoTakenAt } from '@/utils/formatters';
 import { buildContentUrl } from '../files/fileHelpers';
@@ -182,7 +182,8 @@ const SequenceSidebar = ({
    * Move (not copy) selected photos off the memory card. Works like Upload — a multi-select
    * file picker — but defaults to the remembered card folder and DELETES each chosen original
    * after the upload succeeds. Deletion runs under the card folder's read-write grant
-   * (resolve + removeEntry), so there's no per-file permission prompt.
+   * (resolve + removeEntry), so there's no per-file permission prompt — and so the photos
+   * must be inside that folder, or the move does not start.
    */
   const handleMoveFromCard = async (): Promise<void> => {
     const target = folder || defaultFolder;
@@ -226,6 +227,31 @@ const SequenceSidebar = ({
     if (!picked.success || !picked.data || picked.data.length === 0) return;
     const handles = picked.data;
 
+    // The delete runs under the card folder's grant, so every photo has to be inside that
+    // folder — checked BEFORE the upload, so a move is never left half done. The picker
+    // only OPENS in the remembered folder; nothing keeps the user there. A photo from
+    // outside it used to be deleted through its own handle after the upload: Chrome asks
+    // "Save changes to IMG_5467.JPG?" for each one, and that left 8 of 10 on the card
+    // (2026-10-10).
+    let located = await locateWithin(cardDir, handles);
+    if (!located) {
+      const ok = await confirm(
+        `These photos are not in the remembered card folder “${cardDir.name}”, so they could not be deleted from the card after the upload. Choose the folder they are in — it becomes the card folder.`,
+        { title: 'Photos are in another folder', confirmText: 'Choose folder', cancelText: 'Cancel' }
+      );
+      if (!ok) return;
+      // Opens where the picked photos are, so choosing that folder is one click.
+      cardDir = await importFolder.choosePick(handles[0]);
+      if (!cardDir) return;
+      located = await locateWithin(cardDir, handles);
+      if (!located) {
+        toast.error(
+          `Those photos are not in “${cardDir.name}” either — nothing was moved. “Upload (copy)” uploads them and leaves the card as it is.`
+        );
+        return;
+      }
+    }
+
     setMoving(true);
     try {
       await ensureFolder(target); // upload target must exist on the share
@@ -238,26 +264,18 @@ const SequenceSidebar = ({
       // the funnel's 30s default, which would abort it mid-write.
       await postFormData(`/api/patients/${personId}/files/upload?${qs}`, form, { timeoutMs: 120000 });
 
-      // Upload confirmed on the share — now delete each chosen original from the card. Resolve
-      // the file within the granted card folder and removeEntry under that read-write grant.
+      // Upload confirmed on the share — now delete each chosen original from the card, under
+      // the card folder's read-write grant (no prompt). One the card refuses is left there.
       let removed = 0;
       const failed: string[] = [];
-      for (const fh of handles) {
+      const reasons = new Set<string>();
+      for (const [i, segments] of located.entries()) {
         try {
-          const rel = await cardDir.resolve(fh);
-          if (rel && rel.length > 0) {
-            let dir = cardDir;
-            for (let i = 0; i < rel.length - 1; i++) {
-              dir = await dir.getDirectoryHandle(rel[i]);
-            }
-            await dir.removeEntry(rel[rel.length - 1]);
-          } else {
-            // Picked from outside the granted folder — fall back to the handle's own remove().
-            await (fh as FileSystemFileHandle & { remove: () => Promise<void> }).remove();
-          }
+          await removeEntryAt(cardDir, segments);
           removed++;
-        } catch {
-          failed.push(fh.name);
+        } catch (err) {
+          failed.push(handles[i].name);
+          reasons.add((err as DOMException | undefined)?.name || 'Error');
         }
       }
 
@@ -267,8 +285,10 @@ const SequenceSidebar = ({
       if (failed.length === 0) {
         toast.success(`Moved ${removed} photo${removed === 1 ? '' : 's'} — originals removed from the card`);
       } else {
+        // The browser's own reason goes in too: it is the only record of why the card refused.
+        const names = failed.slice(0, 5).join(', ') + (failed.length > 5 ? ', …' : '');
         toast.warning(
-          `Uploaded ${handles.length}; ${removed} removed, ${failed.length} could not be deleted (left on the card)`
+          `Uploaded ${handles.length}; ${removed} removed from the card, ${failed.length} could not be deleted and are still on it: ${names} (${[...reasons].join(', ')})`
         );
       }
     } catch (err) {

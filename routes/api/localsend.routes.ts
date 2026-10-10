@@ -25,13 +25,17 @@ const router = Router();
 router.get(
   '/devices',
   validate({ query: localsend.devices.query }),
-  (req: Request, res: Response): void => {
+  async (req: Request, res: Response): Promise<void> => {
     if (!config.localsend.enabled) {
       sendData(res, localsend.devices.response, { enabled: false, devices: [] });
       return;
     }
     const { rescan } = req.query as z.infer<typeof localsend.devices.query>;
     if (rescan) localsendService.scan();
+    // Reading the list is what "the picker is in use" means, and discovery runs only while it
+    // is. A read that finds it asleep is answered about a second later, once the devices it
+    // has just announced to have had time to answer.
+    await localsendService.wake();
     sendData(res, localsend.devices.response, {
       enabled: true,
       devices: localsendService.getDevices(),

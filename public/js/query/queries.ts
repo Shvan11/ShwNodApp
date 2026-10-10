@@ -1616,9 +1616,11 @@ export const telegramStatusQuery = () =>
   });
 
 /**
- * GET /api/localsend/devices — the devices the server already knows. The server
- * announces every 5 s and keeps what it hears for 5 min, so a plain read lists them
- * at once; `?rescan=1` (the dialog's Rescan) also solicits fresh announcements.
+ * GET /api/localsend/devices — the devices the server knows. The server looks for
+ * devices only while this is being read (and for 5 min after): a read that finds it
+ * asleep wakes it and is answered about a second later, with the devices that
+ * answered its announcement. `?rescan=1` (the dialog's Rescan) also asks every
+ * address on the subnet.
  */
 export const localsendDevicesQuery = () =>
   queryOptions({

@@ -35,8 +35,9 @@ export interface UseImportFolder {
   /** Leaf name of the folder (the API never exposes the full path). */
   folderName: string | null;
   loading: boolean;
-  /** Open the picker, persist the chosen folder, return the handle (null on cancel/error). */
-  choosePick: () => Promise<FileSystemDirectoryHandle | null>;
+  /** Open the picker, persist the chosen folder, return the handle (null on cancel/error).
+   *  `startIn`: open the dialog there — given a file's handle, in the folder holding it. */
+  choosePick: (startIn?: FileSystemHandle) => Promise<FileSystemDirectoryHandle | null>;
   /** Re-request permission for the remembered handle. Must run inside a click handler. */
   grant: () => Promise<boolean>;
   /** Forget the remembered folder. */
@@ -100,10 +101,10 @@ export function useImportFolder(mode: PermissionMode = 'readwrite'): UseImportFo
     await loadSaved();
   }, [supported, loadSaved]);
 
-  const choosePick = useCallback(async (): Promise<FileSystemDirectoryHandle | null> => {
+  const choosePick = useCallback(async (startIn?: FileSystemHandle): Promise<FileSystemDirectoryHandle | null> => {
     if (!supported) return null;
     // `id` lets Chrome reopen the last-used card folder; readwrite so we can delete originals later.
-    const result = await showDirectoryPickerDialog({ mode, id: 'photo-card-import' });
+    const result = await showDirectoryPickerDialog({ mode, id: 'photo-card-import', startIn });
     if (!result.success || !result.data) return null; // cancelled or error — caller stays silent
     const dir = result.data;
     await saveHandle(IMPORT_FOLDER_KEY, dir, { expectedName: dir.name });

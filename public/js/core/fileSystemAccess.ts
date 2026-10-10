@@ -32,7 +32,8 @@ export interface FilePickerOptions {
 export interface DirectoryPickerOptions {
   id?: string;
   mode?: PermissionMode;
-  startIn?: FileSystemDirectoryHandle | 'desktop' | 'documents' | 'downloads';
+  /** A handle opens the dialog in that folder (a file's handle: in the folder holding it). */
+  startIn?: FileSystemHandle | 'desktop' | 'documents' | 'downloads';
 }
 
 /** Result of a file operation */
@@ -472,6 +473,35 @@ export async function navigateToDirectory(
       errorName: err.name
     };
   }
+}
+
+/**
+ * Where each handle sits under `dir`, as the path segments `resolve()` returns (the last
+ * is the entry's own name) — or null when ANY of them is not inside `dir`. A caller that
+ * will delete under `dir`'s read-write grant asks this BEFORE it starts: an entry from
+ * outside the folder can only be removed through its own handle, and for that Chrome
+ * asks "Save changes to <file>?" once per file.
+ */
+export async function locateWithin(
+  dir: FileSystemDirectoryHandle,
+  handles: FileSystemHandle[]
+): Promise<string[][] | null> {
+  const paths: string[][] = [];
+  for (const handle of handles) {
+    const segments = await dir.resolve(handle).catch(() => null);
+    if (!segments || segments.length === 0) return null;
+    paths.push(segments);
+  }
+  return paths;
+}
+
+/** Delete the entry at `segments` (as `locateWithin` returned them) under `dir`'s own grant. */
+export async function removeEntryAt(dir: FileSystemDirectoryHandle, segments: string[]): Promise<void> {
+  let parent = dir;
+  for (const part of segments.slice(0, -1)) {
+    parent = await parent.getDirectoryHandle(part);
+  }
+  await parent.removeEntry(segments[segments.length - 1]);
 }
 
 // ============================================================================
