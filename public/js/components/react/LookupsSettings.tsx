@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
@@ -51,7 +52,27 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
     const toast = useToast();
     const { data, isLoading: loading, isError } = useQuery(adminLookupTablesQuery());
     const { data: photoSlots } = useQuery(photoSlotsQuery());
-    const [expandedTable, setExpandedTable] = useState<string | null>(null);
+
+    // `?table=<key>` opens that table and brings it into view: a dropdown's right-click
+    // "Open in Settings" (useLookupManager) lands here on the dropdown's own table.
+    const [searchParams] = useSearchParams();
+    const linkedTable = searchParams.get('table');
+    const [expandedTable, setExpandedTable] = useState<string | null>(linkedTable);
+    // A different link while this tab is already open (Back from one table to another)
+    // opens the new one. Adjusted during render, keyed on the link, like the tab itself.
+    const [syncedLink, setSyncedLink] = useState(linkedTable);
+    if (linkedTable !== syncedLink) {
+        setSyncedLink(linkedTable);
+        if (linkedTable) setExpandedTable(linkedTable);
+    }
+    // Its title bar goes to the middle of the window: the tab bar above is sticky and
+    // as tall as its tabs wrap, so a row scrolled to the top lands underneath it.
+    const linkedHeaderRef = useRef<HTMLButtonElement | null>(null);
+    useEffect(() => {
+        if (loading || !linkedTable) return;
+        linkedHeaderRef.current?.focus({ preventScroll: true });
+        linkedHeaderRef.current?.scrollIntoView({ block: 'center' });
+    }, [loading, linkedTable]);
 
     useEffect(() => {
         if (isError) toast.error('Failed to load lookup tables configuration');
@@ -155,6 +176,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
             className={cn(styles.item, expandedTable === table.key && styles.expanded)}
         >
             <button
+                ref={table.key === linkedTable ? linkedHeaderRef : undefined}
                 className={styles.itemHeader}
                 onClick={() => toggleTable(table.key)}
                 type="button"

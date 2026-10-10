@@ -60,6 +60,7 @@
   },
   "lookups": {
     "editValues": "Edit values",
+    "openInSettings": "Open in Settings → Lookups",
     "manage": "Manage {{name}}",
     "manageValues": "Manage values",
     "loading": "Loading…",

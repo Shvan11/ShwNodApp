@@ -6,6 +6,7 @@
 
 import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useUnsavedRouteGuard } from '../../hooks/useUnsavedRouteGuard';
+import { useLookupManager } from '../../hooks/useLookupManager';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatNumber, parseFormattedNumber, formatLocaleDate } from '../../utils/formatters';
 import { formatISODate } from '../../core/utils';
@@ -121,6 +122,12 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
     // so each `data` is cast to its concrete row type.
     const { data: workTypesData } = useQuery(workTypesQuery());
     const { data: keywordsData } = useQuery(workKeywordsQuery());
+    // Right-click a Keyword dropdown → edit the keyword list here, or open it in
+    // Settings → Lookups (this page's unsaved-work guard asks before leaving).
+    const keywordLookup = useLookupManager({
+        tableKey: 'tblKeyWord',
+        invalidateKeys: [qk.lookups.workKeywords()],
+    });
     // Who a work can be attributed to: Doctor-position employees + anyone on commission
     // (FE-F7-1). It used to be `employees?percentage=true` — the commission flag alone —
     // which left salaried doctors and the Clinic pseudo-doctor out, and a salaried-only
@@ -1004,6 +1011,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                     <div className={styles.keywordsSection}>
                         <p className={styles.sectionHint}>
                             <i className="fas fa-info-circle" aria-hidden="true"></i> Select up to 5 keywords to categorize this work
+                            {keywordLookup.canManage && ' — right-click a list to add or rename keywords'}
                         </p>
                         <div className={styles.keywordsGrid}>
                             {([1, 2, 3, 4, 5] as const).map(num => {
@@ -1015,6 +1023,8 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                                     <select
                                         value={keywordValue}
                                         onChange={(e: ChangeEvent<HTMLSelectElement>) => setField(`keyword_id_${num}`, e.target.value)}
+                                        onContextMenu={keywordLookup.onContextMenu}
+                                        title={keywordLookup.canManage ? 'Right-click to edit this list' : undefined}
                                     >
                                         <option value="">Select Keyword</option>
                                         {keywords.map(kw => (
@@ -1027,6 +1037,7 @@ const NewWorkComponent = ({ personId, workId = null, onSave, onCancel }: NewWork
                             );
                             })}
                         </div>
+                        {keywordLookup.overlay}
                     </div>
                 </div>
 

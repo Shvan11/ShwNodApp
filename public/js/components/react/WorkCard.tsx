@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import cn from 'classnames';
@@ -36,6 +36,8 @@ interface WorkCardProps {
     writeFinance?: boolean;
     onToggleExpanded: () => void;
     onEdit: (work: Work) => void;
+    /** Opens the work's keywords dialog. Same gate as Edit (`editRecords`): it is a work update. */
+    onEditKeywords?: (work: Work) => void;
     onDelete: (work: Work) => void;
     onTransfer?: (work: Work) => void;
     onAddPayment: (work: Work) => void;
@@ -50,6 +52,9 @@ interface WorkCardProps {
     formatDate: (date: string | null) => string;
     formatCurrency: (amount: number | null, currency: string | null) => string;
 }
+
+/** Room the ⋮ menu keeps from the window's bottom edge before it opens upward instead. */
+const MENU_EDGE_PX = 8;
 
 /** Months of elapsed treatment against which an ortho work with no estimate is measured. */
 const TYPICAL_ORTHO_MONTHS = 18;
@@ -88,6 +93,7 @@ const WorkCard = ({
     writeFinance = false,
     onToggleExpanded,
     onEdit,
+    onEditKeywords,
     onDelete,
     onTransfer,
     onAddPayment,
@@ -135,9 +141,13 @@ const WorkCard = ({
         onToggleExpanded();
     };
 
-    // The ⋮ menu closes with its card: it used to stay open across a collapse and
-    // reappear on the next expand (FE-F7-16).
-    if (!isExpanded && showActions) setShowActions(false);
+    // The ⋮ menu closes when its card expands or collapses (FE-F7-16). Keyed on the
+    // change, not on "collapsed": the menu is offered on a collapsed card too.
+    const [menuExpandedState, setMenuExpandedState] = useState(isExpanded);
+    if (isExpanded !== menuExpandedState) {
+        setMenuExpandedState(isExpanded);
+        if (showActions) setShowActions(false);
+    }
 
     // Outside click and Escape close the menu; Escape hands focus back to its button.
     useEffect(() => {
@@ -163,6 +173,19 @@ const WorkCard = ({
     // between items (the menu took Tab only, which a `role="menu"` doesn't promise).
     useMenuFocus(dropdownRef, showActions);
 
+    // The menu opens upward when the window has no room for it below the ⋮ and more
+    // above: a collapsed card near the bottom of the screen would otherwise hang its
+    // last items off-screen. Measured before paint, so it never shows in the wrong place.
+    const [dropUp, setDropUp] = useState(false);
+    useLayoutEffect(() => {
+        const menu = dropdownRef.current;
+        const button = menuButtonRef.current;
+        if (!showActions || !menu || !button) return;
+        const anchor = button.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - anchor.bottom;
+        setDropUp(spaceBelow < menu.offsetHeight + MENU_EDGE_PX && anchor.top > spaceBelow);
+    }, [showActions]);
+
     const getStatusBadge = () => {
         if (work.status === WORK_STATUS.FINISHED) {
             return <span className={cn(styles.statusBadge, styles.statusBadgeCompleted)}>{t('card.statusCompleted')}</span>;
@@ -182,6 +205,9 @@ const WorkCard = ({
     const balance = workBalance(work);
     const progress = progressPercentage(work, today);
     const hasDuration = work.estimated_duration != null && work.estimated_duration > 0;
+    // Keyword names as the works read joined them, in column order.
+    const keywordNames = [work.Keyword1, work.Keyword2, work.Keyword3, work.Keyword4, work.Keyword5]
+        .filter((name): name is string => !!name);
 
     // The Clinic pseudo-doctor is a bucket, not a person: "Clinic", not "Dr. Clinic".
     const doctorLabel = !work.doctor_name
@@ -196,13 +222,25 @@ const WorkCard = ({
         return styles.active;
     };
 
+    // Every entry is a record write (editRecords) or Transfer (canTransfer), so the ⋮
+    // shows only when it would hold something.
+    const hasMenu = editRecords || (canTransfer && !!onTransfer);
+
     const runMenuAction = (action: (work: Work) => void) => {
         setShowActions(false);
         action(work);
     };
 
     return (
-        <div className={cn(styles.card, getCardClass(), isExpanded ? styles.expanded : styles.collapsed)}>
+        <div
+            className={cn(
+                styles.card,
+                getCardClass(),
+                isExpanded ? styles.expanded : styles.collapsed,
+                hasMenu && styles.hasActions,
+                showActions && styles.menuOpen,
+            )}
+        >
             {/* Minimal Header - Always Visible */}
             <div
                 className={styles.collapsedHeader}
@@ -230,13 +268,35 @@ const WorkCard = ({
                                 <i className="fas fa-exclamation-circle" aria-hidden="true"></i> {t('card.balance', { amount: formatCurrency(balance.remaining, work.currency) })}
                             </span>
                         )}
+                        {/* Collapsed: the keywords share this line as one pill, cut with "…" when
+                            long (all of them on hover), so a card with keywords is no taller than
+                            one without — a patient's cards line up. */}
+                        {!isExpanded && keywordNames.length > 0 && (
+                            <span className={styles.keywordsInline} title={keywordNames.join(', ')}>
+                                <i className="fas fa-tags" aria-hidden="true"></i>
+                                <span className={styles.keywordsInlineText}>{keywordNames.join(', ')}</span>
+                            </span>
+                        )}
                     </div>
+                    {/* Expanded: every keyword as its own tag. Plain spans, not a list: this
+                        header is a `role="button"`, whose children are presentational, so the
+                        names are read as its text. */}
+                    {isExpanded && keywordNames.length > 0 && (
+                        <div className={styles.keywords}>
+                            {keywordNames.map((name, i) => (
+                                // By position: a work may carry the same keyword twice.
+                                <span key={i} className={styles.keyword}>
+                                    <i className="fas fa-tag" aria-hidden="true"></i> {name}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Actions Menu - Show when expanded, and only when it would hold something:
-                every entry is a record write (editRecords) or Transfer (canTransfer). */}
-            {isExpanded && (editRecords || (canTransfer && onTransfer)) && (
+            {/* Actions Menu — on collapsed cards too, so Edit Keywords, Transfer and the
+                status changes need no expand first. */}
+            {hasMenu && (
                 <div className={styles.actionsMenu} ref={menuRef}>
                     <button
                         type="button"
@@ -256,7 +316,7 @@ const WorkCard = ({
                     </button>
                     {showActions && (
                         <div
-                            className={styles.dropdown}
+                            className={cn(styles.dropdown, dropUp && styles.dropUp)}
                             id={menuId}
                             ref={dropdownRef}
                             role="menu"
@@ -267,6 +327,11 @@ const WorkCard = ({
                             {editRecords && (
                                 <button type="button" role="menuitem" onClick={() => runMenuAction(onEdit)}>
                                     <i className="fas fa-edit" aria-hidden="true"></i> {t('card.editWork')}
+                                </button>
+                            )}
+                            {editRecords && onEditKeywords && (
+                                <button type="button" role="menuitem" onClick={() => runMenuAction(onEditKeywords)}>
+                                    <i className="fas fa-tags" aria-hidden="true"></i> {t('card.editKeywords')}
                                 </button>
                             )}
                             {canTransfer && onTransfer && (

@@ -60,6 +60,7 @@
   },
   "lookups": {
     "editValues": "تعديل القيم",
+    "openInSettings": "فتح في الإعدادات ← الجداول المرجعية",
     "manage": "إدارة {{name}}",
     "manageValues": "إدارة القيم",
     "loading": "جارٍ التحميل…",

@@ -68,7 +68,8 @@
     "failDelete": "Failed to delete work",
     "transferred": "Work transferred successfully to another patient",
     "paymentAdded": "Payment added successfully!",
-    "submittedForApproval": "Submitted for admin approval"
+    "submittedForApproval": "Submitted for admin approval",
+    "keywordsSaved": "Keywords saved"
   },
   "deleteDeps": {
     "header": "⚠️ CANNOT DELETE WORK - EXISTING RECORDS FOUND ⚠️",
@@ -139,6 +140,7 @@
     "balance": "Balance: {{amount}}",
     "moreActions": "More actions",
     "editWork": "Edit Work",
+    "editKeywords": "Edit Keywords",
     "transferWork": "Transfer Work",
     "markComplete": "Mark Complete",
     "markDiscontinued": "Mark Discontinued",
@@ -211,5 +213,21 @@
     "conflict": "The target patient already has an active work",
     "notFound": "The work or the patient was not found",
     "failed": "Transfer failed"
+  },
+  "keywords": {
+    "title": "Keywords",
+    "none": "This work has no keywords yet.",
+    "assigned": "Keywords on this work",
+    "remove": "Remove {{name}}",
+    "add": "Add a keyword",
+    "count": "{{n}} of {{max}}",
+    "choose": "Choose a keyword…",
+    "loading": "Loading…",
+    "full": "All {{max}} used — remove one first",
+    "unnamed": "Keyword #{{id}}",
+    "rightClickHint": "Right-click the list to add, rename or delete keywords.",
+    "save": "Save",
+    "saving": "Saving…",
+    "failed": "Failed to save keywords"
   }
 }

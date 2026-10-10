@@ -80,6 +80,8 @@
 
 .titleSection {
     flex: 1;
+    /* Lets the meta line shrink (and a collapsed card's keyword pill cut) inside it. */
+    min-width: 0;
 }
 
 .title {
@@ -146,6 +148,68 @@
     color: var(--text-secondary);
 }
 
+/* Keywords (set from the ⋮ menu's Edit Keywords). A collapsed card shows them as one
+   pill on its meta line, which never wraps: the pill shrinks and ends in "…" instead,
+   so every collapsed card is the same height with or without keywords. */
+.collapsed .metaMinimal {
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+.collapsed .metaMinimal > span {
+    flex-shrink: 0;
+}
+
+.collapsed .metaMinimal .keywordsInline {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 24rem;
+    padding: 0 var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: var(--indigo-100);
+    color: var(--indigo-700);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+}
+
+.metaMinimal .keywordsInline i {
+    color: inherit;
+}
+
+/* Block, not the meta line's flex span: an ellipsis needs a block box to cut. */
+.metaMinimal .keywordsInlineText {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* An expanded card lists every keyword as its own tag, under the meta line. */
+.keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-xs);
+    margin-left: 1.375rem;
+}
+
+.keyword {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 0.125rem var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: var(--indigo-100);
+    color: var(--indigo-700);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+}
+
+.keyword i {
+    font-size: 0.65rem;
+}
+
 /* Full Content - Only When Expanded */
 .fullContent {
     position: relative;
@@ -174,6 +238,23 @@
     z-index: var(--z-index-dropdown);
 }
 
+/* A collapsed card is short: line the ⋮ up with its title row. */
+.collapsed .actionsMenu {
+    top: var(--spacing-sm);
+}
+
+/* The header's text stops short of the ⋮ instead of running under it. */
+.hasActions .collapsedHeader {
+    padding-inline-end: 2.5rem;
+}
+
+/* An open menu hangs below a collapsed card, over the cards after it. Those come
+   later in the page and would paint on top (a completed or discontinued card's
+   `filter` also traps the menu's own z-index inside the card), so the card rises. */
+.menuOpen {
+    z-index: var(--z-index-dropdown);
+}
+
 .dropdown {
     position: absolute;
     right: 0;
@@ -185,6 +266,13 @@
     z-index: var(--z-index-dropdown);
     overflow: hidden;
     margin-top: var(--spacing-xs);
+}
+
+.dropUp {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: var(--spacing-xs);
 }
 
 .dropdown button {
@@ -199,6 +287,8 @@
     cursor: pointer;
     font-size: var(--font-size-sm);
     text-align: left;
+    /* The menu widens to its longest label (Arabic "Edit Keywords" wrapped). */
+    white-space: nowrap;
     transition: background 0.2s;
 }
 
@@ -373,6 +463,12 @@
 @media (max-width: 768px) {
     .expanded {
         padding: var(--spacing-md);
+    }
+
+    /* The meta line stacks here, so a pill would be a line of its own: a collapsed
+       card leaves its keywords to the expanded view. */
+    .collapsed .metaMinimal .keywordsInline {
+        display: none;
     }
 
     .financial {

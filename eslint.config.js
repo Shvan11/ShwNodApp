@@ -336,6 +336,7 @@ export default [
       'public/js/components/react/PatientAppointments.tsx',
       'public/js/components/react/PaymentModal.tsx',
       'public/js/components/react/TransferWorkModal.tsx',
+      'public/js/components/react/WorkKeywordsModal.tsx',
       'public/js/components/react/Navigation.tsx',
       'public/js/components/react/AddPatientForm.tsx',
       'public/js/components/react/EditPatientComponent.tsx',

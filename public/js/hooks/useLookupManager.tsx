@@ -14,12 +14,18 @@
  *   <select onContextMenu={lab.onContextMenu}>…</select>
  *   {lab.overlay}
  *
+ * The menu's second item leaves the screen for the same table in Settings → Lookups
+ * (`/settings/lookups?table=<key>`, which opens that table's row). The first edits in
+ * place and keeps whatever the form around the dropdown holds; the second is for when
+ * the user wants the full page.
+ *
  * Returning JSX from a hook keeps the call site from having to thread menu/modal
  * state by hand; the React Compiler memoizes it, so no manual useCallback/useMemo
  * (per the project convention).
  */
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { QueryKey } from '@tanstack/react-query';
@@ -63,6 +69,7 @@ export function useLookupManager({
   onChanged,
 }: UseLookupManagerOptions): UseLookupManagerResult {
   const { t } = useTranslation('common');
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -94,6 +101,15 @@ export function useLookupManager({
       onClick: () => {
         setMenuPos(null);
         setIsModalOpen(true);
+      },
+    },
+    {
+      key: 'settings',
+      label: t('lookups.openInSettings'),
+      icon: 'fa-external-link-alt',
+      onClick: () => {
+        setMenuPos(null);
+        navigate(`/settings/lookups?table=${encodeURIComponent(tableKey)}`);
       },
     },
   ];

@@ -1,0 +1,164 @@
+/* WorkKeywordsModal — the keywords of one work, from its card's ⋮ menu. */
+
+.modalContent {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    max-width: 460px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.modalBody {
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.empty {
+    margin: 0 0 var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+/* Assigned keywords */
+.tags {
+    list-style: none;
+    margin: 0 0 var(--spacing-sm);
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-xs) var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-full);
+    background: var(--indigo-100);
+    color: var(--indigo-700);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.tagRemove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: inherit;
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+}
+
+.tagRemove:hover {
+    background: var(--indigo-200);
+}
+
+.tagRemove:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
+}
+
+/* Add a keyword */
+.addLabel {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+}
+
+.count {
+    font-weight: var(--font-weight-normal);
+    color: var(--text-secondary);
+}
+
+.select {
+    display: block;
+    width: 100%;
+    height: var(--input-height-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    background-color: var(--surface);
+    border: var(--border-width-thin) solid var(--gray-300);
+    border-radius: var(--radius-md);
+}
+
+.select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-focus);
+}
+
+.hint {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+/* Footer */
+.modalFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+
+.btnSecondary,
+.btnPrimary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btnSecondary {
+    background: var(--surface);
+    border: 1px solid var(--gray-300);
+    color: var(--text-secondary);
+}
+
+.btnSecondary:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+}
+
+.btnPrimary {
+    background: var(--primary-fill);
+    border: 1px solid var(--primary-fill);
+    color: var(--color-white);
+}
+
+.btnPrimary:hover:not(:disabled) {
+    background: var(--primary-fill-hover);
+    border-color: var(--primary-fill-hover);
+}
+
+/* Disabled by a fill change, not opacity (text under 4.5:1 otherwise). */
+.btnPrimary:disabled {
+    background: var(--gray-200);
+    border-color: var(--gray-200);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}

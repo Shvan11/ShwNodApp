@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import WorkCard, { type Work } from './WorkCard';
 import PaymentModal from './PaymentModal';
 import TransferWorkModal from './TransferWorkModal';
+import WorkKeywordsModal from './WorkKeywordsModal';
 import Modal from './Modal';
 import ModalHeader from './ModalHeader';
 import { formatCurrency as formatCurrencyUtil } from '../../utils/formatters';
@@ -164,6 +165,9 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [workToTransfer, setWorkToTransfer] = useState<Work | null>(null);
 
+    // The work whose keywords dialog is open (from the card's ⋮ menu).
+    const [keywordsWork, setKeywordsWork] = useState<Work | null>(null);
+
     // Auto-expand the first active work once per patient, when their works first load.
     // Done during render (adjust-state-during-render) so the React Compiler can optimize
     // it. It used to key on the works-data identity, so every refetch that changed data
@@ -212,6 +216,19 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
 
     const handleEditWork = (work: Work) => {
         navigate(`/patient/${personId}/new-work?workId=${work.work_id}`);
+    };
+
+    const handleKeywordsSaved = (workId: number, outcome: 'applied' | 'pending') => {
+        setKeywordsWork(null);
+        if (outcome === 'pending') {
+            toast.success(t('toast.submittedForApproval'));
+            void invalidateApprovals();
+            return;
+        }
+        // The tags come with the works list; the work's own reads carry them too.
+        void queryClient.invalidateQueries({ queryKey: qk.patient.works(personId ?? '') });
+        void queryClient.invalidateQueries({ queryKey: qk.work.all(workId) });
+        toast.success(t('toast.keywordsSaved'));
     };
 
     // Show confirmation modal for work status changes
@@ -392,12 +409,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
         toast.success(t('toast.transferred'));
     };
 
-    // The search box matches the work type as well as the notes and the doctor (FE-F7-16).
+    // The search box matches the work type as well as the notes, the doctor (FE-F7-16)
+    // and the keywords the card shows.
     const needle = searchTerm.trim().toLowerCase();
     const filteredWorks = works
         .filter(work => {
             const matchesSearch = !needle ||
-                [work.type_name, work.notes, work.doctor_name].some(v => v?.toLowerCase().includes(needle));
+                [work.type_name, work.notes, work.doctor_name, work.Keyword1, work.Keyword2, work.Keyword3, work.Keyword4, work.Keyword5]
+                    .some(v => v?.toLowerCase().includes(needle));
 
             const matchesFilter = filterStatus === 'all' ||
                 (filterStatus === 'active' && work.status === WORK_STATUS.ACTIVE) ||
@@ -620,6 +639,7 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                         writeFinance={caps.writeFinance}
                         onToggleExpanded={() => toggleWorkExpanded(work.work_id)}
                         onEdit={handleEditWork}
+                        onEditKeywords={setKeywordsWork}
                         onDelete={handleDeleteWork}
                         onTransfer={handleTransferWork}
                         onAddPayment={handleAddPayment}
@@ -913,6 +933,14 @@ const WorkComponent = ({ personId }: WorkComponentProps) => {
                     </Modal>
                 );
             })()}
+
+            {keywordsWork && (
+                <WorkKeywordsModal
+                    work={keywordsWork}
+                    onClose={() => setKeywordsWork(null)}
+                    onSaved={(outcome) => handleKeywordsSaved(keywordsWork.work_id, outcome)}
+                />
+            )}
 
             {/* Transfer Work Modal (Admin Only) */}
             {showTransferModal && workToTransfer && (
