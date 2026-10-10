@@ -43,6 +43,17 @@ export function patientPath(personId: string | number, rel: string): string {
   return clinicPath(`${personId}/${rel}`);
 }
 
+/**
+ * A fresh soft-delete folder for one patient, `clinic1/.trash/{personId}/{timestamp}`
+ * (not created). Everything the app deletes recoverably lands in one: the Files page's
+ * Delete, a photo session's originals, an image of the working gallery. Same volume as
+ * both the patient folders and `working/`, so moving in is an atomic rename.
+ */
+export function newTrashDir(personId: string | number): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return clinicPath(`.trash/${personId}/${stamp}`);
+}
+
 // ── The flat Dolphin "working" gallery (`clinic1/working`) ────────────────────
 // Shared, patient-agnostic folder of rendered `.iNN` view images named
 // `{personId}{tpCode as two digits}.{view}` (e.g. `688201.i12`), served as `/DolImgs/<name>`.

@@ -2,7 +2,8 @@
  * 3×3 slot grid (logo in the centre). Each view cell is a drop zone for a
  * sidebar thumbnail and hosts the SlotCanvas + per-slot toolbar. Clicking a cell
  * makes it the active (editable) slot; double-clicking a saved one continues
- * editing it. Each cell's title bar carries its status — what Save would do.
+ * editing it — or, when its original is gone, re-crops the saved photo itself. Each
+ * cell's title bar carries its status — what Save would do.
  */
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -186,11 +187,13 @@ const SlotGrid = ({
             }}
             onClick={(e) => activate(view, e)}
             onDoubleClick={() => {
+              if (slot.sourceRelPath) return;
               // A saved view whose framing was recorded: reopen it where it was left.
-              if (!slot.sourceRelPath && slot.canContinue) {
-                editor.continueEditing(view);
-                onActivate(view);
-              }
+              // One whose original is gone: frame the saved photo itself.
+              if (slot.canContinue) editor.continueEditing(view);
+              else if (!slot.canReEdit && slot.savedName) editor.recropSaved(view);
+              else return;
+              onActivate(view);
             }}
             onKeyDown={(e) => {
               // Only the cell itself: keys inside the cropper/toolbar are theirs.
@@ -292,6 +295,18 @@ const SlotGrid = ({
                   }
             );
           } else if (slot.savedImageUrl) {
+            // Needs no original: the way to re-crop a view whose original is gone.
+            if (slot.savedName) {
+              items.push({
+                key: 'recrop',
+                label: 'Recrop the saved photo',
+                icon: 'fa-crop-simple',
+                onClick: () => {
+                  editor.recropSaved(menu.view);
+                  onActivate(menu.view);
+                },
+              });
+            }
             items.push({
               key: 'remove',
               label: 'Remove',
@@ -302,7 +317,7 @@ const SlotGrid = ({
             if (!slot.canReEdit) {
               items.push({
                 key: 'hint',
-                label: 'Original missing — drag one to redo',
+                label: 'Original missing — drag one in to start over',
                 icon: 'fa-circle-info',
                 disabled: true,
                 onClick: () => undefined,

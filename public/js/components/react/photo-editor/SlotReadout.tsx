@@ -7,7 +7,8 @@
  *
  * Resolution: a saved view keeps the crop's native pixels. Framing against the 2048 px
  * proxy (the default), the loaded media is not the original, so the original's size is
- * read from the server (`sourceSizeQuery`); in Original mode the loaded media is it.
+ * read from the server (`sourceSizeQuery`); in Original mode the loaded media is it. A
+ * re-crop of the saved photo already knows its source's size: the saved photo's.
  */
 import { useQuery } from '@tanstack/react-query';
 import { sourceSizeQuery } from '@/query/queries';
@@ -45,7 +46,7 @@ const SlotReadout = ({ personId, slot, proxyMode, onResetZoom, onResetRotation }
   const live = !!slot?.sourceRelPath;
   const sizeQ = useQuery({
     ...sourceSizeQuery(personId, slot?.sourceRelPath ?? '', slot?.sourceVersion ?? null),
-    enabled: live && proxyMode,
+    enabled: live && proxyMode && !slot?.sourceFromSaved,
     retry: false,
   });
 
@@ -55,8 +56,8 @@ const SlotReadout = ({ personId, slot, proxyMode, onResetZoom, onResetRotation }
   if (live) {
     const area: FramingArea | null = slot.croppedArea;
     // The original's own size: the loaded media in Original mode, the server's answer
-    // for the proxy.
-    const source = proxyMode ? (sizeQ.data ?? null) : slot.mediaSize;
+    // for the proxy (the saved photo's size, for a re-crop of it).
+    const source = !proxyMode ? slot.mediaSize : slot.sourceFromSaved ? slot.savedSize : (sizeQ.data ?? null);
     values = {
       zoom: slot.zoom,
       rotation: slot.rotation,

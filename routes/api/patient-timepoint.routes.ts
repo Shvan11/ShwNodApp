@@ -29,7 +29,7 @@ import {
 } from '../../services/database/queries/native-timepoint-queries.js';
 import { updatePhotoDate } from '../../services/database/queries/photo-session-queries.js';
 import {
-  deleteWorkingFilesForTimepoint,
+  trashWorkingFilesForTimepoint,
   timepointFolderName,
 } from '../../services/imaging/photo-cleanup.service.js';
 import {
@@ -235,13 +235,14 @@ router.put(
 );
 
 /**
- * Delete a time point and all of its on-disk artifacts (permanent).
+ * Delete a time point and its on-disk artifacts.
  * DELETE /patients/:personId/timepoints/:tpCode
  *
  * DB delete is authoritative (cascades to time_point_images; clears the
- * session's private_photos marks). Filesystem cleanup — the rendered working/
- * files, and for scope 'all' moving the originals folder to `.trash` — is
- * best-effort so a missing file/folder never fails the request.
+ * session's private_photos marks). Filesystem cleanup — moving the working/ slot
+ * files (each image with Dolphin's original of it) to `.trash`, and for scope 'all'
+ * the originals folder too — is best-effort so a missing file/folder never fails
+ * the request.
  */
 router.delete(
   '/patients/:personId/timepoints/:tpCode',
@@ -256,10 +257,11 @@ router.delete(
         return;
       }
 
-      // Scope controls how much is removed:
-      //   'cropped' — only the rendered working/ files (keep DB entry + originals folder)
-      //   'entry'   — working/ files + DB time-point row (keep originals folder)
-      //   'all'     — working/ files + DB row + originals folder (to the trash)
+      // Scope controls how much is removed (working/ files go to the trash in pairs:
+      // each image with Dolphin's `.vNN` original of it):
+      //   'cropped' — the 8 views' working/ files (keep DB entry, X-rays + originals folder)
+      //   'entry'   — every slot's working/ files + DB time-point row (keep originals folder)
+      //   'all'     — every slot's working/ files + DB row + originals folder (to the trash)
       const scope = String(req.query.scope ?? 'all');
       if (scope !== 'all' && scope !== 'entry' && scope !== 'cropped') {
         ErrorResponses.badRequest(res, "Invalid scope (expected 'all', 'entry', or 'cropped')");
@@ -272,8 +274,10 @@ router.delete(
         return;
       }
 
-      // Always remove the rendered (cropped) working files for this time point.
-      await deleteWorkingFilesForTimepoint(personId, tpCode);
+      // Always move this time point's working files to the trash: the 8 views for a
+      // cropped-only delete, every slot when the session itself goes (an image left
+      // under its code would turn up in the next session given that code).
+      await trashWorkingFilesForTimepoint(personId, tpCode, scope === 'cropped' ? 'views' : 'all');
 
       // Remove the DB entry unless we're only clearing cropped photos.
       if (scope === 'all' || scope === 'entry') {

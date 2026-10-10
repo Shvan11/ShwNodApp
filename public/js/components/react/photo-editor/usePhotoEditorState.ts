@@ -10,11 +10,13 @@
 import { useReducer } from 'react';
 import type { CropArea, FramingArea, PhotoViewCode, SlotFraming, SlotHydration, SlotMap, SlotState } from './photoEditorTypes';
 import { EMPTY_HYDRATION, aspectForView, defaultFlipV, makeInitialSlot, makeInitialSlots, VIEW_CODES } from './photoEditorTypes';
-import { areaToPixels, framingOf } from './framing';
+import { areaToPixels, coverArea, framingOf } from './framing';
 
 type Action =
   | { type: 'PLACE'; view: PhotoViewCode; sourceRelPath: string; sourceName: string; sourceVersion: string | null }
   | { type: 'CONTINUE'; view: PhotoViewCode }
+  | { type: 'RECROP_SAVED'; view: PhotoViewCode }
+  | { type: 'RECROP'; view: PhotoViewCode }
   | { type: 'DISCARD'; view: PhotoViewCode }
   | { type: 'CLEAR'; view: PhotoViewCode }
   | { type: 'RESET'; view: PhotoViewCode }
@@ -32,6 +34,8 @@ function savedHalf(s: SlotState): SlotHydration {
   return {
     savedImageUrl: s.savedImageUrl,
     savedSize: s.savedSize,
+    savedName: s.savedName,
+    savedVersion: s.savedVersion,
     savedFraming: s.savedFraming,
     canReEdit: s.canReEdit,
     canContinue: s.canContinue,
@@ -42,13 +46,29 @@ function savedHalf(s: SlotState): SlotHydration {
 }
 
 /**
+ * The saved photo as it is: unturned, in the largest frame of the view's aspect (all of
+ * it, unless Dolphin rendered it a little off that aspect). A re-crop of the saved photo
+ * starts here and resets here — not at the default framing, whose occlusal flip the
+ * saved photo already carries.
+ */
+function savedAsIs(s: SlotState): SlotFraming {
+  return {
+    rotation: 0,
+    flipH: false,
+    flipV: false,
+    zoom: 1,
+    area: coverArea(s.savedSize ?? { width: 0, height: 0 }, aspectForView(s.view)),
+  };
+}
+
+/**
  * A live edit of `source`, starting at `framing` (null = the default framing), over
  * `s`'s saved half. The cropper remounts (framingKey), so its first media load reports
  * the new photo's size and frame — and applies `framing`, held as pending until then.
  */
 function startEdit(
   s: SlotState,
-  source: { relPath: string; name: string; version: string | null },
+  source: { relPath: string; name: string; version: string | null; fromSaved?: boolean },
   framing: SlotFraming | null,
   baseline: SlotFraming | null
 ): SlotState {
@@ -58,6 +78,7 @@ function startEdit(
     sourceRelPath: source.relPath,
     sourceName: source.name,
     sourceVersion: source.version,
+    sourceFromSaved: !!source.fromSaved,
     ...(framing
       ? { rotation: framing.rotation, flipH: framing.flipH, flipV: framing.flipV, zoom: framing.zoom }
       : {}),
@@ -114,6 +135,26 @@ export function slotsReducer(state: SlotMap, action: Action): SlotMap {
         )
       );
     }
+    case 'RECROP_SAVED': {
+      // Frame the saved photo itself — the way to re-crop a view whose original is
+      // gone. Opened as it is, it is no change until it is moved.
+      if (!slot.savedName) return state;
+      const asIs = savedAsIs(slot);
+      return put(
+        startEdit(
+          slot,
+          { relPath: slot.savedName, name: slot.savedName, version: slot.savedVersion, fromSaved: true },
+          asIs,
+          asIs
+        )
+      );
+    }
+    case 'RECROP':
+      // "Re-crop" from the photos grid: the saved view in its cropper, framed as it is
+      // now — over its original when the save recorded that framing (which keeps the
+      // most of the picture), else over the saved photo itself. Never over a live edit.
+      if (slot.sourceRelPath) return state;
+      return slotsReducer(state, { type: slot.canContinue ? 'CONTINUE' : 'RECROP_SAVED', view: action.view });
     case 'DISCARD':
       // Drop the live edit only: a saved photo underneath shows again.
       return put({ ...makeInitialSlot(action.view), ...savedHalf(slot), framingKey: slot.framingKey });
@@ -184,6 +225,10 @@ export interface PhotoEditorState {
   place: (view: PhotoViewCode, sourceRelPath: string, sourceName: string, sourceVersion: string | null) => void;
   /** Reopen a saved view's original with the framing it was saved with. */
   continueEditing: (view: PhotoViewCode) => void;
+  /** Frame the saved photo itself (no original needed); Save re-crops it in place. */
+  recropSaved: (view: PhotoViewCode) => void;
+  /** Reopen a saved view framed as it is now: Continue editing when it can, else recropSaved. */
+  recrop: (view: PhotoViewCode) => void;
   /** Drop the live edit; a saved photo underneath shows again. */
   discard: (view: PhotoViewCode) => void;
   /** Empty the slot entirely (after its saved photo was removed on the server). */
@@ -207,6 +252,8 @@ export function usePhotoEditorState(): PhotoEditorState {
     place: (view, sourceRelPath, sourceName, sourceVersion) =>
       dispatch({ type: 'PLACE', view, sourceRelPath, sourceName, sourceVersion }),
     continueEditing: (view) => dispatch({ type: 'CONTINUE', view }),
+    recropSaved: (view) => dispatch({ type: 'RECROP_SAVED', view }),
+    recrop: (view) => dispatch({ type: 'RECROP', view }),
     discard: (view) => dispatch({ type: 'DISCARD', view }),
     clear: (view) => dispatch({ type: 'CLEAR', view }),
     reset: (view) => dispatch({ type: 'RESET', view }),

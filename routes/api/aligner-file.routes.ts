@@ -28,8 +28,11 @@ import {
 import driveUploadService from '../../services/google-drive/drive-upload.js';
 import {
   listPhotosForSet,
+  readPhotoForSet,
   deletePhotoForSet,
+  isR2Configured,
   PhotoOwnershipError,
+  PhotoNotFoundError,
 } from '../../services/imaging/aligner-photo.service.js';
 import { timeouts } from '../../middleware/timeout.js';
 import {
@@ -156,6 +159,55 @@ router.get(
     } catch (error) {
       log.error('Error listing R2 photos:', error);
       ErrorResponses.internalError(res, 'Failed to retrieve set photos', error as Error);
+    }
+  }
+);
+
+/**
+ * One attachment's bytes, same-origin (the 3D scan viewer). The browser can't read
+ * the presigned R2 URL itself: the bucket's CORS admits only the doctor portal.
+ * Same gate as the list — whoever can list a set's files can already download them.
+ */
+router.get(
+  '/aligner/sets/:setId/photos/content',
+  validate({ params: contract.photoContent.params, query: contract.photoContent.query }),
+  async (
+    req: Request<{ setId: string }, unknown, unknown, contract.PhotoContentQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const setId = parseInt(req.params.setId, 10);
+      if (!Number.isInteger(setId) || setId <= 0) {
+        ErrorResponses.badRequest(res, 'Invalid aligner set ID');
+        return;
+      }
+      if (!isR2Configured()) {
+        ErrorResponses.notFound(res, 'Portal file');
+        return;
+      }
+
+      const { bytes, fileName } = await readPhotoForSet(setId, req.query.path);
+      log.info('[Aligner] portal file read', { userId: req.session?.userId, setId, path: req.query.path });
+
+      // `attachment` keeps a doctor-uploaded file from ever rendering inline on this
+      // origin; the octet-stream type is set after it (attachment() types by extension).
+      res.attachment(fileName);
+      res.type('application/octet-stream');
+      // Private (PHI), and safe to keep a day: portal keys are write-once — the name
+      // carries the upload's millisecond timestamp, so new bytes mean a new key.
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      res.send(bytes);
+    } catch (error) {
+      if (error instanceof PhotoOwnershipError) {
+        ErrorResponses.forbidden(res, error.message);
+        return;
+      }
+      if (error instanceof PhotoNotFoundError) {
+        ErrorResponses.notFound(res, 'Portal file');
+        return;
+      }
+      log.error('Error reading R2 photo:', error);
+      ErrorResponses.internalError(res, 'Failed to read the file', error as Error);
     }
   }
 );

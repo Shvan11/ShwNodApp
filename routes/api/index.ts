@@ -68,6 +68,7 @@ import holidayRoutes from './holiday.routes.js';
 import videoRoutes from './video.routes.js';
 import standRoutes from './stand.routes.js';
 import fileExplorerRoutes from './file-explorer.routes.js';
+import photoSlotRoutes from './photo-slot.routes.js';
 import slideshowRoutes from './slideshow.routes.js';
 import localsendRoutes from './localsend.routes.js';
 import telegramRoutes from './telegram.routes.js';
@@ -116,6 +117,7 @@ router.use('/', patientTimepointRoutes);     // Time points, gallery, X-ray
 router.use('/', alertRoutes);                // Patient alerts / header tasks
 router.use('/', patientPortalAdminRoutes);   // Staff-side portal access + photo privacy
 router.use('/', fileExplorerRoutes);  // Per-patient file explorer (/patients/:id/files*)
+router.use('/', photoSlotRoutes);     // The clinic's names for Dolphin's extra photo slots (/photo-slots*)
 router.use('/', slideshowRoutes);     // Saved slideshow configurations (/slideshow-configs*)
 router.use('/', appointmentRoutes);   // Appointment scheduling
 router.use('/', chairDisplayRoutes);  // Chair-side public display events

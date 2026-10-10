@@ -59,6 +59,24 @@ export function areaToPixels(area: FramingArea, natural: Size, rotation: number,
   };
 }
 
+/**
+ * The largest frame of `aspect` inside a `photo`-sized picture, centred — where the
+ * cropper's cover fit puts its frame at zoom 1. How a saved photo looks in its slot as
+ * it is: one rendered here already has the view's aspect (the whole photo), one Dolphin
+ * rendered is often a little off it (a Rest of 3811×4443 against 13:15), and a frame of
+ * the whole of that could never be applied, so opening it read as a change.
+ */
+export function coverArea(photo: Size, aspect: number): FramingArea {
+  if (!(photo.width > 0 && photo.height > 0 && aspect > 0)) return { x: 0, y: 0, width: 100, height: 100 };
+  const photoAspect = photo.width / photo.height;
+  if (photoAspect > aspect) {
+    const width = (aspect / photoAspect) * 100;
+    return { x: (100 - width) / 2, y: 0, width, height: 100 };
+  }
+  const height = (photoAspect / aspect) * 100;
+  return { x: 0, y: (100 - height) / 2, width: 100, height };
+}
+
 /** A 0–359 rotation as the signed turn a person means by it: 350 → −10. */
 export function signedDegrees(rotation: number): number {
   const deg = Math.round(rotation);

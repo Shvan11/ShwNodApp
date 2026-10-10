@@ -3,9 +3,9 @@
  * or a tile's ⋯ button opens, like a desktop file manager's context menu.
  *
  * On entries it offers Open, Download, Share, Cut, Copy, Move to…, Copy to…,
- * Rename (and, on a folder, Rename to existing timepoint…) and Delete; on the
- * folder's empty space, New folder, Paste, Upload and
- * Refresh. Several entries (a right-click on part of the selection) get only what
+ * Rename (and, on a folder, Rename to existing timepoint…), Delete and Properties;
+ * on the folder's empty space, New folder, Paste, Upload, Refresh and the folder's
+ * Properties. Several entries (a right-click on part of the selection) get only what
  * applies to many. Portaled to <body> and fixed-positioned so the virtualized
  * list's overflow can't clip it; focus, arrows, Escape and viewport clamping are
  * `useFloatingMenu`'s.
@@ -29,7 +29,8 @@ export type FileAction =
   | 'paste'
   | 'newFolder'
   | 'upload'
-  | 'refresh';
+  | 'refresh'
+  | 'properties';
 
 interface Props {
   anchor: MenuAnchor;
@@ -102,6 +103,7 @@ const FileActionsMenu = ({
         })}
         <div className={styles.menuDivider} role="separator" />
         {item('refresh', 'fa-rotate-right', 'Refresh')}
+        {item('properties', 'fa-circle-info', 'Properties')}
       </>
     );
   } else {
@@ -135,6 +137,12 @@ const FileActionsMenu = ({
         {single && item('rename', 'fa-pen', 'Rename')}
         {single?.type === 'dir' && item('renameToTimepoint', 'fa-camera', 'Rename to existing timepoint…')}
         {item('delete', 'fa-trash-can', `Delete${what}`, { danger: true })}
+        {single && (
+          <>
+            <div className={styles.menuDivider} role="separator" />
+            {item('properties', 'fa-circle-info', 'Properties')}
+          </>
+        )}
       </>
     );
   }

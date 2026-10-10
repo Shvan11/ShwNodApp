@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { slotsReducer } from './usePhotoEditorState';
-import { EMPTY_HYDRATION, makeInitialSlots, type SavedFraming, type SlotHydration, type SlotMap } from './photoEditorTypes';
-import { isSlotDirty } from './framing';
+import {
+  EMPTY_HYDRATION,
+  aspectForView,
+  makeInitialSlots,
+  type SavedFraming,
+  type SlotHydration,
+  type SlotMap,
+} from './photoEditorTypes';
+import { coverArea, isSlotDirty } from './framing';
 
 const saved: SavedFraming = {
   v: 1,
@@ -17,6 +24,8 @@ const hydration: SlotHydration = {
   ...EMPTY_HYDRATION,
   savedImageUrl: '/api/patients/7/working-files/content?name=7012.i12',
   savedSize: { width: 2000, height: 2308 },
+  savedName: '7012.i12',
+  savedVersion: '1759309200000',
   savedFraming: saved,
   canReEdit: true,
   canContinue: true,
@@ -156,5 +165,110 @@ describe('slotsReducer — Reset framing', () => {
     expect(r.i12.pendingFraming?.area).toEqual(saved.area);
     expect(r.i12.croppedArea).toEqual(saved.area);
     expect(isSlotDirty(r.i12)).toBe(false);
+  });
+});
+
+describe('slotsReducer — Recrop the saved photo (no original needed)', () => {
+  // An occlusal view saved by Dolphin: no original, no recorded framing.
+  const orphan: SlotHydration = {
+    ...EMPTY_HYDRATION,
+    savedImageUrl: '/api/patients/7/working-files/content?name=7012.i23',
+    savedSize: { width: 3000, height: 2077 },
+    savedName: '7012.i23',
+    savedVersion: '1759309200000',
+  };
+  const orphaned = (): SlotMap => slotsReducer(makeInitialSlots(), { type: 'HYDRATE', views: { i23: orphan } });
+
+  it('frames the saved photo itself, as it is — untouched, it is no change', () => {
+    const before = orphaned();
+    const s = slotsReducer(before, { type: 'RECROP_SAVED', view: 'i23' });
+    const slot = s.i23;
+    expect(slot.sourceFromSaved).toBe(true);
+    expect(slot.sourceRelPath).toBe('7012.i23');
+    expect(slot.sourceVersion).toBe('1759309200000');
+    // The saved photo already carries the occlusal flip: the default flip would mirror it again.
+    expect([slot.rotation, slot.flipH, slot.flipV, slot.zoom]).toEqual([0, false, false, 1]);
+    // The whole photo, in the largest frame of the view's aspect.
+    expect(slot.pendingFraming?.area).toEqual(coverArea({ width: 3000, height: 2077 }, aspectForView('i23')));
+    expect(slot.framingKey).toBe(before.i23.framingKey + 1);
+    expect(isSlotDirty(slot)).toBe(false);
+  });
+
+  it('a Dolphin render a little off the view’s aspect opens unchanged too', () => {
+    // Patient 7's Rest, 3811×4443 against 13:15: no frame of that aspect holds all of it.
+    const rest: SlotHydration = { ...orphan, savedName: '700.i12', savedSize: { width: 3811, height: 4443 } };
+    let s = slotsReducer(makeInitialSlots(), { type: 'HYDRATE', views: { i12: rest } });
+    s = slotsReducer(s, { type: 'RECROP_SAVED', view: 'i12' });
+    // The 2048 px proxy loads, and the cropper reports where its cover fit put the frame.
+    const proxy = { width: 1757, height: 2048 };
+    s = slotsReducer(s, { type: 'SET_MEDIA_SIZE', view: 'i12', size: proxy });
+    s = slotsReducer(s, {
+      type: 'SET_CROPPED',
+      view: 'i12',
+      area: coverArea(proxy, aspectForView('i12')),
+      pixels: { x: 0, y: 0, width: 1, height: 1 },
+    });
+    expect(isSlotDirty(s.i12)).toBe(false);
+  });
+
+  it('becomes a change once moved, and Reset returns to the photo as it is', () => {
+    let s = slotsReducer(orphaned(), { type: 'RECROP_SAVED', view: 'i23' });
+    s = slotsReducer(s, { type: 'SET_MEDIA_SIZE', view: 'i23', size: { width: 2048, height: 1418 } });
+    s = slotsReducer(s, { type: 'SET_ZOOM', view: 'i23', zoom: 1.3 });
+    s = slotsReducer(s, { type: 'SET_CROPPED', view: 'i23', area: { x: 10, y: 10, width: 77, height: 77 }, pixels: { x: 1, y: 1, width: 1, height: 1 } });
+    expect(isSlotDirty(s.i23)).toBe(true);
+    const r = slotsReducer(s, { type: 'RESET', view: 'i23' });
+    expect([r.i23.zoom, r.i23.flipV]).toEqual([1, false]);
+    expect(isSlotDirty(r.i23)).toBe(false);
+  });
+
+  it('Discard goes back to the saved photo; a new photo placed over it is no re-crop', () => {
+    const live = slotsReducer(orphaned(), { type: 'RECROP_SAVED', view: 'i23' });
+    const discarded = slotsReducer(live, { type: 'DISCARD', view: 'i23' });
+    expect(discarded.i23.sourceRelPath).toBeNull();
+    expect(discarded.i23.sourceFromSaved).toBe(false);
+    expect(discarded.i23.savedName).toBe('7012.i23');
+    const placed = slotsReducer(live, { type: 'PLACE', view: 'i23', sourceRelPath: 'S/u.jpg', sourceName: 'u.jpg', sourceVersion: null });
+    expect(placed.i23.sourceFromSaved).toBe(false);
+  });
+
+  it('is refused for a slot with nothing saved', () => {
+    const s = makeInitialSlots();
+    expect(slotsReducer(s, { type: 'RECROP_SAVED', view: 'i23' })).toBe(s);
+  });
+});
+
+describe('slotsReducer — Re-crop from the photos grid', () => {
+  it('continues from the original when the save recorded its framing', () => {
+    const s = slotsReducer(hydrated(), { type: 'RECROP', view: 'i12' });
+    expect(s.i12.sourceRelPath).toBe(hydration.reEditRelPath);
+    expect(s.i12.sourceFromSaved).toBe(false);
+    expect(s.i12.pendingFraming?.area).toEqual(saved.area);
+    expect(isSlotDirty(s.i12)).toBe(false);
+  });
+
+  it('frames the saved photo itself otherwise — original gone, or saved without a record', () => {
+    const noOriginal = slotsReducer(makeInitialSlots(), {
+      type: 'HYDRATE',
+      views: { i12: { ...hydration, canReEdit: false, canContinue: false, reEditRelPath: null } },
+    });
+    const noRecord = slotsReducer(makeInitialSlots(), {
+      type: 'HYDRATE',
+      views: { i12: { ...hydration, savedFraming: null, canContinue: false } },
+    });
+    for (const before of [noOriginal, noRecord]) {
+      const s = slotsReducer(before, { type: 'RECROP', view: 'i12' });
+      expect(s.i12.sourceFromSaved).toBe(true);
+      expect(s.i12.sourceRelPath).toBe('7012.i12');
+      expect(isSlotDirty(s.i12)).toBe(false);
+    }
+  });
+
+  it('never replaces a live edit, and does nothing for a slot with nothing saved', () => {
+    let live = slotsReducer(hydrated(), { type: 'PLACE', view: 'i12', sourceRelPath: 'S/x.jpg', sourceName: 'x.jpg', sourceVersion: null });
+    live = slotsReducer(live, { type: 'SET_ZOOM', view: 'i12', zoom: 2 });
+    expect(slotsReducer(live, { type: 'RECROP', view: 'i12' })).toBe(live);
+    const empty = makeInitialSlots();
+    expect(slotsReducer(empty, { type: 'RECROP', view: 'i12' })).toBe(empty);
   });
 });

@@ -142,8 +142,8 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
     const lightboxRef = useRef<PhotoSwipeLightbox | null>(null);
     // LocalSend share modal — opened imperatively from the lightbox toolbar.
     const [shareSources, setShareSources] = useState<ShareSource[] | null>(null);
-    // Right-click menu on a grid photo (copy / download / open / send), and the
-    // "Download all" zip in progress.
+    // Right-click menu on a grid photo (copy / download / open / send / re-crop), and
+    // the "Download all" zip in progress.
     const [photoMenu, setPhotoMenu] = useState<{ view: PhotoViewCode; x: number; y: number } | null>(null);
     const [zipping, setZipping] = useState(false);
     // Time-point edit/delete UI state.
@@ -486,6 +486,14 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
         }
     };
 
+    // Re-crop one photo: the editor opens on this session with the photo already in its
+    // cropper, framed as it is now (PhotoEditor's `?recrop=`). Leaving the grid also
+    // ends a fullscreen presentation.
+    const recropPhoto = (view: PhotoViewCode) => {
+        if (!personId) return;
+        navigate(`/patient/${personId}/photo-editor/tp${tpCode}?recrop=${view}`);
+    };
+
     const menuImage = photoMenu ? gallery?.[photoMenu.view] ?? null : null;
     const photoMenuItems = (view: PhotoViewCode, image: GalleryView): SlotMenuItem[] => {
         const barred = !!eyeBarFor(view);
@@ -518,6 +526,12 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 label: `Send to a device or Telegram${covered}`,
                 icon: 'fa-share-alt',
                 onClick: () => void sharePhoto(view, image),
+            },
+            {
+                key: 'recrop',
+                label: 'Re-crop',
+                icon: 'fa-crop-simple',
+                onClick: () => recropPhoto(view),
             },
         ];
     };
@@ -1018,9 +1032,9 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
             await invalidatePatientPhotos(personId);
             toast.success(
                 scope === 'cropped'
-                    ? 'Cropped photos deleted'
+                    ? 'Cropped photos moved to the trash'
                     : scope === 'entry'
-                      ? 'Time point deleted (originals kept)'
+                      ? 'Time point deleted (folder originals kept)'
                       : 'Time point deleted'
             );
             setDeleteTp(null);
@@ -1530,6 +1544,7 @@ const GridComponent = ({ personId, tpCode = '0' }: Props) => {
                 isOpen={!!deleteTp}
                 timepoint={deleteTp}
                 scope={deleteScope}
+                sessionFiles={(workingQ.data?.entries ?? []).filter((e) => String(e.tpCode) === deleteTp?.tp_code)}
                 deleting={deletingTp}
                 onConfirm={handleDeleteTimepoint}
                 onCancel={() => setDeleteTp(null)}

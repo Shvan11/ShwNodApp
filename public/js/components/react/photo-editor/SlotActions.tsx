@@ -7,9 +7,10 @@
  * each slot because it has no mouse equivalent. The selected slot's framing readout
  * (SlotReadout) sits right after them.
  *
- * A saved slot offers both re-edit routes: "Continue editing" (its original, framed as
- * saved — when the save recorded its framing) and "Start over" (its original at the
- * default framing).
+ * A saved slot offers three re-edit routes: "Continue editing" (its original, framed as
+ * saved — when the save recorded its framing), "Start over" (its original at the
+ * default framing), and "Recrop saved photo" (the saved photo itself — the one that
+ * needs no original, so a view whose original is gone can still be re-cropped).
  */
 import styles from './SlotActions.module.css';
 import { labelForView, type PhotoViewCode } from './photoEditorTypes';
@@ -121,6 +122,20 @@ const SlotActions = ({ personId, editor, activeView, proxyMode, onRemoveSaved }:
               }}
             >
               <i className="fas fa-clock-rotate-left" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={styles.btn}
+              disabled={!slot?.savedName}
+              title={
+                canRestore
+                  ? 'Recrop the saved photo — frames the cropped photo itself (Start over keeps more of the picture)'
+                  : 'Recrop the saved photo — its original is missing, so this frames the cropped photo itself (or double-click the photo)'
+              }
+              aria-label="Recrop the saved photo"
+              onClick={() => activeView && editor.recropSaved(activeView)}
+            >
+              <i className="fas fa-crop-simple" aria-hidden="true" />
             </button>
             <button
               type="button"

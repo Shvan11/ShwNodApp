@@ -92,8 +92,12 @@ export type { PhotoViewCode };
  */
 export interface SlotRenderSpec {
     view: PhotoViewCode;
-    /** Path relative to clinic1/{personId}/, e.g. "Initial_01-01-2026/IMG_001.jpg". */
-    sourceRelPath: string;
+    /** Path relative to clinic1/{personId}/, e.g. "Initial_01-01-2026/IMG_001.jpg".
+     *  Absent with `fromSaved`. */
+    sourceRelPath?: string;
+    /** Re-crop the view's own saved photo instead of an original (the original is gone).
+     *  The server finds that photo itself; `extract` is in its pixel space. */
+    fromSaved?: boolean;
     flipH: boolean;
     flipV: boolean;
     rotation: number;

@@ -1,23 +1,34 @@
 /**
- * Read-only viewer for a patient's images in Dolphin's shared `working/` gallery,
+ * Viewer for a patient's images in Dolphin's shared `working/` gallery,
  * filtered to THIS patient: the 8 rendered photo views of every session AND the
  * images the 8-cell grid has no place for (a Dolphin OPG, a ceph, …). Grouped by
  * session in the photos page's order; `?tp=N` shows one session (the photos page's
  * "also in Dolphin" chip and the session kebab open it that way).
  *
+ * A slot Dolphin filled also keeps Dolphin's untouched original of its image (the
+ * `.vNN` "V file": the photo or X-ray before any crop). Each one is a tile of its own,
+ * right after its image, tagged "V file".
+ *
  * Reuses the file-explorer tile + preview (via an injected working-files URL
- * builder), so it looks and behaves like the Files page minus all mutation.
+ * builder), so it looks and behaves like the Files page, with Delete as its only
+ * write. Image and original are a pair: deleting either moves BOTH to the patient's
+ * trash, and the slot's record goes from the app's database AND Dolphin's, which the
+ * confirm spells out, naming both files, before anything happens.
  */
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import type { WorkingFileEntry } from '@shared/contracts/file-explorer.contract';
-import { slotLabel } from '@shared/photo-views';
+import type { z } from 'zod';
+import { deleteWorkingFile, type WorkingFileEntry } from '@shared/contracts/file-explorer.contract';
 import { timepointsQuery, workingFilesQuery } from '@/query/queries';
+import { useApiMutation } from '@/query/useApiMutation';
+import { invalidatePatientPhotos } from '@/query/photos';
 import { useLastPhotoTab } from '@/hooks/useLastPhotoTab';
+import { useConfirm } from '@/contexts/ConfirmContext';
+import { useToast } from '@/contexts/ToastContext';
 import { buildWorkingContentUrl } from './fileHelpers';
-import { compareSlots } from './workingImages';
-import { httpErrorMessage } from '@/core/http';
+import { compareSlots, entryLabel } from './workingImages';
+import { deleteJSON, httpErrorMessage } from '@/core/http';
 import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
 import explorer from './FileExplorer.module.css';
@@ -38,11 +49,22 @@ const noop = (): void => {};
 /** 'YYYY-MM-DD' → 'DD-MM-YYYY', as the session tabs show it. */
 const tabDate = (date: string): string => date.substring(0, 10).split('-').reverse().join('-');
 
+/** A tile's name: the slot ("Rest", "OPG"), and for Dolphin's original of it, that it is one. */
+const tileName = (e: WorkingFileEntry): string => (e.original ? `${entryLabel(e)} · original` : entryLabel(e));
+
+const ORIGINAL_NAME_RE = /\.v\d{2}$/i;
+
+/** Within a session: the slots in grid order, each image right before Dolphin's original of it. */
+const compareEntries = (a: WorkingFileEntry, b: WorkingFileEntry): number =>
+  compareSlots(a.view, b.view) || Number(a.original) - Number(b.original) || a.name.localeCompare(b.name);
+
 const WorkingFilesView = ({ personId }: Props) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const onlyTp = searchParams.get('tp');
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const { data, isLoading, error: queryError } = useQuery({
     ...workingFilesQuery(personId ?? ''),
@@ -53,7 +75,7 @@ const WorkingFilesView = ({ personId }: Props) => {
   const error = queryError ? httpErrorMessage(queryError, 'Failed to load working files') : null;
 
   // Sessions in the photos page's order (by date); a session's images in grid order,
-  // then the slots the grid has no place for.
+  // then the slots the grid has no place for, each followed by Dolphin's original of it.
   const bySession = new Map<string, WorkingFileEntry[]>();
   for (const entry of data?.entries ?? []) {
     const key = String(entry.tpCode);
@@ -72,14 +94,23 @@ const WorkingFilesView = ({ personId }: Props) => {
       return {
         tpCode: code,
         title: tp ? `${tp.tp_description} · ${tabDate(tp.tp_date_time)}` : `Session ${code}`,
-        entries: (bySession.get(code) ?? []).sort((a, b) => compareSlots(a.view, b.view)),
+        entries: (bySession.get(code) ?? []).sort(compareEntries),
       };
     });
   // One preview sequence across every group on screen.
   const visible = groups.flatMap((g) => g.entries);
+  const previewName = (e: WorkingFileEntry): string =>
+    e.original ? `${entryLabel(e)} · Dolphin original (V file)` : entryLabel(e);
   const titleByPath = new Map(
-    groups.flatMap((g) => g.entries.map((e) => [e.relPath, `${slotLabel(e.view)} — ${g.title} (${e.name})`] as const))
+    groups.flatMap((g) => g.entries.map((e) => [e.relPath, `${previewName(e)} — ${g.title} (${e.name})`] as const))
   );
+  const originalCount = visible.filter((e) => e.original).length;
+  const imageCount = visible.length - originalCount;
+  /** The other file of the entry's slot (its image, or Dolphin's original of it), if it has one. */
+  const partnerOf = (entry: WorkingFileEntry): WorkingFileEntry | undefined =>
+    (data?.entries ?? []).find(
+      (e) => e.tpCode === entry.tpCode && e.view === entry.view && e.original !== entry.original
+    );
 
   const onlySession = onlyTp === null ? null : timepoints?.find((tp) => tp.tp_code === onlyTp);
   // "Photos" returns to the session the user came from: the one last open on the
@@ -103,13 +134,64 @@ const WorkingFilesView = ({ personId }: Props) => {
     );
   };
 
+  // Every photo read refreshes, not just this list: the grid, Compare and the
+  // slideshow show the same file.
+  const deleteImage = useApiMutation({
+    mutationFn: (name: string) =>
+      deleteJSON<z.infer<typeof deleteWorkingFile.response>>(
+        `/api/patients/${personId}/working-files?${new URLSearchParams({ name }).toString()}`,
+        { schema: deleteWorkingFile.response }
+      ),
+    onSuccess: () => invalidatePatientPhotos(personId ?? ''),
+  });
+  // Deleting either file of a slot deletes both (the server moves the pair), so the
+  // confirm names every file that will go, and says so.
+  const confirmDelete = async (entry: WorkingFileEntry, sessionTitle: string): Promise<void> => {
+    if (deleteImage.isPending) return;
+    const partner = partnerOf(entry);
+    const image = entry.original ? partner : entry;
+    const original = entry.original ? entry : partner;
+    const photo = `the ${entryLabel(entry)} photo of ${sessionTitle}`;
+    const record = 'Its photo record will be deleted from the Dolphin database too.';
+    const [title, message, confirmText] =
+      image && original
+        ? [
+            'Delete photo and its original?',
+            `Both files of ${photo} will be moved to the trash: the photo (${image.name}) and Dolphin's original of it, the V file (${original.name}). Deleting either one deletes the pair. ${record}`,
+            'Delete both',
+          ]
+        : image
+          ? ['Delete photo?', `${photo[0].toUpperCase()}${photo.slice(1)} (${image.name}) will be moved to the trash. ${record}`, 'Delete']
+          : [
+              'Delete original?',
+              `Dolphin's original of ${photo}, the V file (${entry.name}), will be moved to the trash. The photo itself is already gone; any photo record left for it is deleted from the Dolphin database too.`,
+              'Delete',
+            ];
+    const ok = await confirm(message, { title, confirmText, danger: true });
+    if (!ok) return;
+    try {
+      const { removed } = await deleteImage.mutateAsync(entry.name);
+      const hasOriginal = removed.some((n) => ORIGINAL_NAME_RE.test(n));
+      const hasImage = removed.some((n) => !ORIGINAL_NAME_RE.test(n));
+      toast.success(
+        hasImage && hasOriginal
+          ? 'Photo and its original moved to the trash.'
+          : hasOriginal
+            ? 'Original moved to the trash.'
+            : 'Photo moved to the trash.'
+      );
+    } catch (err) {
+      toast.error(httpErrorMessage(err, 'Delete failed'));
+    }
+  };
+
   if (!personId) {
     return <div className={explorer.message}>No patient selected.</div>;
   }
 
   return (
     <div className={explorer.explorer}>
-      {/* Header — mirrors the explorer breadcrumb, but this is a read-only view */}
+      {/* Header — mirrors the explorer breadcrumb */}
       <nav className={explorer.breadcrumb} aria-label="Working files">
         <button
           type="button"
@@ -141,7 +223,10 @@ const WorkingFilesView = ({ personId }: Props) => {
           </span>
         )}
         {!loading && !error && visible.length > 0 && (
-          <span className={styles.count}>{visible.length} image(s)</span>
+          <span className={styles.count}>
+            {imageCount} image(s)
+            {originalCount > 0 && ` · ${originalCount} V file(s)`}
+          </span>
         )}
       </nav>
 
@@ -174,13 +259,19 @@ const WorkingFilesView = ({ personId }: Props) => {
                     key={entry.relPath}
                     personId={personId}
                     entry={entry}
-                    displayName={slotLabel(entry.view)}
+                    displayName={tileName(entry)}
+                    badge={
+                      entry.original
+                        ? {
+                            label: 'V file',
+                            title: `Dolphin's original (${entry.name}): the full image before any crop or rotation`,
+                          }
+                        : undefined
+                    }
                     view="grid"
-                    readOnly
                     buildUrl={buildWorkingContentUrl}
                     onOpen={() => setPreviewIndex(visible.indexOf(entry))}
-                    onRename={noop}
-                    onDelete={noop}
+                    onDelete={() => void confirmDelete(entry, group.title)}
                     onToggleSelect={noop}
                   />
                 ))}

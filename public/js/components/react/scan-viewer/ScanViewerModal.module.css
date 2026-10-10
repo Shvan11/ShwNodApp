@@ -1,0 +1,72 @@
+.modal {
+  width: min(1100px, 96vw);
+  height: min(820px, 90vh);
+  display: flex;
+  flex-direction: column;
+}
+
+/* The scan's backdrop: the canvas itself is transparent, so this sets the colour in both themes. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0 var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+.canvasHost canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* The other files of the set: tick one to add it to the scene (upper + lower → occlusion). */
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.error {
+  margin: var(--spacing-sm) var(--spacing-md) 0;
+  font-size: var(--font-size-sm);
+  color: var(--error-700);
+}
+
+.hint {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}

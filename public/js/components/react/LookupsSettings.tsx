@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import cn from 'classnames';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '../../contexts/ToastContext';
-import { adminLookupTablesQuery } from '@/query/queries';
+import { adminLookupTablesQuery, photoSlotsQuery } from '@/query/queries';
 import LookupEditor from './LookupEditor';
 import HolidayEditor from './HolidayEditor';
 import CostPresetsSettings from './CostPresetsSettings';
 import PatientTypesReadOnly from './PatientTypesReadOnly';
+import PhotoSlotNamesEditor from './PhotoSlotNamesEditor';
 import type { LookupTableInfo } from '@shared/contracts/lookup-admin.contract';
 
 // The accordion shell is this tab's own module; the global sheet stays imported
@@ -23,6 +24,12 @@ const COST_PRESETS_TABLE_KEY = 'tblEstimatedCostPresets';
 // works-derived classifier so they aren't staff-editable; shown for reference via
 // the /api/patient-types feed, not the generic lookup CRUD.
 const PATIENT_TYPES_TABLE_KEY = 'patientTypesReadOnly';
+
+// Synthetic entry for the clinic's names for Dolphin's photo slots outside the grid views
+// (/api/photo-slots: the codes are fixed by Dolphin's files, so it is rename-only, which the
+// generic CRUD can't express). Listed only where some photo uses such a slot: an install that
+// never ran Dolphin has none.
+const PHOTO_SLOTS_TABLE_KEY = 'photoSlotNames';
 
 type TableConfig = LookupTableInfo;
 
@@ -43,6 +50,7 @@ interface LookupsSettingsProps {
 const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onChangesUpdate }) => {
     const toast = useToast();
     const { data, isLoading: loading, isError } = useQuery(adminLookupTablesQuery());
+    const { data: photoSlots } = useQuery(photoSlotsQuery());
     const [expandedTable, setExpandedTable] = useState<string | null>(null);
 
     useEffect(() => {
@@ -67,7 +75,18 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         columns: [],
         protectedIds: [],
     };
-    const tables = data ? [...data, costPresetsEntry, patientTypesEntry] : [];
+    const photoSlotsEntry: TableConfig = {
+        key: PHOTO_SLOTS_TABLE_KEY,
+        displayName: 'Photo Slot Names',
+        icon: 'fas fa-images',
+        idColumn: 'code',
+        columns: [],
+        protectedIds: [],
+    };
+    const hasPhotoSlots = photoSlots?.some((s) => s.images > 0) ?? false;
+    const tables = data
+        ? [...data, costPresetsEntry, patientTypesEntry, ...(hasPhotoSlots ? [photoSlotsEntry] : [])]
+        : [];
 
     const toggleTable = (tableKey: string): void => {
         setExpandedTable(expandedTable === tableKey ? null : tableKey);
@@ -83,7 +102,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
         {
             name: 'Clinical',
             icon: 'fas fa-stethoscope',
-            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer', 'tblShadeVitaClassic', 'tblShade3dMaster', 'tblLabs', 'tblTimePointNames']
+            keys: ['tblWorkType', 'tblKeyWord', 'tblDetail', 'tblImplantManufacturer', 'tblShadeVitaClassic', 'tblShade3dMaster', 'tblLabs', 'tblTimePointNames', PHOTO_SLOTS_TABLE_KEY]
         },
         {
             name: 'Patient Information',
@@ -129,7 +148,7 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
 
     // One accordion row. Shared by the grouped sections and the "Other" catch-all
     // below so the two can't drift; the editor a row opens is chosen here, since
-    // three tables are backed by something other than the generic lookup CRUD.
+    // four tables are backed by something other than the generic lookup CRUD.
     const renderAccordionItem = (table: TableConfig) => (
         <div
             key={table.key}
@@ -160,6 +179,8 @@ const LookupsSettings: React.FC<LookupsSettingsProps> = ({ onChangesUpdate: _onC
                         <CostPresetsSettings />
                     ) : table.key === PATIENT_TYPES_TABLE_KEY ? (
                         <PatientTypesReadOnly />
+                    ) : table.key === PHOTO_SLOTS_TABLE_KEY ? (
+                        <PhotoSlotNamesEditor />
                     ) : (
                         <LookupEditor
                             tableKey={table.key}

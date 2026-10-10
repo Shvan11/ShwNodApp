@@ -48,6 +48,7 @@ import * as approvalsContract from '@shared/contracts/approvals.contract';
 import * as videoContract from '@shared/contracts/video.contract';
 import * as mediaContract from '@shared/contracts/media.contract';
 import * as fileExplorerContract from '@shared/contracts/file-explorer.contract';
+import * as photoSlotContract from '@shared/contracts/photo-slot.contract';
 import * as calendarContract from '@shared/contracts/calendar.contract';
 import * as whatsappContract from '@shared/contracts/whatsapp.contract';
 import * as photoEditorContract from '@shared/contracts/photo-editor.contract';
@@ -1054,6 +1055,17 @@ export const patientFilesQuery = (id: Id, path = '', flat = false) =>
       ),
   });
 
+/** GET /api/patients/:id/files/properties?path= — one entry's Properties ('' = the patient folder). */
+export const filePropertiesQuery = (id: Id, path: string) =>
+  queryOptions({
+    queryKey: qk.patient.fileProperties(id, path),
+    queryFn: ({ signal }) =>
+      fetchJSON<fileExplorerContract.EntryProperties>(
+        `/api/patients/${id}/files/properties?${new URLSearchParams({ path })}`,
+        { signal, schema: fileExplorerContract.properties.response }
+      ),
+  });
+
 /**
  * GET /api/photo-editor/:id/taken-dates?folder=&scope= — when each original in a
  * patient folder was taken (EXIF), keyed by file name. `views` (the photo grid) holds
@@ -1093,6 +1105,17 @@ export const workingFilesQuery = (id: Id) =>
         `/api/patients/${id}/working-files`,
         { signal, schema: fileExplorerContract.workingFiles.response }
       ),
+  });
+
+/** GET /api/photo-slots — Dolphin's photo slots outside the grid, for Settings → Lookups → Photo Slot Names. */
+export const photoSlotsQuery = () =>
+  queryOptions({
+    queryKey: qk.lookups.photoSlots(),
+    queryFn: ({ signal }) =>
+      fetchJSON<z.infer<typeof photoSlotContract.listSlots.response>>('/api/photo-slots', {
+        signal,
+        schema: photoSlotContract.listSlots.response,
+      }),
   });
 
 /** GET /api/photo-editor/:id/photo-dates — appointment/visit dates for the photo-session picker. */

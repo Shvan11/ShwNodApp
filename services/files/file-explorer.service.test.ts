@@ -10,7 +10,9 @@ vi.mock('./clinic-paths.js', () => ({
   patientDir: (id: string | number) => path.join(clinic, String(id)),
 }));
 
-const { transferEntries, FileExplorerError } = await import('./file-explorer.service.js');
+const { transferEntries, walkFlat, getEntryProperties, FileExplorerError } = await import(
+  './file-explorer.service.js'
+);
 
 const patient = path.join(clinic, '27');
 const at = (rel: string) => path.join(patient, ...rel.split('/'));
@@ -121,5 +123,54 @@ describe('path safety', () => {
       FileExplorerError
     );
     expect(read('a.jpg')).toBe('a.jpg');
+  });
+});
+
+describe('flat listing', () => {
+  it('gives every file its size and date, as the folder view does', async () => {
+    write('Retainer/scan.pano', '12345');
+    const { entries } = await walkFlat(27, '');
+    const pano = entries.find((e) => e.relPath === 'Retainer/scan.pano');
+    expect(pano).toMatchObject({ size: 5, category: 'other' });
+    expect(Date.parse(pano?.modified ?? '')).not.toBeNaN();
+    expect(entries.every((e) => typeof e.size === 'number')).toBe(true);
+  });
+});
+
+describe('properties', () => {
+  it('describes a file', async () => {
+    write('Retainer/scan.pano', '12345');
+    const p = await getEntryProperties(27, 'Retainer/scan.pano');
+    expect(p).toMatchObject({
+      name: 'scan.pano',
+      relPath: 'Retainer/scan.pano',
+      type: 'file',
+      ext: '.pano',
+      size: 5,
+      contents: null,
+    });
+    expect(Date.parse(p.modified)).not.toBeNaN();
+  });
+
+  it('counts a folder and adds up everything inside it', async () => {
+    const p = await getEntryProperties(27, 'Retainer');
+    // Retainer/r.jpg + Retainer/Upper/u.jpg (each file's body is its own path)
+    expect(p).toMatchObject({
+      type: 'dir',
+      size: 'Retainer/r.jpg'.length + 'Retainer/Upper/u.jpg'.length,
+      contents: { files: 2, folders: 1, truncated: false },
+    });
+  });
+
+  it('describes the patient folder itself, never counting the app infra dirs', async () => {
+    write('.trash/old.jpg');
+    const p = await getEntryProperties(27, '');
+    expect(p).toMatchObject({ relPath: '', type: 'dir', contents: { files: 3, folders: 3 } });
+  });
+
+  it('refuses a path outside the patient folder, and a missing one', async () => {
+    await expect(getEntryProperties(27, '../28/other.jpg')).rejects.toMatchObject({ status: 403 });
+    await expect(getEntryProperties(27, 'nope.jpg')).rejects.toBeInstanceOf(FileExplorerError);
+    await expect(getEntryProperties(27, 'nope.jpg')).rejects.toMatchObject({ status: 404 });
   });
 });

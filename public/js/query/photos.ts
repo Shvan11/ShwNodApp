@@ -29,3 +29,14 @@ export function invalidatePatientPhotos(personId: Id, opts: { works?: boolean } 
     () => undefined
   );
 }
+
+/**
+ * Every patient's working-files listing, after a photo slot is renamed (Settings → Lookups →
+ * Photo Slot Names): the listing carries the clinic's slot names, so one rename changes it
+ * for every patient at once.
+ */
+export function invalidateAllWorkingFiles(): Promise<void> {
+  // ['patient', id, 'working-files']: match the key factory's first and last parts.
+  const [root, , leaf] = qk.patient.workingFiles(0);
+  return queryClient.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === root && queryKey[2] === leaf });
+}

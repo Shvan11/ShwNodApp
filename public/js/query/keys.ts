@@ -61,6 +61,10 @@ export const qk = {
     /** GET /api/patients/:id/files?path=&flat= — file-explorer listing for a folder. */
     files: (id: Id, path = '', flat = false) =>
       ['patient', normId(id), 'files', path, flat ? 'flat' : 'nested'] as const,
+    /** GET /api/patients/:id/files/properties?path= — one entry's Properties. Under
+     *  `filesAll`, so every file write's listing refresh refreshes it too. */
+    fileProperties: (id: Id, path: string) =>
+      ['patient', normId(id), 'files', path, 'properties'] as const,
     /** GET /api/photo-editor/:id/taken-dates?folder=&scope= — originals' EXIF capture
      *  times. Under `filesAll`, so every photo write's `invalidatePatientPhotos` (renders
      *  re-tag originals, renames move the folder) refreshes it with the listings. */
@@ -188,6 +192,8 @@ export const qk = {
     shades: () => ['lookups', 'shades'] as const,
     /** GET /api/timepoint-names — the common photo-session names (New / Edit Photo Session). */
     timepointNames: () => ['lookups', 'timepoint-names'] as const,
+    /** GET /api/photo-slots — Dolphin's photo slots outside the grid, with the clinic's names. */
+    photoSlots: () => ['lookups', 'photo-slots'] as const,
     /** GET /api/labs — labs from the "Lab" expense subcategories (Bridge/Veneers work items). */
     labs: () => ['lookups', 'labs'] as const,
     alertTypes: () => ['lookups', 'alert-types'] as const,

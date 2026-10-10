@@ -147,6 +147,12 @@ export interface SlotState {
    * browser's cached copy of the old one, while Save rendered the new one.
    */
   sourceVersion: string | null;
+  /**
+   * The live edit frames the view's own SAVED photo ("Recrop saved photo"), not an
+   * original: `sourceRelPath` is then the saved photo's working-file name, loaded from
+   * the working gallery, and Save re-crops that photo in place.
+   */
+  sourceFromSaved: boolean;
   crop: { x: number; y: number };
   zoom: number;
   rotation: number;
@@ -168,6 +174,9 @@ export interface SlotState {
   savedImageUrl: string | null;
   /** The saved view's pixel size — the saved-photo resolution readout. */
   savedSize: { width: number; height: number } | null;
+  /** The saved view's working-file name and mtime — what "Recrop saved photo" frames. */
+  savedName: string | null;
+  savedVersion: string | null;
   /** The framing the saved view was rendered with, when its render recorded one. */
   savedFraming: SavedFraming | null;
   /** True when a tagged source original still exists to reload for re-editing. */
@@ -200,6 +209,8 @@ export type SlotMap = Record<PhotoViewCode, SlotState>;
 export interface SlotHydration {
   savedImageUrl: string | null;
   savedSize: { width: number; height: number } | null;
+  savedName: string | null;
+  savedVersion: string | null;
   savedFraming: SavedFraming | null;
   canReEdit: boolean;
   canContinue: boolean;
@@ -212,6 +223,8 @@ export interface SlotHydration {
 export const EMPTY_HYDRATION: SlotHydration = {
   savedImageUrl: null,
   savedSize: null,
+  savedName: null,
+  savedVersion: null,
   savedFraming: null,
   canReEdit: false,
   canContinue: false,
@@ -226,6 +239,7 @@ export function makeInitialSlot(view: PhotoViewCode): SlotState {
     sourceRelPath: null,
     sourceName: null,
     sourceVersion: null,
+    sourceFromSaved: false,
     crop: { x: 0, y: 0 },
     zoom: 1,
     rotation: 0,

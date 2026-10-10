@@ -42,6 +42,7 @@ import FileEntryTile from './FileEntryTile';
 import FilePreviewModal from './FilePreviewModal';
 import FileActionsMenu, { type FileAction } from './FileActionsMenu';
 import FolderPickerModal from './FolderPickerModal';
+import FilePropertiesModal from './FilePropertiesModal';
 import TimepointFolderModal from './TimepointFolderModal';
 import type { ShareSource } from '@/components/react/localsend/LocalSendShareModal';
 import ShareSheet from '@/components/react/share/ShareSheet';
@@ -144,6 +145,8 @@ const FileExplorer = ({ personId, subPath }: Props) => {
   const [picker, setPicker] = useState<PickerState | null>(null);
   /** The folder being renamed to a timepoint's folder name. */
   const [timepointFolder, setTimepointFolder] = useState<FileEntry | null>(null);
+  /** Properties open for an entry, or (no `entry`) for the folder being viewed. */
+  const [properties, setProperties] = useState<{ relPath: string; entry?: FileEntry } | null>(null);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   /** The breadcrumb a drag is over (its folder's relPath). */
   const [crumbOver, setCrumbOver] = useState<string | null>(null);
@@ -679,6 +682,9 @@ const FileExplorer = ({ personId, subPath }: Props) => {
         if (single) void doDelete(single);
         else if (targets) void deleteEntries(targets);
         break;
+      case 'properties':
+        setProperties(single ? { relPath: single.relPath, entry: single } : { relPath: currentPath });
+        break;
     }
   };
 
@@ -1132,6 +1138,16 @@ const FileExplorer = ({ personId, subPath }: Props) => {
           flat={flat}
           onAction={runAction}
           onClose={closeMenu}
+        />
+      )}
+
+      {properties && (
+        <FilePropertiesModal
+          personId={personId}
+          relPath={properties.relPath}
+          entry={properties.entry}
+          takenAt={takenAtByPath[properties.relPath] ?? null}
+          onClose={() => setProperties(null)}
         />
       )}
 

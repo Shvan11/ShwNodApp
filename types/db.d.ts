@@ -204,9 +204,15 @@ export interface CarriedWires {
 }
 
 export interface CdcSinkControl {
+  /**
+   * CAPTURE gate — the sole flag cdc_capture() reads. Set true by a successful engine start, false ONLY by the circuit breaker (backlog > maxBacklog) or a deliberate operator kill switch. NEVER written from a per-process env flag: the row is shared by every process pointing at this database.
+   */
   enabled: Generated<boolean>;
   note: string | null;
   sink: string;
+  /**
+   * Capture stopped with changes unrecorded — a FULL RELOAD is required to reconverge. Cleared only by an operator, never by a restart.
+   */
   stale: Generated<boolean>;
   updated_at: Generated<Timestamp>;
 }
@@ -433,6 +439,10 @@ export interface ImageTypes {
   description: string | null;
   dolphin_ityp_id: string | null;
   image_type_code: string;
+  /**
+   * The clinic's name for this slot (Settings → Lookups → Photo Slot Names); NULL = the app's built-in name. description stays Dolphin's own name.
+   */
+  label: string | null;
 }
 
 export interface ImplantManufacturers {

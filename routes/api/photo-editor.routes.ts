@@ -62,6 +62,8 @@ export function setWebSocketEmitter(emitter: EventEmitter): void {
 type SlotSpec = {
   view?: string;
   sourceRelPath?: string;
+  /** Re-crop the view's own saved render (its original is gone) — `sourceRelPath` is then ignored. */
+  fromSaved?: boolean;
   flipH?: boolean;
   flipV?: boolean;
   rotation?: number;
@@ -302,7 +304,7 @@ interface RenderJob {
 
 /**
  * Background worker for POST /render. Renders each slot, upserts its image row, tags
- * the source original, then emits PHOTO_TIMEPOINT_RENDERED so open photo grids
+ * the source original (a `fromSaved` slot re-crops the saved render and has none), then emits PHOTO_TIMEPOINT_RENDERED so open photo grids
  * refetch. Detached from the HTTP request (the client already got its 202), so it
  * never touches res; partial success is tolerated and the warning count rides the
  * completion event. Wrapped so a stray error can't become an unhandledRejection.
@@ -319,13 +321,16 @@ async function processRenderJob(job: RenderJob): Promise<void> {
   try {
     for (const slot of slots) {
       const view = slot?.view;
+      // null = re-crop the view's own saved render; undefined = no usable source.
+      const sourceRelPath =
+        slot?.fromSaved === true ? null : typeof slot?.sourceRelPath === 'string' ? slot.sourceRelPath : undefined;
       try {
         const ex = slot?.extract;
         const op = slot?.output;
         const isFiniteNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
         const opOk = !!op && [op.width, op.height].every(isFiniteNum);
         const exOk = !ex || [ex.left, ex.top, ex.width, ex.height].every(isFiniteNum);
-        if (typeof view !== 'string' || typeof slot?.sourceRelPath !== 'string' || !opOk || !exOk) {
+        if (typeof view !== 'string' || sourceRelPath === undefined || !opOk || !exOk) {
           warnings.push({ view: typeof view === 'string' ? view : '?', reason: 'Malformed slot — not saved' });
           continue;
         }
@@ -368,7 +373,7 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           personId,
           tpCode: tp_code,
           view,
-          sourceRelPath: slot.sourceRelPath,
+          sourceRelPath,
           flipH: !!slot.flipH,
           flipV: !!slot.flipV,
           rotation: Number(slot.rotation) || 0,
@@ -388,7 +393,8 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           null
         );
         written.push(filename);
-        toTag.push({ view, sourceRelPath: slot.sourceRelPath });
+        // A re-crop of the saved render has no original to tag.
+        if (sourceRelPath !== null) toTag.push({ view, sourceRelPath });
       } catch (err) {
         // A FileExplorerError carries curated text ("Not found", "Source is not an
         // image"); anything else is an internal error whose message may name a server
@@ -398,7 +404,9 @@ async function processRenderJob(job: RenderJob): Promise<void> {
           reason:
             err instanceof FileExplorerError
               ? err.status === 404
-                ? 'Its original photo was moved or renamed'
+                ? sourceRelPath === null
+                  ? 'Its saved photo was removed'
+                  : 'Its original photo was moved or renamed'
                 : err.message
               : 'Could not be rendered',
         });
@@ -456,10 +464,11 @@ async function processRenderJob(job: RenderJob): Promise<void> {
 
 /**
  * DELETE /:personId/view
- * Remove ONE saved view: delete its cropped working file + its tblTimePointImages
- * row, and untag the source original (rename `i{view}-NAME` back to `NAME`, so it
- * returns to the sidebar). The ORIGINAL photo is kept — only the derived crop goes.
- * Idempotent/best-effort: missing pieces are tolerated.
+ * Remove ONE saved view: move its cropped working file to the patient's trash —
+ * together with Dolphin's `.vNN` original of it when the slot has one (a pair is
+ * never split) — delete its tblTimePointImages row, and untag the source original
+ * (rename `i{view}-NAME` back to `NAME`, so it returns to the sidebar). The original
+ * in the session folder is kept. Idempotent/best-effort: missing pieces are tolerated.
  */
 router.delete(
   '/:personId/view',
@@ -471,8 +480,8 @@ router.delete(
       const { tpCode, view } = req.body as DeleteViewBody;
       const tpCodeNum = tpCode; // already coerced to a non-negative int by the schema
 
-      // 1. Delete the cropped working file (idempotent).
-      await deleteWorkingView(Number(personId), tpCodeNum, view);
+      // 1. Trash the cropped working file and Dolphin's original of it (idempotent).
+      const files = await deleteWorkingView(Number(personId), tpCodeNum, view);
 
       // 2. Delete the DB image row (resolve timePointId; skip if the timepoint is gone).
       const tp = await getNativeTimePoint(Number(personId), tpCodeNum);
@@ -494,8 +503,13 @@ router.delete(
         tp_code: tpCodeNum,
         view,
       });
-      sendData(res, photoEditor.view.response, { removed: view });
+      sendData(res, photoEditor.view.response, { removed: view, files });
     } catch (err) {
+      // A file Dolphin holds open is a 409 the user can act on ("close it and try again").
+      if (err instanceof FileExplorerError) {
+        sendError(res, err.status, err.message);
+        return;
+      }
       log.error('[PhotoEditor] remove view failed', { error: (err as Error).message });
       ErrorResponses.internalError(res, 'Failed to remove view', err as Error);
     }

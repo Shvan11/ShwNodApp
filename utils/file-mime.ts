@@ -8,6 +8,7 @@
  * each extension to both. The video routes used to carry a 6-extension copy of
  * the same data in `utils/video-mime.ts`; they now call `getMediaMimeType`.
  */
+import fs from 'fs/promises';
 import path from 'path';
 
 export type FileCategory =
@@ -149,4 +150,28 @@ export function getFileCategory(filePath: string): FileCategory {
 export function getMediaMimeType(filePath: string): string {
   if (path.extname(filePath).toLowerCase() === '.ogg') return 'video/ogg';
   return getFileMimeType(filePath);
+}
+
+/**
+ * The image type a file's first bytes declare, for files whose extension says nothing:
+ * Dolphin's slot files (`.iNN` renders are JPEG; its `.vNN` originals are JPEG, TIFF, BMP
+ * or PNG). Null for anything else, so a caller never serves unknown bytes inline.
+ */
+export async function sniffImageMime(filePath: string): Promise<string | null> {
+  const b = Buffer.alloc(12);
+  const fh = await fs.open(filePath, 'r');
+  try {
+    await fh.read(b, 0, b.length, 0);
+  } finally {
+    await fh.close();
+  }
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if ((b[0] === 0x49 && b[1] === 0x49 && b[2] === 0x2a && b[3] === 0x00) || (b[0] === 0x4d && b[1] === 0x4d && b[2] === 0x00 && b[3] === 0x2a)) {
+    return 'image/tiff';
+  }
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+  if (b.subarray(0, 4).toString('latin1') === 'GIF8') return 'image/gif';
+  if (b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  return null;
 }

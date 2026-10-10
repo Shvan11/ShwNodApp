@@ -99,7 +99,7 @@ const TimepointActionsMenu = ({
                 <i className="fas fa-crop-simple" aria-hidden="true"></i>
                 <span className={styles.itemText}>
                     Cropped photos only
-                    <small className={styles.hint}>Keeps session &amp; originals</small>
+                    <small className={styles.hint}>Keeps session &amp; folder originals</small>
                 </span>
             </button>
             <button
@@ -111,7 +111,7 @@ const TimepointActionsMenu = ({
                 <i className="fas fa-eraser" aria-hidden="true"></i>
                 <span className={styles.itemText}>
                     Cropped + session
-                    <small className={styles.hint}>Keeps original photos</small>
+                    <small className={styles.hint}>Keeps the originals folder</small>
                 </span>
             </button>
             <button

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   areaToPixels,
+  coverArea,
   frameLeavesPhoto,
   framingMatchesOriginal,
   isSlotDirty,
@@ -32,6 +33,31 @@ describe('rotatedSize', () => {
     const q = rotatedSize(4000, 3000, 90);
     expect(q.width).toBeCloseTo(3000, 6);
     expect(q.height).toBeCloseTo(4000, 6);
+  });
+});
+
+describe('coverArea', () => {
+  it('is the whole photo when it already has the frame’s aspect', () => {
+    const a = coverArea({ width: 3467, height: 4000 }, FACIAL_ASPECT);
+    expect([a.x, a.y, a.width, a.height]).toEqual([0, 0, 100, 100]);
+  });
+
+  it('trims a Dolphin render slightly off the aspect evenly, at both ends', () => {
+    // Patient 7's Rest: 3811×4443 (0.858) against 13:15 (0.867) — a little too tall.
+    const tall = coverArea({ width: 3811, height: 4443 }, FACIAL_ASPECT);
+    expect(tall.x).toBe(0);
+    expect(tall.width).toBe(100);
+    expect(tall.height).toBeCloseTo(98.96, 2);
+    expect(tall.y).toBeCloseTo((100 - tall.height) / 2, 9);
+    // Too wide: trimmed left and right instead.
+    const wide = coverArea(PHOTO, FACIAL_ASPECT);
+    expect([wide.y, wide.height]).toEqual([0, 100]);
+    expect(wide.width).toBeCloseTo((FACIAL_ASPECT / (4000 / 3000)) * 100, 9);
+    expect(wide.x).toBeCloseTo((100 - wide.width) / 2, 9);
+  });
+
+  it('falls back to the whole photo when the size is unknown', () => {
+    expect(coverArea({ width: 0, height: 0 }, FACIAL_ASPECT)).toEqual({ x: 0, y: 0, width: 100, height: 100 });
   });
 });
 

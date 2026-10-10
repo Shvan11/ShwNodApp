@@ -14,10 +14,14 @@
  * session's name and date come from the timepoints read BY CODE, never from the URL:
  * a stale URL (Back after a re-date, a second tab) used to make the save find-or-create
  * a session by that name and date — a duplicate — and render into it (FE-F14-3).
+ *
+ * `?recrop={view}` is the photos grid's "Re-crop": that view opens selected and, once
+ * the saved views are known, in its cropper, framed as it is now.
  */
-import { useEffect, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { z } from 'zod';
 import styles from './PhotoEditor.module.css';
 import SlotGrid from './SlotGrid';
 import SlotActions from './SlotActions';
@@ -42,9 +46,10 @@ import { newRenderJobId, watchRenderJob } from '../../../services/photo-render-w
 import { postJSON, deleteJSON, httpErrorMessage } from '../../../core/http';
 import { qk } from '@/query/keys';
 import { invalidatePatientPhotos } from '@/query/photos';
-import { framingQuery, galleryQuery, patientFilesQuery, timepointsQuery } from '@/query/queries';
+import { framingQuery, galleryQuery, patientFilesQuery, timepointsQuery, workingFilesQuery } from '@/query/queries';
 import { sessionFolderName } from '@shared/photo-session-folder';
-import { renderedEvent } from '@shared/contracts/photo-editor.contract';
+import { isViewCode } from '@shared/photo-views';
+import { renderedEvent, view as viewContract } from '@shared/contracts/photo-editor.contract';
 import type { GalleryResponse, TimepointRow } from '@shared/contracts/patient.contract';
 import { buildWorkingContentUrl } from '../files/fileHelpers';
 
@@ -149,6 +154,10 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
   const tpName = session?.tp_description ?? '';
   const tpDate = session?.tp_date_time ?? '';
   const sessionFolder = sessionFolderName(tpName, tpDate) ?? '';
+  // The view the photos grid asked to re-crop (see the docblock), if any.
+  const [searchParams] = useSearchParams();
+  const recropParam = searchParams.get('recrop');
+  const recropView = recropParam && isViewCode(recropParam) ? recropParam : null;
   // A sidebar photo picked by click or keyboard, waiting for a slot — the
   // non-drag way to place a photo (FE-F14-13a). Escape puts it back.
   const [armed, setArmed] = useState<ArmedPhoto | null>(null);
@@ -160,7 +169,7 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [armed]);
-  const [activeView, setActiveView] = useState<PhotoViewCode | null>(null);
+  const [activeView, setActiveView] = useState<PhotoViewCode | null>(recropView);
   const [saving, setSaving] = useState(false);
   const [zoom, setZoom] = useState(1);
   const adjustZoom = (delta: number): void =>
@@ -230,6 +239,11 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
     enabled: !!personId && !!session,
     retry: false,
   });
+  // Dolphin's originals of this session's views (`.vNN` V files): Remove takes a view's
+  // with it, and its confirm says so. The photos grid reads the same listing.
+  const workingQ = useQuery({ ...workingFilesQuery(personId ?? ''), enabled: !!personId, retry: false });
+  const dolphinOriginalOf = (view: PhotoViewCode): string | undefined =>
+    workingQ.data?.entries.find((e) => e.original && String(e.tpCode) === tpCode && e.view === view)?.name;
 
   // Unsaved-changes guard: a slot whose live edit differs from what is saved is
   // framing the router would silently discard. The shared page guard (useConfirm + the
@@ -263,6 +277,8 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
         ...EMPTY_HYDRATION,
         savedImageUrl: buildWorkingContentUrl(personId, img.name, { thumb: 480, v: img.mtime }),
         savedSize: { width: img.width, height: img.height },
+        savedName: img.name,
+        savedVersion: String(img.mtime),
         savedFraming: hydrateFramingData?.[view] ?? null,
       };
     }
@@ -292,6 +308,28 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
     // a probe's data changes (covers a background render landing → query invalidated).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personId, tpCode, hydrateGalleryData, hydrateFilesData, hydrateFramingData]);
+
+  // `?recrop=`: open that view in its cropper, framed as it is now — editor.recrop picks
+  // its original or the saved photo. Once per visit, and only when all three probes have
+  // answered and none is refetching: a cached framing can predate a re-crop that dropped
+  // it, and would reopen the view as it no longer looks. Declared AFTER the hydration
+  // effect, so when both run in one commit the reducer gets HYDRATE first.
+  const recropPending = useRef(recropView);
+  const probesSettled =
+    !!hydrateGalleryData &&
+    !hydrateGalleryQ.isFetching &&
+    !hydrateFramingQ.isPending &&
+    !hydrateFramingQ.isFetching &&
+    // No folder name (a session that can't have one) = no folder probe to wait for.
+    (!sessionFolder || (!hydrateFilesQ.isPending && !hydrateFilesQ.isFetching));
+  useEffect(() => {
+    const view = recropPending.current;
+    if (!view || !probesSettled) return;
+    recropPending.current = null;
+    editor.recrop(view);
+    // A bottom-row view can open below the fold of the grid's scroll area.
+    document.querySelector('[data-slot-cell][data-active="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [editor, probesSettled]);
 
   // Listen for this timepoint's background-render completion while the editor
   // is open: re-hydrate (sidebar included — its originals get view-tagged by the
@@ -402,7 +440,9 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
   // "used up" once placed (but never deleted from the folder). Clearing or replacing
   // a slot drops its path from this set, so the photo reappears in the list.
   const usedRelPaths = new Set(
-    VIEW_CODES.map((v) => editor.slots[v].sourceRelPath).filter((p): p is string => !!p),
+    VIEW_CODES.filter((v) => !editor.slots[v].sourceFromSaved)
+      .map((v) => editor.slots[v].sourceRelPath)
+      .filter((p): p is string => !!p),
   );
 
   const handleSave = async (): Promise<void> => {
@@ -415,7 +455,8 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
       const a = s.croppedAreaPixels;
       slots.push({
         view,
-        sourceRelPath: s.sourceRelPath,
+        // A re-crop of the saved photo: the server finds that photo by the slot itself.
+        ...(s.sourceFromSaved ? { fromSaved: true } : { sourceRelPath: s.sourceRelPath }),
         flipH: s.flipH,
         flipV: s.flipV,
         rotation: s.rotation,
@@ -426,8 +467,9 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
         // The pixel space the extract rect lives in (proxy thumbnail vs full
         // original) — the server scales the rect to source space when they differ.
         ...(s.mediaSize ? { cropSpace: s.mediaSize } : {}),
-        // The framing record the render embeds, so this view can be continued later.
-        ...(a && s.croppedArea ? { framing: { area: s.croppedArea, zoom: s.zoom } } : {}),
+        // The framing record the render embeds, so this view can be continued later —
+        // never for a re-crop, whose source is the photo the render replaces.
+        ...(a && s.croppedArea && !s.sourceFromSaved ? { framing: { area: s.croppedArea, zoom: s.zoom } } : {}),
       });
     }
     if (slots.length === 0) {
@@ -459,20 +501,27 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
     }
   };
 
-  // "Remove" on a saved slot → delete the cropped view (file + DB row) and untag its
-  // original (which the server renames back, returning it to the panel). The original
-  // photo is kept. The shared confirm (FE-F14-8), not a bespoke modal.
+  // "Remove" on a saved slot → move the cropped view to the trash (and delete its DB
+  // row) and untag its original (which the server renames back, returning it to the
+  // panel). A slot Dolphin filled also has Dolphin's own original of it (a V file); the
+  // pair is never split, so that goes to the trash too, and the confirm names it. The
+  // original in the session folder is kept. The shared confirm (FE-F14-8), not a
+  // bespoke modal.
   const removeView = async (view: PhotoViewCode): Promise<void> => {
     if (removing) return;
+    const vFile = dolphinOriginalOf(view);
     const ok = await confirm(
-      `This removes the cropped ${labelForView(view)} photo from this session. The original photo is kept and returns to the Sequence Files panel.`,
-      { title: 'Remove photo?', confirmText: 'Remove', danger: true }
+      `This moves the cropped ${labelForView(view)} photo of this session to the trash${
+        vFile ? `, together with Dolphin's original of it (the V file ${vFile})` : ''
+      }.${editor.slots[view].canReEdit ? ' The original photo is kept and returns to the Sequence Files panel.' : ''}`,
+      { title: vFile ? 'Remove photo and its V file?' : 'Remove photo?', confirmText: 'Remove', danger: true }
     );
     if (!ok) return;
     setRemoving(true);
     try {
-      await deleteJSON(`/api/photo-editor/${personId}/view`, {
+      const { files } = await deleteJSON<z.infer<typeof viewContract.response>>(`/api/photo-editor/${personId}/view`, {
         body: JSON.stringify({ tpCode, view }),
+        schema: viewContract.response,
       });
       // The cached gallery still lists the file; mark it gone NOW, before the refetch,
       // or the hydration below re-seeds the slot from it (FE-F14-2).
@@ -482,7 +531,9 @@ const PhotoEditor = ({ personId, tpCode }: Props) => {
       editor.clear(view); // empty the slot in the editor
       void invalidatePatientPhotos(personId); // grid, Compare, slideshow, working files
       setSidebarRefresh((n) => n + 1); // re-list the folder (original is back, untagged)
-      toast.success('Photo removed.');
+      toast.success(
+        files.some((n) => /\.v\d{2}$/i.test(n)) ? 'Photo and its V file moved to the trash.' : 'Photo moved to the trash.'
+      );
     } catch (err) {
       toast.error(`Remove failed: ${httpErrorMessage(err, 'unknown error')}`);
     } finally {

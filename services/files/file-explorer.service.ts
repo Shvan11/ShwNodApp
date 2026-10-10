@@ -11,7 +11,7 @@
  */
 import fs from 'fs/promises';
 import path from 'path';
-import { clinicPath, patientDir } from './clinic-paths.js';
+import { clinicPath, newTrashDir, patientDir } from './clinic-paths.js';
 import { getFileCategory, type FileCategory } from '../../utils/file-mime.js';
 import { log } from '../../utils/logger.js';
 
@@ -26,9 +26,9 @@ export interface FileEntry {
   /** Path relative to the patient root, web-style `/` separators. */
   relPath: string;
   type: FileEntryType;
-  /** Bytes — present in browse mode, omitted in flat mode (per-file stat cost on remote/drvfs mounts). */
+  /** Bytes, for a file. Absent on a folder, and on an entry that vanished mid-listing. */
   size?: number;
-  /** ISO mtime — present in browse mode, omitted in flat mode. */
+  /** ISO mtime. Absent only on an entry that vanished mid-listing. */
   modified?: string;
   ext: string;
   category: FileCategory;
@@ -69,8 +69,6 @@ const MAX_ENTRIES = 5000;
  */
 const INFRA_DIRS = new Set(['.trash', '.uploads']);
 
-/** Trash root: sibling of the numeric patient folders, same volume. */
-const TRASH_ROOT = clinicPath('.trash');
 /** Upload staging root: sibling of patient folders, same volume, so the
  *  final rename into a patient folder is atomic + EXDEV-free. */
 const UPLOADS_ROOT = clinicPath('.uploads');
@@ -282,9 +280,12 @@ export async function listDirectory(
 
 /**
  * Recursively flatten a subtree into a file-only list. Streams via `opendir`,
- * emits names/types straight from the Dirent (NO per-file lstat — that cost
- * bites on remote/drvfs mounts), skips symlinked dirs, and stops at the
- * depth/entry caps.
+ * takes names/types straight from the Dirent (no stat while walking), skips
+ * symlinked dirs, and stops at the depth/entry caps. Then it lstats the files it
+ * kept, bounded like `listDirectory`, so the flat view shows each file's size and
+ * date as the folder view does. It skipped that until 2026-10-10 to spare remote
+ * and drvfs mounts, and the flat view showed no size at all. The walk is at most
+ * MAX_ENTRIES files and runs on a click, so the cost is bounded.
  */
 export async function walkFlat(
   personId: string | number,
@@ -294,6 +295,8 @@ export async function walkFlat(
   await realpathGuard(abs, root);
 
   const entries: FileEntry[] = [];
+  /** Each entry's absolute path, by index — for the lstat pass after the walk. */
+  const absPaths: string[] = [];
   let truncated = false;
 
   async function walk(dirAbs: string, dirRel: string, depth: number): Promise<void> {
@@ -325,13 +328,124 @@ export async function walkFlat(
           ext: path.extname(d.name).toLowerCase(),
           category: getFileCategory(d.name),
         });
+        absPaths.push(path.join(dirAbs, d.name));
       }
     }
   }
 
   const norm = normalizeRel(relPath);
   await walk(abs, norm, 0);
+  await mapLimit(
+    entries.map((_, i) => i),
+    32,
+    async (i) => {
+      try {
+        const st = await fs.lstat(absPaths[i]);
+        entries[i].size = st.size;
+        entries[i].modified = st.mtime.toISOString();
+      } catch {
+        /* vanished since the walk — listed without metadata, as listDirectory does */
+      }
+    }
+  );
   return { path: norm, parent: parentOf(relPath), flat: true, truncated, entries };
+}
+
+/** A folder's Properties stop counting here (and say so). */
+const MAX_PROPERTIES_ENTRIES = 50_000;
+
+/** What the Properties dialog shows for one entry. */
+export interface EntryProperties {
+  name: string;
+  /** Path relative to the patient root; `''` is the patient folder itself. */
+  relPath: string;
+  type: FileEntryType;
+  ext: string;
+  category: FileCategory;
+  /** Bytes: a file's own size, or everything inside a folder. */
+  size: number;
+  modified: string;
+  /** When it was created; null where the filesystem doesn't record it. */
+  created: string | null;
+  /**
+   * A folder's contents, counted as the listings show them (no app infra dirs, no
+   * symlinks followed). `truncated`: the count stopped at a cap, so it is a minimum.
+   */
+  contents: { files: number; folders: number; truncated: boolean } | null;
+}
+
+/**
+ * Properties of one entry, or of the patient folder itself (`relPath` `''`): its size,
+ * dates and, for a folder, how many files and folders it holds and their total size.
+ * A folder is walked like `walkFlat` (Dirent types, then a bounded lstat of its files),
+ * up to MAX_DEPTH levels and MAX_PROPERTIES_ENTRIES entries.
+ */
+export async function getEntryProperties(
+  personId: string | number,
+  relPath = ''
+): Promise<EntryProperties> {
+  const { root, abs } = resolveSafe(personId, relPath);
+  await realpathGuard(abs, root);
+  const st = await fs.lstat(abs);
+  const type: FileEntryType = st.isSymbolicLink() ? 'symlink' : st.isDirectory() ? 'dir' : 'file';
+  const name = path.basename(abs);
+
+  let size = type === 'file' ? st.size : 0;
+  let contents: EntryProperties['contents'] = null;
+  if (type === 'dir') {
+    const files: string[] = [];
+    let folders = 0;
+    let truncated = false;
+    const walk = async (dirAbs: string, depth: number): Promise<void> => {
+      if (depth > MAX_DEPTH) {
+        truncated = true;
+        return;
+      }
+      let dir;
+      try {
+        dir = await fs.opendir(dirAbs);
+      } catch {
+        return; // unreadable — count what can be read
+      }
+      for await (const d of dir) {
+        if (files.length + folders >= MAX_PROPERTIES_ENTRIES) {
+          truncated = true;
+          return;
+        }
+        if (INFRA_DIRS.has(d.name) || d.isSymbolicLink()) continue;
+        if (d.isDirectory()) {
+          folders += 1;
+          await walk(path.join(dirAbs, d.name), depth + 1);
+          if (truncated) return;
+        } else if (d.isFile()) {
+          files.push(path.join(dirAbs, d.name));
+        }
+      }
+    };
+    await walk(abs, 0);
+    const sizes = await mapLimit(files, 32, async (p) => {
+      try {
+        return (await fs.lstat(p)).size;
+      } catch {
+        return 0; // vanished since the walk
+      }
+    });
+    size = sizes.reduce((a, b) => a + b, 0);
+    contents = { files: files.length, folders, truncated };
+  }
+
+  return {
+    name,
+    relPath: normalizeRel(relPath),
+    type,
+    ext: type === 'file' ? path.extname(name).toLowerCase() : '',
+    category: type === 'file' ? getFileCategory(name) : 'other',
+    size,
+    modified: st.mtime.toISOString(),
+    // A filesystem without a birth time reports the epoch (or 0) rather than failing.
+    created: st.birthtimeMs > 0 ? st.birthtime.toISOString() : null,
+    contents,
+  };
 }
 
 // ===========================================
@@ -457,8 +571,7 @@ export async function softDelete(personId: string | number, relPath: string): Pr
   }
   await realpathGuard(abs, root);
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const trashDir = path.join(TRASH_ROOT, String(personId), stamp);
+  const trashDir = newTrashDir(personId);
   await fs.mkdir(trashDir, { recursive: true });
   await fs.rename(abs, path.join(trashDir, path.basename(abs)));
 }
@@ -499,8 +612,7 @@ export async function softDeleteBatch(
     throw new FileExplorerError('Invalid patient id', 400);
   }
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const trashDir = path.join(TRASH_ROOT, String(personId), stamp);
+  const trashDir = newTrashDir(personId);
   await fs.mkdir(trashDir, { recursive: true });
 
   // Reserve a unique landing name per item. The check+reserve is synchronous

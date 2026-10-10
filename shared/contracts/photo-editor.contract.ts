@@ -43,16 +43,17 @@ export const prepare = {
 } as const;
 export type PrepareBody = z.infer<typeof prepare.body>;
 
-// DELETE /api/photo-editor/:personId/view → { removed }. The session is resolved by
+// DELETE /api/photo-editor/:personId/view → { removed, files }. The session is resolved by
 // code alone — its originals folder comes from the row, not from a name/date the
-// client carried in a possibly stale URL (FE-F14-3).
+// client carried in a possibly stale URL (FE-F14-3). `files` names what went to the
+// patient's trash: the view's image and, for a slot Dolphin filled, its `.vNN` original.
 export const view = {
   params: personIdParams,
   body: z.object({
     tpCode: z.coerce.number().int().nonnegative(),
     view: z.string().regex(/^i(10|12|13|20|21|22|23|24)$/, 'Invalid view code'),
   }),
-  response: z.object({ removed: z.string() }),
+  response: z.object({ removed: z.string(), files: z.array(z.string()) }),
 } as const;
 export type DeleteViewBody = z.infer<typeof view.body>;
 

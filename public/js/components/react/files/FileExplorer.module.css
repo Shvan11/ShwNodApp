@@ -400,6 +400,25 @@
 }
 /* List: the checkbox leads the row in normal flow (rendered first in JSX). */
 
+/* A tile's corner mark (Dolphin's originals: "V file"). Leads a list row in normal flow. */
+.entryBadge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--purple-fill);
+  color: var(--color-white);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.tile .entryBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+}
+
 .tileSelected,
 .tileSelected:hover {
   border-color: var(--primary-color);
@@ -615,6 +634,23 @@
 }
 .pickerNew .promptInput {
   margin-bottom: 0;
+}
+/* Properties dialog: label / value pairs. */
+.propsList {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--spacing-xs) var(--spacing-md);
+  margin: 0;
+  padding: var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+.propsList dt {
+  color: var(--text-secondary);
+}
+.propsList dd {
+  margin: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 .pickerFooter {
   display: flex;

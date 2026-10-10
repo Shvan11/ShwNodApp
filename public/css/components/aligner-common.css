@@ -2564,6 +2564,43 @@ a.archform-btn {
     opacity: 1;
 }
 
+/* A scan card opens the 3D viewer; its download is this corner button (the delete
+   button's twin, on the other side). */
+.aligner-photo-download-btn {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: var(--primary-fill);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.75rem;
+    text-decoration: none;
+    z-index: 2;
+}
+
+.aligner-photo-card:hover .aligner-photo-download-btn,
+.aligner-photo-card:focus-within .aligner-photo-download-btn {
+    opacity: 1;
+}
+
+.aligner-photo-download-btn:hover {
+    background: var(--primary-fill-hover);
+    color: white;
+}
+
+.aligner-photo-download-btn:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
+}
+
 .aligner-photo-info-overlay {
     position: absolute;
     bottom: 0;

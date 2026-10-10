@@ -3,16 +3,24 @@
  * carries its upload date under the name — a set collects uploads over several
  * visits, and the date is how staff tell the new ones from the old.
  *
- * Each card is a container holding two buttons — view (or download) and delete.
+ * Each card is a container holding sibling buttons — view (or download) and delete.
  * It used to be one `role="button"` card with the delete button nested inside, so
  * Enter on Delete bubbled up and opened the viewer instead (FE-F17-4).
+ *
+ * A scan file (STL / PLY / ZIP) opens in the 3D viewer; its download moved to a
+ * small button on the card. The viewer reads the bytes through the server
+ * (`…/photos/content`): the presigned R2 URL is cross-origin and the bucket's CORS
+ * admits only the doctor portal.
  */
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { alignerSetPhotosQuery } from '@/query/queries';
 import { deleteJSON, httpErrorMessage } from '@/core/http';
 import { invalidateAligner } from '@/query/aligner';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { useToast } from '../../../contexts/ToastContext';
+import ScanViewerModal, { type ScanFile } from '../../../components/react/scan-viewer/ScanViewerModal';
+import { scanFormat } from '../../../components/react/scan-viewer/scanFormats';
 import type { AlignerPhoto } from '../aligner.types';
 import { fileIconClass, formatSetDate, formatSetDateTime } from './setHelpers';
 import styles from '../PatientSets.module.css';
@@ -26,6 +34,7 @@ export default function SetAttachments({ setId, onViewPhotos }: SetAttachmentsPr
     const confirm = useConfirm();
     const toast = useToast();
     const { data, isPending, isError, refetch } = useQuery(alignerSetPhotosQuery(setId));
+    const [viewingScan, setViewingScan] = useState<AlignerPhoto | null>(null);
 
     if (isPending) {
         return (
@@ -53,6 +62,13 @@ export default function SetAttachments({ setId, onViewPhotos }: SetAttachmentsPr
     const all = data.photos;
     const imagePhotos = all.filter((p) => p.path.includes('/photos/') || !p.path.includes('/files/'));
     const fileAttachments = all.filter((p) => p.path.includes('/files/'));
+    // The viewer lists every scan of the set, so an upper and a lower can be shown together.
+    const scans = fileAttachments.filter((f) => scanFormat(f.file_name) !== null);
+    const scanFiles: ScanFile[] = scans.map((f) => ({
+        url: `/api/aligner/sets/${setId}/photos/content?path=${encodeURIComponent(f.path)}`,
+        name: f.file_name,
+        size: f.file_size,
+    }));
 
     // The delete removes the DOCTOR's upload from the portal's storage for good —
     // the prompt says so, and says "file" for a scan (FE-F17-11).
@@ -124,18 +140,44 @@ export default function SetAttachments({ setId, onViewPhotos }: SetAttachmentsPr
                     <div className="aligner-photos-grid">
                         {fileAttachments.map((file) => (
                             <div key={file.path} className="aligner-photo-card">
-                                <a
-                                    className="aligner-photo-view"
-                                    href={file.view_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title={`Download ${file.file_name}`}
-                                >
-                                    <span className="aligner-file-icon-placeholder">
-                                        <i className={fileIconClass(file)} aria-hidden="true"></i>
-                                    </span>
-                                    <AttachmentCaption attachment={file} />
-                                </a>
+                                {scanFormat(file.file_name) ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            className="aligner-photo-view"
+                                            onClick={() => setViewingScan(file)}
+                                            title={`View ${file.file_name} in 3D`}
+                                        >
+                                            <span className="aligner-file-icon-placeholder">
+                                                <i className={fileIconClass(file)} aria-hidden="true"></i>
+                                            </span>
+                                            <AttachmentCaption attachment={file} />
+                                        </button>
+                                        <a
+                                            className="aligner-photo-download-btn"
+                                            href={file.view_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            title="Download file"
+                                            aria-label={`Download file ${file.file_name}`}
+                                        >
+                                            <i className="fas fa-download" aria-hidden="true"></i>
+                                        </a>
+                                    </>
+                                ) : (
+                                    <a
+                                        className="aligner-photo-view"
+                                        href={file.view_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={`Download ${file.file_name}`}
+                                    >
+                                        <span className="aligner-file-icon-placeholder">
+                                            <i className={fileIconClass(file)} aria-hidden="true"></i>
+                                        </span>
+                                        <AttachmentCaption attachment={file} />
+                                    </a>
+                                )}
                                 <button
                                     type="button"
                                     className="aligner-photo-delete-btn"
@@ -150,6 +192,15 @@ export default function SetAttachments({ setId, onViewPhotos }: SetAttachmentsPr
                     </div>
                 )}
             </div>
+
+            {viewingScan && (
+                <ScanViewerModal
+                    key={viewingScan.path}
+                    files={scanFiles}
+                    initialIndex={Math.max(0, scans.findIndex((s) => s.path === viewingScan.path))}
+                    onClose={() => setViewingScan(null)}
+                />
+            )}
         </div>
     );
 }

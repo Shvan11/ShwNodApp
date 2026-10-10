@@ -20,7 +20,7 @@ Everything lives in PostgreSQL (`shwan`), keyed by `person_id`. `types/db.d.ts`
 |-------|---------|
 | `time_points` | One row per photo session — `tp_code` (sequential per patient, the authoritative handle), `tp_description` (`Initial`/`Progress`/`Final`/`Retention`), `tp_date_time` (a `date`, wall-clock). |
 | `time_point_images` | One row per view image — `image_type` (2-digit view code, e.g. `10`/`22`), `image_file`, `image_date`. FK → `time_points` (`ON DELETE CASCADE`). Unique on `(time_point_id, image_type)`. |
-| `image_types` | Code→label dictionary (e.g. `10`=Facial Right, `22`=IntraOral Center, `51`=X-ray Panoramic). Reference only; not FK-enforced. |
+| `image_types` | Dolphin's slot-code dictionary: its 34 codes with Dolphin's names and ids (e.g. `10`=Facial Right, `22`=IntraOral Center, `51`=X-ray Panoramic), plus `25`/`60`/`61`, which hold images here but aren't Dolphin types (added 2026-10-09). `label` is the clinic's own name for a slot (Settings → Lookups → Photo Slot Names; NULL = built-in). Reference only; not FK-enforced. Only the Dolphin sink reads it, but **keep it when that sink goes**: it is the only record of what a legacy `.Inn` code means. |
 
 > **Date gotcha:** `tp_date_time` is a PG `date` (WITHOUT time zone). The centralized
 > `pg` parser (see `services/database/kysely.ts`) already returns `date` columns as a
@@ -81,6 +81,19 @@ then offers both re-edit routes: **Continue editing** (its tagged original, fram
 saved — offered only while that original is still the file the record names, by name +
 mtime) and **Start over from original** (default framing). A view saved without a record
 offers only Start over, and the menu says why.
+
+**Re-crop.** One route needs no original: **Recrop the saved photo** frames the saved
+view itself, so a Dolphin-era view, or one whose original is gone, can still be
+re-framed. It opens in the largest frame of the view's aspect, centred
+(`framing.ts#coverArea`): Dolphin's renders are often about 1 % off the aspects the editor
+renders, so no frame holds all of one, and a whole-photo frame used to read as a change
+the moment it opened. Save cuts the saved render in place (a crop of a crop: it can tighten, turn
+and straighten, but not take in more of the picture) and records no framing, since the
+render it was framed on is the one it replaces. The photo grid's right-click **Re-crop**
+opens the editor at `?recrop={view}`: that view is selected and, once the editor has read
+what is saved (gallery, framing, session folder — none still refetching), opens in its
+cropper framed as it is now — over its original when the save recorded the framing
+(Continue editing), else over the saved photo (`usePhotoEditorState.ts`, `RECROP`).
 
 **What counts as a change.** A slot is *unsaved* only when Save would change what is on
 disk: a newly placed photo, or a re-opened one whose framing moved from the saved one
@@ -167,6 +180,76 @@ code minus the leading `i`).
 around `logo.png` in the centre (a client-only layout concern; `getImageSizes` never
 returns the logo). The full set of codes the data may contain is in `image_types`.
 
+### Dolphin's other slots — legacy
+
+The 8 views are 8 of Dolphin's 34 slot codes. The others hold about 1,000 of this
+clinic's images (2026-10), all made in Dolphin:
+
+- **X-rays**: `51` OPG (~690), `50` lateral ceph (~160), `01` ceph (19), and a few
+  frontal, occlusal and periapical films in `52`–`57`.
+- **Close-ups**: Dolphin has no close-up type, so they went into spare slots. **Smile
+  close-ups are in `02`** (Dolphin's "Ceph Front", ~100), intraoral close-ups in `25`,
+  `60` and `61` (codes Dolphin's table doesn't define).
+- A handful in `00`, `04`, `33` and `40`–`42`.
+
+The working-files listing returns them with the 8 views. The grid flags a session that
+has some (a tab icon and a "+ …" chip) and the Working files page shows them. The app
+never writes these slots; the X-rays page reads the patient's `OPG` folder instead.
+
+**Slot names are the clinic's.** What a spare slot holds was each clinic's choice, so a
+clinic names its slots in Settings → Lookups → Photo Slot Names (`image_types.label`,
+`routes/api/photo-slot.routes.ts`; this clinic: `02` = "Smile close-up"). A slot without
+a name shows its built-in one: the X-ray name (`shared/photo-views.ts#XRAY_SLOT_LABELS`)
+or "Image". The working-files listing carries each entry's `label`, which is how the
+Working files page and the grid's chip and tab tooltip get it. The 8 grid views can't be
+renamed. The editor lists only codes some photo uses, and appears only on an install
+that has any.
+
+### Dolphin's originals (`.vNN` "V files") — legacy, being phased out
+
+A slot Dolphin filled has two files in `working/`: the image (`.iNN`, cropped/rotated,
+what every screen shows) and Dolphin's untouched original of it (`.vNN`: the full camera
+frame or X-ray; JPEG, some TIFF/BMP/PNG). The app never writes a `.vNN` (its originals
+live in the session folder), so they exist only for Dolphin-era slots and are being
+phased out. Don't build features on them.
+
+- The Working files page lists each `.vNN` right after its image, tagged "V file"
+  (`original: true` in the listing). The content route sniffs the bytes
+  (`utils/file-mime.ts#sniffImageMime`): TIFF is shown as PNG, bytes that aren't an image
+  are download-only. sharp can't read BMP, so those tiles show an icon.
+- **Image and original are a pair: every delete takes both, to the patient's trash**
+  (`clinic1/.trash/{pid}/{stamp}/working/`): the Working files page's Delete (named by
+  either file; both or neither), the editor's Remove, and a session delete (*cropped* →
+  the 8 views; *entry*/*all* → every slot of the session, so nothing is left under a code
+  the next session may reuse). A patient delete purges them with everything else. Each
+  confirm names the V files only when the slot or session has some.
+- **A `.vNN` without its image is not necessarily garbage.** In a session that still
+  exists it is usually the only copy of a view the session no longer shows (an OPG, a
+  buccal, a frontal): 186 of the 193 such sessions found in 2026-10 had no originals
+  folder. Check the session before removing one, and when V files are phased out, move
+  these into the session's originals folder rather than delete them.
+- 2026-10-09: a cleanup moved the 289 `.vNN` that had no image to the trash (manifest
+  `clinic1/.trash/orphaned-v-files-2026-10-09T15-15-56-542Z.csv`). 272 of them were in
+  sessions that still exist and were put back the same day
+  (`restored-v-files-2026-10-09T17-47-08-283Z.csv`); left in the trash are the 16 whose
+  session is gone and `72101.V60`, whose image was deleted from the Working files page.
+  After a per-file review, 268 of the 272 became their slot's image (`.Vnn` → `.Inn`;
+  the 15 TIFF and 1 BMP written as JPEG, their originals to the trash) with a photo record
+  each, dated like the session's other photos, and 4 went to the trash
+  (`v-file-choices-applied-2026-10-09T19-10-56-187Z.csv`, `…T19-11-18-989Z.csv`). No live
+  session was left with a `.vNN` missing its image.
+  The 59 that became an occlusal view (`i23`/`i24`) were Dolphin's raw mirror shots, so they
+  showed the arch reversed. 57 were flipped vertically the same evening, as Dolphin's own
+  renders are (each original to the patient's trash; manifest
+  `occlusal-flips-2026-10-09T19-59-17-962Z.csv`); `9301.I23` (not an occlusal view) and
+  `80100.I24` (shot without the mirror) were already right. Dolphin-era slot mix-ups seen
+  then: `78000.I23`/`.I24` hold each other's arch, `90601.I24` is an upper occlusal, and
+  `80100.I23` is a second lower one.
+  The 51 slot files whose session no longer existed (deleted patients and sessions, a
+  `00.*` set with no patient number, and byte-identical copies of patient 304's sessions
+  10/11 left under the pre-fix `{id}0{tp}` name) were trashed too; manifest
+  `clinic1/.trash/sessionless-working-files-2026-10-09T15-29-48-378Z.csv`.
+
 ---
 
 ## 4. Related paths & files
@@ -181,6 +264,7 @@ returns the logo). The full set of codes the data may contain is in `image_types
 | Framing record: XMP encode/decode (pure) + reads | `services/imaging/photo-framing-xmp.ts`, `photo-framing.service.ts` |
 | Editor framing maths (dirty check, white edge, resolution) | `public/js/components/react/photo-editor/framing.ts` |
 | View-image sizing + `/DolImgs` static mount | `services/imaging/index.ts`, `index.ts` |
+| Working gallery: list/serve/delete a patient's slot files (image + V-file pairs) | `services/files/working-files.service.ts`, `services/imaging/photo-cleanup.service.ts` |
 | View codes + original-tag convention (shared SSoT) | `shared/photo-views.ts` |
 | Editor UI | `public/js/components/react/photo-editor/`, `PhotoSessionDialog.tsx` |
 | Endpoint contracts | `shared/contracts/photo-editor.contract.ts` |

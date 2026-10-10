@@ -1,0 +1,52 @@
+/* Settings → Lookups → Photo Slot Names. The table itself is the shared lookup-editor sheet
+   (`.lookup-table`, loaded by LookupsSettings); these are the editor's own pieces. */
+
+.intro {
+  margin: 0 0 var(--spacing-md);
+  max-width: 72ch;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.count {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.nameCell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.nameInput {
+  flex: 1 1 14rem;
+  min-width: 10rem;
+  max-width: 22rem;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.toggle {
+  margin-top: var(--spacing-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-color);
+  font: inherit;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  text-decoration: underline;
+}
+
+.error {
+  margin: 0;
+  color: var(--error-700);
+}

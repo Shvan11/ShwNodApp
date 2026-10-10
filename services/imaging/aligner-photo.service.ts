@@ -152,14 +152,51 @@ export class PhotoOwnershipError extends Error {
   }
 }
 
+/** No object under that key — deleted by the doctor since the list was read. */
+export class PhotoNotFoundError extends Error {
+  constructor(message = 'Photo not found.') {
+    super(message);
+    this.name = 'PhotoNotFoundError';
+  }
+}
+
+/** Refuse a key outside `sets/<id>/` — the only check standing between a set id and another set's files. */
+function assertKeyBelongsToSet(setId: number, key: string): void {
+  if (!key.startsWith(`sets/${setId}/`)) {
+    throw new PhotoOwnershipError();
+  }
+}
+
+/** Upper bound on one attachment read (the portal caps an upload at 100 MB; a scan is ~10 MB). */
+const READ_TIMEOUT_MS = 120_000;
+
+/**
+ * Read one attachment of a set into memory, for the staff app's 3D scan viewer.
+ * Buffered like the 3Shape download proxy: portal files are at most 100 MB.
+ */
+export async function readPhotoForSet(setId: number, key: string): Promise<{ bytes: Buffer; fileName: string }> {
+  assertKeyBelongsToSet(setId, key);
+
+  const client = getS3Client();
+  try {
+    const response = await client.send(
+      new GetObjectCommand({ Bucket: r2Config.bucketName, Key: key }),
+      { abortSignal: AbortSignal.timeout(READ_TIMEOUT_MS) }
+    );
+    if (!response.Body) throw new PhotoNotFoundError();
+    const bytes = Buffer.from(await response.Body.transformToByteArray());
+    return { bytes, fileName: displayName(key.slice(key.lastIndexOf('/') + 1)) };
+  } catch (error) {
+    if ((error as { name?: string }).name === 'NoSuchKey') throw new PhotoNotFoundError();
+    throw error;
+  }
+}
+
 /**
  * Delete a case photo belonging to an aligner set.
  */
 export async function deletePhotoForSet(setId: number, key: string): Promise<void> {
-  const expectedPrefix = `sets/${setId}/`;
-  if (!key.startsWith(expectedPrefix)) {
-    throw new PhotoOwnershipError();
-  }
+  assertKeyBelongsToSet(setId, key);
 
   const client = getS3Client();
 

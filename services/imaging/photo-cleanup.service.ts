@@ -3,15 +3,17 @@
  * artifacts when it is edited (folder rename) or deleted.
  *
  * A timepoint has two footprints (see docs/photo-sessions.md):
- *   1. Rendered gallery files in the shared `working/` dir, named
- *      `{pid}{tpCode:02}.{view}` — keyed by tpCode, what getImageSizes reads.
+ *   1. Slot files in the shared `working/` dir, named `{pid}{tpCode:02}.{slot}`
+ *      — keyed by tpCode: each slot's image (`.iNN`, what getImageSizes reads) and,
+ *      for a slot Dolphin filled, its untouched original (`.vNN`).
  *   2. An optional originals folder `clinic1/{pid}/{tpName}_{DD-MM-YYYY}/` —
  *      keyed by name + date (the rename/delete of THAT folder is done via the
  *      file-explorer service; this module only computes its name).
  */
 import fs from 'fs/promises';
 import { log } from '../../utils/logger.js';
-import { workingFileNameVariants, workingFilePath } from '../files/clinic-paths.js';
+import { workingFilePath } from '../files/clinic-paths.js';
+import { listSlotFiles, moveWorkingFilesToTrash } from '../files/working-files.service.js';
 import { VIEW_CODES } from '../../shared/photo-views.js';
 import { sessionFolderName } from '../../shared/photo-session-folder.js';
 
@@ -27,48 +29,51 @@ export function timepointFolderName(tpName: string | null, tpDate: string | null
 }
 
 /**
- * Permanently remove a timepoint's rendered gallery files from the shared
- * `working/` dir: `working/{pid}{tpCode:02}.{view}` for every known view code.
- * Best-effort per file (`force` ⇒ a missing file is fine); a real error (e.g.
- * a locked file) is logged but never thrown, so DB-authoritative deletion isn't
- * blocked by a filesystem hiccup. Names come from `workingFileNameVariants` over
- * the shared VIEW_CODES, so this clears exactly what the renderer
- * (photo-render.service.ts) and getImageSizes write/read — including the legacy
- * uppercase `.INN` spelling, and adding a view code to the SSoT can never leave
- * an orphan here.
+ * Move a timepoint's slot files from the shared `working/` dir to the patient's trash
+ * (`clinic1/.trash/{pid}/{stamp}/working/`, restorable): each slot's image AND Dolphin's
+ * original of it, so a delete never leaves a `.vNN` behind without its image.
+ *
+ * `slots` — `'views'`: the 8 grid views only (the session's *Delete cropped photos*,
+ * which keeps the session and its X-rays); `'all'`: every slot of the session, X-rays
+ * and Dolphin's other slots too (the session itself goes, and an image left under its
+ * code would turn up in the next session given that code).
+ *
+ * Best-effort per file: a locked file is logged and left, never thrown, so the
+ * DB-authoritative deletion isn't blocked by a filesystem hiccup. Names are the
+ * session's exact stem (working-files.service.ts#listSlotFiles), any spelling.
  */
-export async function deleteWorkingFilesForTimepoint(
+export async function trashWorkingFilesForTimepoint(
   personId: number,
-  tpCode: number
-): Promise<void> {
-  const files = VIEW_CODES.flatMap((view) =>
-    workingFileNameVariants(personId, tpCode, view).map(workingFilePath)
-  );
-  await Promise.all(
-    files.map(async (file) => {
-      try {
-        await fs.rm(file, { force: true });
-      } catch (err) {
-        log.warn('[TimePoint] failed to remove working file', {
-          file,
-          error: (err as Error).message,
-        });
-      }
-    })
-  );
+  tpCode: number,
+  slots: 'views' | 'all'
+): Promise<string[]> {
+  const names = await listSlotFiles(personId, [tpCode], slots === 'views' ? VIEW_CODES : undefined);
+  return moveWorkingFilesToTrash(personId, names, { allOrNothing: false });
 }
 
 /**
- * Remove the rendered `working/` gallery files for ALL of a patient's timepoints
- * (used by the patient delete — patient-queries.ts#deletePatient only removes DB
- * rows + the originals folder, not these flat shared files). Takes the patient's
- * tpCodes (read before the DB cascade dropped them) and clears each via the
- * exact-filename helper — exact names, never a `{personId}*` glob, because
- * personIds can prefix each other (e.g. 71 vs 710) and collide in that scheme.
+ * Permanently remove ALL of a patient's slot files from `working/` — every slot of
+ * every session, images and Dolphin's originals alike (used by the patient delete —
+ * patient-queries.ts#deletePatient only removes DB rows, and the patient folder goes
+ * for good, so these do too). Takes the patient's tpCodes (read before the DB cascade
+ * dropped them) and matches exact stems, never a `{personId}*` glob, because personIds
+ * can prefix each other (e.g. 71 vs 710) and collide in that scheme.
  */
 export async function deleteWorkingFilesForPatient(
   personId: number,
   tpCodes: number[]
 ): Promise<void> {
-  await Promise.all(tpCodes.map((tpCode) => deleteWorkingFilesForTimepoint(personId, tpCode)));
+  const names = await listSlotFiles(personId, tpCodes);
+  await Promise.all(
+    names.map(async (name) => {
+      try {
+        await fs.rm(workingFilePath(name), { force: true });
+      } catch (err) {
+        log.warn('[TimePoint] failed to remove working file', {
+          name,
+          error: (err as Error).message,
+        });
+      }
+    })
+  );
 }

@@ -38,17 +38,23 @@ interface Props {
   showFullPath?: boolean;
   /** Shown instead of the name/path (the working-files view names a tile by its slot, "OPG"). */
   displayName?: string;
+  /**
+   * A short mark in the tile's corner, with a hover explanation (the working-files view
+   * tags Dolphin's originals "V file"). Visual only: say the same in `displayName`.
+   */
+  badge?: { label: string; title: string };
   /** When the photo was taken (EXIF, 'YYYY-MM-DDTHH:MM:SS'), shown under the name. */
   takenAt?: string | null;
   /** Selection mode: tile toggles selection instead of opening. */
   selectMode?: boolean;
   selected?: boolean;
-  /** Read-only: hide rename/delete (download stays). Used by the working-files view. */
-  readOnly?: boolean;
   /** Override how content/thumbnail/download URLs are built (default: patient files). */
   buildUrl?: UrlBuilder;
   onOpen: (entry: FileEntry) => void;
-  /** Rename / Delete buttons on the tile — only without `onMenu`, which holds them instead. */
+  /**
+   * Rename / Delete buttons on the tile, each shown when given — only without `onMenu`,
+   * which holds them instead. The working-files view passes Delete alone.
+   */
   onRename?: (entry: FileEntry) => void;
   onDelete?: (entry: FileEntry) => void;
   onToggleSelect: (entry: FileEntry) => void;
@@ -80,10 +86,10 @@ const FileEntryTile = ({
   view,
   showFullPath,
   displayName,
+  badge,
   takenAt,
   selectMode,
   selected,
-  readOnly,
   buildUrl = buildContentUrl,
   onOpen,
   onRename,
@@ -191,6 +197,12 @@ const FileEntryTile = ({
         </span>
       )}
 
+      {badge && (
+        <span className={styles.entryBadge} title={badge.title} aria-hidden="true">
+          {badge.label}
+        </span>
+      )}
+
       <div className={styles.entryVisual}>{visual}</div>
 
       <div className={styles.entryInfo}>
@@ -254,27 +266,27 @@ const FileEntryTile = ({
               <i className="fas fa-ellipsis" aria-hidden="true" />
             </button>
           )}
-          {!readOnly && !onMenu && onRename && onDelete && (
-            <>
-              <button
-                type="button"
-                className={styles.iconButton}
-                onClick={() => onRename(entry)}
-                title="Rename"
-                aria-label={`Rename ${entry.name}`}
-              >
-                <i className="fas fa-pen" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className={`${styles.iconButton} ${styles.danger}`}
-                onClick={() => onDelete(entry)}
-                title="Delete"
-                aria-label={`Delete ${entry.name}`}
-              >
-                <i className="fas fa-trash-can" aria-hidden="true" />
-              </button>
-            </>
+          {!onMenu && onRename && (
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => onRename(entry)}
+              title="Rename"
+              aria-label={`Rename ${entry.name}`}
+            >
+              <i className="fas fa-pen" aria-hidden="true" />
+            </button>
+          )}
+          {!onMenu && onDelete && (
+            <button
+              type="button"
+              className={`${styles.iconButton} ${styles.danger}`}
+              onClick={() => onDelete(entry)}
+              title="Delete"
+              aria-label={`Delete ${entry.name}`}
+            >
+              <i className="fas fa-trash-can" aria-hidden="true" />
+            </button>
           )}
         </div>
       )}

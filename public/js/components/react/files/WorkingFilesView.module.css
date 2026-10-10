@@ -1,4 +1,4 @@
-/* Responsive tile grid for the read-only working-files view. The tile visuals
+/* Responsive tile grid for the working-files view. The tile visuals
    themselves come from FileExplorer.module.css (reused via FileEntryTile). */
 .grid {
   display: grid;

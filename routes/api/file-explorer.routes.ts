@@ -1,7 +1,7 @@
 /**
  * Patient File Explorer routes.
  *
- * Per-patient filesystem browser: list/flat-walk, content (inline preview +
+ * Per-patient filesystem browser: list/flat-walk, properties, content (inline preview +
  * download + thumbnail), and full management (upload, mkdir, rename, move,
  * copy, soft delete). All path safety lives in services/files/file-explorer.service.ts.
  *
@@ -14,6 +14,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import multer from 'multer';
 import path from 'path';
 import { createReadStream, promises as fsp } from 'fs';
+import sharp from 'sharp';
 import { log } from '../../utils/logger.js';
 import { ErrorResponses, sendError, sendData } from '../../utils/error-response.js';
 import { createUpload, uploadErrorMessage } from '../../middleware/upload.js';
@@ -22,7 +23,7 @@ import { CLINICAL_ROLES } from '../../shared/auth/roles.js';
 import { validate } from '../../middleware/validate.js';
 import { timeouts } from '../../middleware/timeout.js';
 import * as fileExplorer from '../../shared/contracts/file-explorer.contract.js';
-import { getFileMimeType } from '../../utils/file-mime.js';
+import { getFileMimeType, sniffImageMime } from '../../utils/file-mime.js';
 import { imageCacheControl, REVALIDATE } from '../../utils/image-cache-control.js';
 import { folderOwner } from '../../shared/photo-session-folder.js';
 import { getTimePoints } from '../../services/database/queries/timepoint-queries.js';
@@ -30,6 +31,7 @@ import {
   FileExplorerError,
   listDirectory,
   walkFlat,
+  getEntryProperties,
   resolveFileForServe,
   createFolder,
   renameEntry,
@@ -45,8 +47,16 @@ import { getThumbnail, getWorkingThumbnail } from '../../services/files/thumbnai
 import {
   listPatientWorkingFiles,
   resolveWorkingFile,
+  trashWorkingFile,
 } from '../../services/files/working-files.service.js';
 import { getTimePointCodes } from '../../services/database/queries/timepoint-queries.js';
+import { getPhotoSlotLabels } from '../../services/database/queries/photo-slot-queries.js';
+import {
+  getNativeTimePoint,
+  deleteNativeTimePointImage,
+} from '../../services/database/queries/native-timepoint-queries.js';
+import { timepointFolderName } from '../../services/imaging/photo-cleanup.service.js';
+import { untagOriginalForView } from '../../services/imaging/photo-original-tags.js';
 
 const router = Router();
 
@@ -199,6 +209,25 @@ router.get(
   }
 );
 
+// One entry's Properties (right-click → Properties): size, dates, a folder's counts.
+router.get(
+  '/patients/:personId/files/properties',
+  validate({ params: fileExplorer.properties.params, query: fileExplorer.properties.query }),
+  async (
+    req: Request<PersonIdParams, unknown, unknown, fileExplorer.PropertiesQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { personId } = req.params;
+      const relPath = req.query.path ?? '';
+      const props = await getEntryProperties(personId, relPath);
+      sendData(res, fileExplorer.properties.response, props);
+    } catch (err) {
+      handleError(res, err, 'properties');
+    }
+  }
+);
+
 // ===========================================
 // CONTENT  (read — inline preview / download / thumbnail)
 // ===========================================
@@ -244,6 +273,14 @@ router.get(
 
       // Always revalidated (a 304 when unchanged), and never `public` — PHI.
       res.setHeader('Cache-Control', REVALIDATE);
+
+      // Browsers (bar Safari) can't decode TIFF, so it is viewed as a lossless,
+      // full-resolution PNG. A download still gets the original file.
+      if (!download && mime === 'image/tiff') {
+        res.type('png').send(await sharp(abs).rotate().png().toBuffer());
+        return;
+      }
+
       const sendOpts = {
         dotfiles: 'allow' as const,
         acceptRanges: true,
@@ -287,8 +324,9 @@ router.get(
 );
 
 // ===========================================
-// WORKING FILES  (read-only — this patient's .iNN images in the shared working/ dir:
-//                 the 8 grid views and every other Dolphin slot, e.g. OPG/ceph)
+// WORKING FILES  (this patient's slot files in the shared working/ dir: the 8 grid
+//                 views and every other Dolphin slot, e.g. OPG/ceph, each as its .iNN
+//                 image and Dolphin's .vNN original — list, content, and a per-slot delete)
 // ===========================================
 
 router.get(
@@ -300,7 +338,9 @@ router.get(
       // this patient can actually own (a `{personId}…` prefix match would pull in
       // any patient whose id starts with `{personId}`).
       const tpCodes = await getTimePointCodes(personId);
-      const entries = await listPatientWorkingFiles(personId, tpCodes);
+      const [files, slotNames] = await Promise.all([listPatientWorkingFiles(personId, tpCodes), getPhotoSlotLabels()]);
+      // Each slot under the clinic's own name for it, where it set one (Settings → Lookups).
+      const entries = files.map((e) => ({ ...e, label: slotNames.get(e.view) ?? null }));
       log.info('[Files] working-list', {
         userId: req.session?.userId,
         personId,
@@ -353,9 +393,24 @@ router.get(
         return;
       }
 
-      // ── Full file branch (working `.iNN` images are JPEG bytes) ──
+      // ── Full file branch ──
+      // The extension says nothing (`.iNN`, `.vNN`), so the bytes give the type: an
+      // image is always JPEG, Dolphin's original of it JPEG, TIFF, BMP or PNG. Bytes that
+      // aren't an image are only ever offered as a download, never served inline.
       log.info('[Files] working-content', { userId: req.session?.userId, personId, name, download });
       res.setHeader('Cache-Control', REVALIDATE);
+      const mime = await sniffImageMime(abs);
+      if (!download && !mime) {
+        sendError(res, 415, 'Not an image a browser can show — download it instead');
+        return;
+      }
+      // Browsers (bar Safari) can't decode TIFF, so it is viewed as a lossless,
+      // full-resolution PNG, as on the Files page. A download gets the original file.
+      if (!download && mime === 'image/tiff') {
+        res.type('png').send(await sharp(abs).rotate().png().toBuffer());
+        return;
+      }
+      const type = mime ?? 'application/octet-stream';
       const sendOpts = {
         dotfiles: 'allow' as const,
         acceptRanges: true,
@@ -364,18 +419,64 @@ router.get(
       };
       const onDone = (err: Error | undefined): void => {
         if (!err || res.headersSent) return;
-        streamFileFallback(req, res, abs, 'image/jpeg', download, name).catch(() => {
+        streamFileFallback(req, res, abs, type, download, name).catch(() => {
           if (!res.headersSent) ErrorResponses.serverError(res, 'Failed to serve file');
         });
       };
       if (download) {
         res.download(abs, name, sendOpts, onDone);
       } else {
-        res.setHeader('Content-type', 'image/jpeg');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-type', type);
         res.sendFile(abs, sendOpts, onDone);
       }
     } catch (err) {
       handleError(res, err, 'working-content');
+    }
+  }
+);
+
+/**
+ * DELETE /patients/:personId/working-files?name=
+ * The Working files page's Delete, for one slot (a grid view or an OPG), named by
+ * either of its files: the image (`.iNN`) and Dolphin's original of it (`.vNN`) go to
+ * the patient's trash together, and the slot's `time_point_images` row is deleted.
+ * Deleting the row is what removes the image from Dolphin as well: the Dolphin sink
+ * deletes the `TimePointImages` row it maps to (the client's confirm says so). The
+ * files move first, both or neither, so a file Dolphin holds open fails the request
+ * with nothing changed.
+ */
+router.delete(
+  '/patients/:personId/working-files',
+  authorize(CLINICAL_ROLES),
+  validate({ params: fileExplorer.deleteWorkingFile.params, query: fileExplorer.deleteWorkingFile.query }),
+  async (
+    req: Request<PersonIdParams, unknown, unknown, fileExplorer.DeleteWorkingFileQuery>,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const personId = Number.parseInt(req.params.personId, 10);
+      const { name } = req.query;
+      const tpCodes = await getTimePointCodes(req.params.personId);
+      const { tpCode, view, removed } = await trashWorkingFile(personId, name, tpCodes);
+
+      const tp = await getNativeTimePoint(personId, tpCode);
+      if (tp) await deleteNativeTimePointImage(tp.timePointId, view.slice(1));
+
+      // A grid view's original returns to the photo editor's Sequence Files panel, as
+      // after the editor's own Remove (a no-op for the other slots). Best-effort: the
+      // image and its record are already gone.
+      const folder = tp ? timepointFolderName(tp.tp_description, tp.tp_date_time) : null;
+      if (folder) {
+        await untagOriginalForView(personId, folder, view).catch((err: Error) => {
+          log.warn('[Files] working-delete: untag original failed', { personId, folder, view, error: err.message });
+        });
+      }
+
+      log.info('[Files] working-delete', { userId: req.session?.userId, personId, name, tpCode, view, removed });
+      sendData(res, fileExplorer.deleteWorkingFile.response, { name, removed }, 'Photo deleted');
+    } catch (err) {
+      handleError(res, err, 'working-delete');
     }
   }
 );

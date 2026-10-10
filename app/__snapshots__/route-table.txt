@@ -105,9 +105,11 @@ GET     /api/patients/:personId/photos/visibility  [authorize(admin|front_desk|c
 POST    /api/patients/:personId/photos/visibility  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 MOUNT   /api
 GET     /api/patients/:personId/files
+GET     /api/patients/:personId/files/properties  [validate(params,query)]
 GET     /api/patients/:personId/files/content
 GET     /api/patients/:personId/working-files
 GET     /api/patients/:personId/working-files/content
+DELETE  /api/patients/:personId/working-files  [authorize(admin|front_desk|clinical) -> validate(params,query)]
 POST    /api/patients/:personId/files/upload  [authorize(admin|front_desk|clinical) -> validate(params) -> timeout(120000ms) -> runUpload]
 POST    /api/patients/:personId/files/folder  [authorize(admin|front_desk|clinical) -> validate(params,body)]
 POST    /api/patients/:personId/files/rename  [authorize(admin|front_desk|clinical) -> validate(params,body)]
@@ -115,6 +117,9 @@ DELETE  /api/patients/:personId/files  [authorize(admin|front_desk|clinical) -> 
 POST    /api/patients/:personId/files/delete-batch  [authorize(admin|front_desk|clinical) -> validate(params) -> timeout(120000ms)]
 POST    /api/patients/:personId/files/move  [authorize(admin|front_desk|clinical) -> validate(params,body) -> timeout(120000ms)]
 POST    /api/patients/:personId/files/copy  [authorize(admin|front_desk|clinical) -> validate(params,body) -> timeout(600000ms)]
+MOUNT   /api
+GET     /api/photo-slots  [authorize(admin|front_desk)]
+PUT     /api/photo-slots/:code  [authorize(admin|front_desk) -> validate(params,body)]
 MOUNT   /api
 GET     /api/slideshow-configs  [validate(query)]
 POST    /api/slideshow-configs  [authorize(admin|front_desk|clinical) -> validate(body)]
@@ -229,6 +234,7 @@ MOUNT   /api
 POST    /api/aligner/sets/:setId/upload-pdf  [authorize(admin|front_desk|clinical) -> validate(params) -> timeout(120000ms) -> multerMiddleware -> handleUploadError]
 DELETE  /api/aligner/sets/:setId/pdf  [authorize(admin|front_desk|clinical) -> validate(params)]
 GET     /api/aligner/sets/:setId/photos  [validate(params)]
+GET     /api/aligner/sets/:setId/photos/content  [validate(params,query)]
 DELETE  /api/aligner/sets/:setId/photos  [authorize(admin|front_desk|clinical) -> validate(params,query)]
 MOUNT   /api
 GET     /api/aligner/archform/patients

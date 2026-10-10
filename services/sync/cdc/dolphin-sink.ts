@@ -248,6 +248,9 @@ export class DolphinSink implements SyncSink {
    * tblImageTypes.dolphin_ityp_id. Misses are cached as null too — an image type with no Dolphin
    * mapping is a permanent fact of the schema, and not caching it re-queried image_types for every
    * single image of that type on every drain.
+   *
+   * This is image_types' only reader, but the table outlives this sink: it is the app's only
+   * record of what a legacy `.Inn` slot code means (docs/photo-sessions.md). Keep it.
    */
   private async resolveItyp(imageType: string | null): Promise<string | null> {
     if (!imageType) return null;

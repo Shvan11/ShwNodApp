@@ -381,6 +381,15 @@ export const getSetPhotos = {
   response: z.object({ photos: z.array(alignerPhotoRow) }),
 } as const;
 
+// GET /api/aligner/sets/:setId/photos/content?path= — one attachment's bytes, served
+// same-origin for the 3D scan viewer (the R2 bucket's CORS only admits the doctor
+// portal, so the staff app can't fetch the presigned URL). Binary: no response schema.
+export const photoContent = {
+  params: setIdParams,
+  query: z.object({ path: z.string().min(1).max(1024) }),
+} as const;
+export type PhotoContentQuery = z.infer<typeof photoContent.query>;
+
 // GET /api/aligner/notes/:noteId/status — { isRead } (or 404).
 export const noteStatus = {
   response: z.object({ isRead: z.boolean() }),

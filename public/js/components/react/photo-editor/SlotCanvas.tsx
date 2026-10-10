@@ -18,7 +18,7 @@ import type { Area, CropperProps, MediaSize, Point } from 'react-easy-crop';
 import styles from './SlotCanvas.module.css';
 import type { CropArea, FramingArea, PhotoViewCode, SlotState } from './photoEditorTypes';
 import { aspectForView, gridLinesForView, labelForView, ZOOM_MIN, ZOOM_MAX, ZOOM_SPEED } from './photoEditorTypes';
-import { buildContentUrl } from '../files/fileHelpers';
+import { buildContentUrl, buildWorkingContentUrl } from '../files/fileHelpers';
 
 /**
  * react-easy-crop, with its cover fit settled BEFORE a media load is measured.
@@ -108,10 +108,18 @@ function Ghost({ url, opacity }: { url: string; opacity: number }): ReactElement
  * The 2048 px proxy or the original, versioned by the listing's mtime: unversioned,
  * a different photo later uploaded under this name was framed from the browser's
  * cached copy of the old one while Save rendered the new one. 2048 must stay in the
- * thumbnail service's ALLOWED_WIDTHS.
+ * thumbnail service's ALLOWED_WIDTHS. A re-crop of the saved photo loads it from the
+ * working gallery instead (by name, versioned by the gallery's mtime).
  */
-function contentUrl(personId: number, relPath: string, proxy: boolean, version: string | null): string {
-  return buildContentUrl(personId, relPath, { thumb: proxy ? 2048 : undefined, v: version ?? undefined });
+function contentUrl(
+  personId: number,
+  relPath: string,
+  fromSaved: boolean,
+  proxy: boolean,
+  version: string | null
+): string {
+  const opts = { thumb: proxy ? 2048 : undefined, v: version ?? undefined };
+  return fromSaved ? buildWorkingContentUrl(personId, relPath, opts) : buildContentUrl(personId, relPath, opts);
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -172,7 +180,9 @@ const SlotCanvas = ({
   // body (react-hooks/set-state-in-effect), and blob revocation stays centralised.
   useEffect(() => {
     let cancelled = false;
-    const base = slot.sourceRelPath ? contentUrl(personId, slot.sourceRelPath, proxyMode, slot.sourceVersion) : null;
+    const base = slot.sourceRelPath
+      ? contentUrl(personId, slot.sourceRelPath, slot.sourceFromSaved, proxyMode, slot.sourceVersion)
+      : null;
     const load: Promise<string | null> =
       !base ? Promise.resolve(null)
       : (!slot.flipH && !slot.flipV) ? Promise.resolve(base)
@@ -195,7 +205,7 @@ const SlotCanvas = ({
     return () => {
       cancelled = true;
     };
-  }, [personId, slot.sourceRelPath, slot.sourceVersion, slot.flipH, slot.flipV, proxyMode]);
+  }, [personId, slot.sourceRelPath, slot.sourceVersion, slot.sourceFromSaved, slot.flipH, slot.flipV, proxyMode]);
 
   // Revoke any outstanding blob on unmount.
   useEffect(() => () => revoke(), []);

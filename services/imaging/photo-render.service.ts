@@ -30,6 +30,7 @@ import type { FramingArea } from '../../shared/contracts/photo-editor.contract.j
 import { getFileCategory } from '../../utils/file-mime.js';
 import { workingFileName, workingFileNameVariants, workingFilePath } from '../files/clinic-paths.js';
 import { resolveFileForServe, FileExplorerError } from '../files/file-explorer.service.js';
+import { trashWorkingSlot } from '../files/working-files.service.js';
 import { log } from '../../utils/logger.js';
 import { framingToXmp } from './photo-framing-xmp.js';
 
@@ -42,8 +43,14 @@ export interface RenderSlotInput {
   personId: number;
   tpCode: number;
   view: string; // 'i10' … 'i24'
-  /** Path relative to clinic1/{personId}/, e.g. "Initial_01-01-2026/IMG_001.jpg". */
-  sourceRelPath: string;
+  /**
+   * Path relative to clinic1/{personId}/, e.g. "Initial_01-01-2026/IMG_001.jpg" — or
+   * null to re-crop the view's own saved render (`working/{pid}{tp:02}.iNN`), for a
+   * view whose original is gone. That render is read whole before its replacement is
+   * written, and carries no framing record: a frame of the old render could never be
+   * reopened, since the old render is what it replaces.
+   */
+  sourceRelPath: string | null;
   flipH: boolean;
   flipV: boolean;
   rotation: number; // degrees (MVP: multiples of 90)
@@ -110,6 +117,22 @@ function clampInt(v: number, lo: number, hi: number): number {
 let tmpSeq = 0;
 
 /**
+ * The view's saved render on disk — the source of a re-crop. Same spelling order as
+ * the gallery (`getImageSizes`), so it is the photo the editor showed.
+ */
+async function findSavedView(personId: number, tpCode: number, view: string): Promise<string> {
+  for (const name of workingFileNameVariants(personId, tpCode, view)) {
+    const abs = workingFilePath(name);
+    try {
+      if ((await fs.stat(abs)).isFile()) return abs;
+    } catch {
+      /* try the next spelling */
+    }
+  }
+  throw new FileExplorerError('Saved photo not found', 404);
+}
+
+/**
  * Render one slot to `working/{personId}{tpCode:02}.{view}` (lowercase, matching
  * getImageSizes). Atomic temp-file + rename on the working/ volume (no EXDEV).
  * Returns the written filename.
@@ -132,10 +155,16 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
   // crop rect R (and thus its native pixel size) is known.
   const aspect = output.width / output.height;
 
-  // Validate + symlink-guard the source under the patient root; images only.
-  const { abs: sourceAbs } = await resolveFileForServe(personId, sourceRelPath);
-  if (getFileCategory(sourceRelPath) !== 'image') {
-    throw new FileExplorerError('Source is not an image', 415);
+  // An original: validate + symlink-guard it under the patient root; images only.
+  // The saved render: found by the slot itself, never by a client-sent path.
+  let sourceAbs: string;
+  if (sourceRelPath !== null) {
+    ({ abs: sourceAbs } = await resolveFileForServe(personId, sourceRelPath));
+    if (getFileCategory(sourceRelPath) !== 'image') {
+      throw new FileExplorerError('Source is not an image', 415);
+    }
+  } else {
+    sourceAbs = await findSavedView(personId, tpCode, view);
   }
 
   const filename = workingFileName(personId, tpCode, view);
@@ -145,9 +174,13 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
   await acquire();
   try {
     const sharpOpts = { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'none' as const };
+    // A re-crop reads the file it is about to replace: take it whole first, so no open
+    // handle on it can block the rename (Windows) and a concurrent save can't swap it
+    // out mid-render. A render is a few MB.
+    const input: string | Buffer = sourceRelPath === null ? await fs.readFile(sourceAbs) : sourceAbs;
 
     // Dimensions AFTER EXIF auto-orient + the requested rotation, to clamp the rect.
-    const meta = await sharp(sourceAbs, sharpOpts).metadata();
+    const meta = await sharp(input, sharpOpts).metadata();
     if (!meta.width || !meta.height) throw new FileExplorerError('Unreadable image', 415);
     let w = meta.width;
     let h = meta.height;
@@ -162,7 +195,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     // original is still this file; the tag rename that follows the render keeps the
     // mtime. The name is the clean one — a re-edit's source is already `{view}-…`.
     let xmp: string | null = null;
-    if (framing && extract) {
+    if (framing && extract && sourceRelPath !== null) {
       const base = path.basename(sourceRelPath);
       const st = await fs.stat(sourceAbs);
       xmp = framingToXmp({
@@ -260,7 +293,7 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
     // mis-crop bug). The mirrored rect + θeff above make this single un-flipped
     // pass produce exactly the mirror image of the desired crop; pipeline B at the
     // bottom flips the output-sized result back.
-    let pipeline = sharp(sourceAbs, sharpOpts).autoOrient();
+    let pipeline = sharp(input, sharpOpts).autoOrient();
     if (rotation % 360 !== 0) pipeline = pipeline.rotate(thetaEff, { background: WHITE });
 
     let out: ReturnType<typeof sharp>;
@@ -332,19 +365,18 @@ export async function renderSlotToWorking(input: RenderSlotInput): Promise<strin
 }
 
 /**
- * Delete a single rendered view file `working/{personId}{tpCode:02}.{view}` (the
- * cropped output) — backs the photo editor's per-view "Remove". Idempotent: a
- * missing file is a no-op. Guards mirror renderSlotToWorking so only a valid
- * (personId, tpCode, view) can ever form the path. Clears the legacy uppercase
- * `.INN` spelling too, so "Remove" empties the slot on a case-sensitive volume
- * as well (see workingFileNameVariants).
+ * Move a single view's files to the patient's trash — backs the photo editor's
+ * per-view "Remove": the rendered view `working/{personId}{tpCode:02}.{view}` (the
+ * cropped output) AND, for a slot Dolphin filled, Dolphin's original of it (`.vNN`),
+ * both or neither, any spelling (working-files.service.ts#trashWorkingSlot).
+ * Idempotent: a slot with no files is a no-op. Guards mirror renderSlotToWorking so
+ * only a valid (personId, tpCode, view) can ever form the names. Returns the names moved.
  */
-export async function deleteWorkingView(personId: number, tpCode: number, view: string): Promise<void> {
+export async function deleteWorkingView(personId: number, tpCode: number, view: string): Promise<string[]> {
   if (!/^\d+$/.test(String(personId))) throw new FileExplorerError('Invalid patient id', 400);
   if (!/^\d+$/.test(String(tpCode))) throw new FileExplorerError('Invalid timepoint code', 400);
   if (!isViewCode(view)) throw new FileExplorerError(`Invalid view code: ${view}`, 400);
-  for (const name of workingFileNameVariants(personId, tpCode, view)) {
-    await fs.rm(workingFilePath(name), { force: true });
-  }
-  log.info('[PhotoEditor] deleted view', { personId, tpCode, view });
+  const removed = await trashWorkingSlot(personId, tpCode, view);
+  log.info('[PhotoEditor] deleted view', { personId, tpCode, view, removed });
+  return removed;
 }
